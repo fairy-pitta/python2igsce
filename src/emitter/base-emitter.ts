@@ -163,6 +163,9 @@ export abstract class BaseEmitter {
   protected formatText(text: string): string {
     let formatted = text;
     
+    // 演算子の変換（Python → IGCSE）
+    formatted = this.convertOperators(formatted);
+    
     // キーワードの大文字化
     if (this.context.formatter.uppercaseKeywords) {
       formatted = this.uppercaseKeywords(formatted);
@@ -173,9 +176,9 @@ export abstract class BaseEmitter {
       formatted = this.addSpaceAroundOperators(formatted);
     }
     
-    // カンマ後のスペース
+    // カンマ後のスペース（文字列リテラル内は除外）
     if (this.context.formatter.spaceAfterComma) {
-      formatted = formatted.replace(/,(?!\s)/g, ', ');
+      formatted = this.addSpaceAfterCommaOutsideStrings(formatted);
     }
     
     return formatted;
@@ -207,6 +210,32 @@ export abstract class BaseEmitter {
   }
 
   /**
+   * 演算子の変換（Python → IGCSE）
+   */
+  private convertOperators(text: string): string {
+    let result = text;
+    
+    // 代入演算子の変換
+    result = result.replace(/\s*=\s*/g, ' ← ');
+    
+    // 比較演算子の変換
+    result = result.replace(/!=/g, '≠');
+    result = result.replace(/<=/g, '≤');
+    result = result.replace(/>=/g, '≥');
+    
+    // 論理演算子の変換
+    result = result.replace(/\band\b/gi, 'AND');
+    result = result.replace(/\bor\b/gi, 'OR');
+    result = result.replace(/\bnot\b/gi, 'NOT');
+    
+    // 算術演算子の変換
+    result = result.replace(/\s*%\s*/g, ' MOD ');
+    result = result.replace(/\s*\/\/\s*/g, ' DIV ');
+    
+    return result;
+  }
+
+  /**
    * 演算子周りのスペース追加
    */
   private addSpaceAroundOperators(text: string): string {
@@ -230,6 +259,40 @@ export abstract class BaseEmitter {
    */
   private escapeRegex(text: string): string {
     return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  /**
+   * 文字列リテラル外のカンマの後にスペースを追加
+   */
+  private addSpaceAfterCommaOutsideStrings(text: string): string {
+    let result = '';
+    let inString = false;
+    let stringChar = '';
+    
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const prevChar = i > 0 ? text[i - 1] : '';
+      
+      // 文字列の開始/終了を検出
+      if ((char === '"' || char === "'") && prevChar !== '\\') {
+        if (!inString) {
+          inString = true;
+          stringChar = char;
+        } else if (char === stringChar) {
+          inString = false;
+          stringChar = '';
+        }
+      }
+      
+      result += char;
+      
+      // 文字列外のカンマの後にスペースを追加
+      if (!inString && char === ',' && i + 1 < text.length && text[i + 1] !== ' ') {
+        result += ' ';
+      }
+    }
+    
+    return result;
   }
 
   /**

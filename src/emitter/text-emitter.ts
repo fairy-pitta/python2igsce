@@ -72,6 +72,10 @@ export class TextEmitter extends BaseEmitter {
         this.emitComment(node.text);
         break;
         
+      case 'compound':
+        this.emitCompound(node);
+        break;
+        
       case 'if':
         this.emitIf(node);
         break;
@@ -140,6 +144,10 @@ export class TextEmitter extends BaseEmitter {
         this.emitExpression(node);
         break;
         
+      case 'block':
+        this.emitBlock(node);
+        break;
+        
       default:
         this.addWarning(
           `Unsupported node kind: ${node.kind}`,
@@ -161,11 +169,36 @@ export class TextEmitter extends BaseEmitter {
   }
 
   /**
+   * ブロックの出力
+   */
+  private emitBlock(node: IR): void {
+    // ブロックは子ノードをそのまま出力
+    this.emitChildren(node);
+  }
+
+  /**
    * 出力文の出力
    */
   private emitOutput(node: IR): void {
-    const text = this.formatText(node.text);
-    this.emitLine(text);
+    // IRArgumentの情報を使用して適切にフォーマット
+    if (node.meta?.arguments) {
+      const formattedArgs = node.meta.arguments.map(arg => {
+        if (arg.type === 'literal') {
+          // 文字列リテラルはそのまま出力（整形しない）
+          return arg.value;
+        } else {
+          // 変数や式は通常通り整形
+          return this.formatText(arg.value);
+        }
+      }).join(', '); // エミッター側で安全にスペースを追加
+      
+      const outputText = `OUTPUT ${formattedArgs}`;
+      this.emitLine(outputText);
+    } else {
+      // 従来の処理（後方互換性）
+      const text = this.formatText(node.text);
+      this.emitLine(text);
+    }
     this.emitChildren(node);
   }
 
@@ -470,6 +503,16 @@ export class TextEmitter extends BaseEmitter {
     }
     
     this.emitChildren(node);
+  }
+
+  /**
+   * 複合文の出力
+   */
+  private emitCompound(node: IR): void {
+    // 複合文は子ノードをそのまま順次出力
+    for (const child of node.children) {
+      this.emitNode(child);
+    }
   }
 
   /**

@@ -1,7 +1,7 @@
 // Python ASTビジターパターンの実装
-import { IR, IRKind, createIR, IRMeta } from '../types/ir';
+import { IR, IRKind, createIR, IRMeta, IRArgument } from '../types/ir';
 import { BaseParser } from './base-parser';
-import { inferDataType } from '../types/igcse';
+import { inferDataType, IGCSEDataType } from '../types/igcse';
 import { ParameterInfo } from '../types/parser';
 
 /**
@@ -304,16 +304,60 @@ export class PythonASTVisitor extends BaseParser {
       const condition = trimmed.slice(3).replace(/:$/, ''); // 'if ' を除去し、末尾の ':' を除去
       
       // 比較演算子を含む条件を解析
-      const compareMatch = condition.match(/(.*?)\s*(<=|>=|==|!=|<|>)\s*(.*)/); 
+      const compareMatch = condition.match(/(.*?)\s*(<=|>=|==|!=|<|>)\s*(.*)/);
       if (compareMatch) {
         const [, left, op, right] = compareMatch;
+        const leftValue = left.trim();
+        const rightValue = right.trim();
+        
+        // 左辺の解析（配列アクセスかどうかチェック）
+        let leftNode: ASTNode;
+        const leftArrayMatch = leftValue.match(/(\w+)\[([\w\d]+)\]/);
+        if (leftArrayMatch) {
+          const [, arrayName, index] = leftArrayMatch;
+          leftNode = {
+            type: 'ArrayAccess',
+            array: { type: 'Name', id: arrayName },
+            index: isNaN(parseInt(index)) ? index : parseInt(index)
+          };
+        } else {
+          leftNode = { type: 'Name', id: leftValue };
+        }
+        
+        // 右辺の解析（配列アクセスかどうかチェック）
+        let rightNode: ASTNode;
+        const rightArrayMatch = rightValue.match(/(\w+)\[([\w\d]+)\]/);
+        if (rightArrayMatch) {
+          const [, arrayName, index] = rightArrayMatch;
+          rightNode = {
+            type: 'ArrayAccess',
+            array: { type: 'Name', id: arrayName },
+            index: isNaN(parseInt(index)) ? index : parseInt(index)
+          };
+        } else {
+          // 数値かどうかを判定
+          const isNumber = /^-?\d+(\.\d+)?$/.test(rightValue);
+          if (isNumber) {
+            rightNode = { 
+              type: 'Constant', 
+              value: Number(rightValue) 
+            };
+          } else {
+            // 変数名の場合はNameノードとして作成
+            rightNode = {
+              type: 'Name',
+              id: rightValue
+            };
+          }
+        }
+        
         return {
           type: 'If',
           test: {
             type: 'Compare',
-            left: { type: 'Name', id: left.trim() },
+            left: leftNode,
             ops: [{ type: this.mapCompareOp(op) }],
-            comparators: [{ type: 'Constant', value: right.trim() }]
+            comparators: [rightNode]
           },
           body: [],
           orelse: [],
@@ -338,13 +382,19 @@ export class PythonASTVisitor extends BaseParser {
       const compareMatch = condition.match(/(.*?)\s*(<=|>=|==|!=|<|>)\s*(.*)/); 
       if (compareMatch) {
         const [, left, op, right] = compareMatch;
+        const rightValue = right.trim();
+        // 数値かどうかを判定
+        const isNumber = /^-?\d+(\.\d+)?$/.test(rightValue);
         return {
           type: 'If',
           test: {
             type: 'Compare',
             left: { type: 'Name', id: left.trim() },
             ops: [{ type: this.mapCompareOp(op) }],
-            comparators: [{ type: 'Constant', value: right.trim() }]
+            comparators: [{ 
+              type: 'Constant', 
+              value: isNumber ? Number(rightValue) : rightValue 
+            }]
           },
           body: [],
           orelse: [],
@@ -387,16 +437,39 @@ export class PythonASTVisitor extends BaseParser {
       }
     }
     
-    // 配列要素への代入（例: numbers[0] = 10）
+    // 配列要素への代入（例: numbers[0] = 10, numbers[i] = 10）
     if (trimmed.includes('=') && trimmed.includes('[') && trimmed.includes(']') && !trimmed.includes('==')) {
-      const match = trimmed.match(/(\w+)\[(\d+)\]\s*=\s*(.+)/);
+      const match = trimmed.match(/(\w+)\[([\w\d]+)\]\s*=\s*(.+)/);
       if (match) {
         const [, arrayName, index, value] = match;
+        const valueTrimmed = value.trim();
+        
+        // 値の型判定
+        let parsedValue: any;
+        
+        // 文字列リテラル（引用符で囲まれている）
+        if ((valueTrimmed.startsWith('"') && valueTrimmed.endsWith('"')) ||
+            (valueTrimmed.startsWith("'") && valueTrimmed.endsWith("'"))) {
+          parsedValue = valueTrimmed.slice(1, -1); // 引用符を除去
+        }
+        // 数値（整数または小数）
+        else if (/^-?\d+(\.\d+)?$/.test(valueTrimmed)) {
+          parsedValue = Number(valueTrimmed);
+        }
+        // 真偽値
+        else if (valueTrimmed === 'True' || valueTrimmed === 'False') {
+          parsedValue = valueTrimmed === 'True';
+        }
+        // その他は文字列として扱う
+        else {
+          parsedValue = valueTrimmed;
+        }
+        
         return {
           type: 'ArrayAssign',
           target: { type: 'Name', id: arrayName },
           index: parseInt(index),
-          value: { type: 'Constant', value: value.trim() },
+          value: { type: 'Constant', value: parsedValue },
           lineno: lineNumber
         };
       }
@@ -432,7 +505,7 @@ export class PythonASTVisitor extends BaseParser {
       const rightTrimmed = right.trim();
       
       // 右辺の式を解析
-      let valueNode: ASTNode;
+      let valueNode: ASTNode | undefined = undefined;
       
       // 算術演算子を含む式の解析
       const binaryOpMatch = rightTrimmed.match(/(.*?)\s*(\+|\-|\*|\/|\/\/|%|\*\*)\s*(.*)/);
@@ -462,7 +535,58 @@ export class PythonASTVisitor extends BaseParser {
             : { type: 'Constant', value: Number(rightExprTrimmed) }
         };
       } else {
-        // 単純な値
+        // 単純な値の型判定
+        let parsedValue: any;
+        let isVariable = false;
+        
+        // 文字列リテラル（引用符で囲まれている）
+        if ((rightTrimmed.startsWith('"') && rightTrimmed.endsWith('"')) ||
+            (rightTrimmed.startsWith("'") && rightTrimmed.endsWith("'"))) {
+          parsedValue = rightTrimmed.slice(1, -1); // 引用符を除去
+        }
+        // 数値（整数または小数）
+        else if (/^-?\d+(\.\d+)?$/.test(rightTrimmed)) {
+          parsedValue = Number(rightTrimmed);
+        }
+        // 真偽値
+        else if (rightTrimmed === 'True' || rightTrimmed === 'False') {
+          parsedValue = rightTrimmed === 'True';
+        }
+        // 配列リテラル（例: [1, 2, 3, 4, 5]）
+        else if (rightTrimmed.startsWith('[') && rightTrimmed.endsWith(']')) {
+          parsedValue = rightTrimmed; // 配列リテラルはそのまま保持
+        }
+        // 配列アクセス（例: numbers[i], arr[0]）
+        else {
+          const arrayAccessMatch = rightTrimmed.match(/(\w+)\[([\w\d]+)\]/);
+          if (arrayAccessMatch) {
+            const [, arrayName, index] = arrayAccessMatch;
+            isVariable = true;
+            valueNode = {
+              type: 'ArrayAccess',
+              array: { type: 'Name', id: arrayName },
+              index: isNaN(parseInt(index)) ? index : parseInt(index)
+            };
+          }
+          // 変数名
+          else if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(rightTrimmed)) {
+            isVariable = true;
+            valueNode = { type: 'Name', id: rightTrimmed };
+          }
+          // その他は文字列として扱う
+          else {
+            parsedValue = rightTrimmed;
+          }
+        }
+        
+        // Constantノードを作成（変数名以外の場合）
+        if (!isVariable) {
+          valueNode = { type: 'Constant', value: parsedValue };
+        }
+      }
+      
+      // valueNodeが設定されていない場合のフォールバック
+      if (!valueNode) {
         valueNode = { type: 'Constant', value: rightTrimmed };
       }
       
@@ -478,53 +602,65 @@ export class PythonASTVisitor extends BaseParser {
     if (trimmed.startsWith('print(')) {
       const content = trimmed.slice(6, -1); // print( と ) を除去
       
-      let arg;
+      // カンマ区切りの引数を解析
+      const args = [];
       
-      // 配列アクセスを含むprint文の処理
-      const arrayAccessMatch = content.match(/(\w+)\[(\d+)\]/);
-      if (arrayAccessMatch) {
-        const [, arrayName, index] = arrayAccessMatch;
-        arg = {
-          type: 'ArrayAccess',
-          array: { type: 'Name', id: arrayName },
-          index: parseInt(index)
-        };
-      } else if (content.startsWith('f"') && content.endsWith('"')) {
-        // f-string処理
-        const fStringContent = content.slice(2, -1); // f" と " を除去
-        const parts = [];
-        let currentPart = '';
-        let inBrace = false;
+      // 簡易的な引数分割（文字列内のカンマは無視）
+      const argParts = this.splitPrintArgs(content);
+      
+      for (const argPart of argParts) {
+        const trimmedArg = argPart.trim();
         
-        for (let i = 0; i < fStringContent.length; i++) {
-          const char = fStringContent[i];
-          if (char === '{' && !inBrace) {
-            if (currentPart) {
-              parts.push({ type: 'Constant', value: currentPart });
-              currentPart = '';
+        // 配列アクセスを含む引数の処理
+        const arrayAccessMatch = trimmedArg.match(/(\w+)\[([\w\d]+)\]/);
+        if (arrayAccessMatch) {
+          const [, arrayName, index] = arrayAccessMatch;
+          args.push({
+            type: 'ArrayAccess',
+            array: { type: 'Name', id: arrayName },
+            index: isNaN(parseInt(index)) ? index : parseInt(index)
+          });
+        } else if (trimmedArg.startsWith('f"') && trimmedArg.endsWith('"')) {
+          // f-string処理
+          const fStringContent = trimmedArg.slice(2, -1); // f" と " を除去
+          const parts = [];
+          let currentPart = '';
+          let inBrace = false;
+          
+          for (let i = 0; i < fStringContent.length; i++) {
+            const char = fStringContent[i];
+            if (char === '{' && !inBrace) {
+              if (currentPart) {
+                parts.push({ type: 'Constant', value: currentPart });
+                currentPart = '';
+              }
+              inBrace = true;
+            } else if (char === '}' && inBrace) {
+              if (currentPart) {
+                parts.push({ type: 'FormattedValue', value: { type: 'Name', id: currentPart } });
+                currentPart = '';
+              }
+              inBrace = false;
+            } else {
+              currentPart += char;
             }
-            inBrace = true;
-          } else if (char === '}' && inBrace) {
-            if (currentPart) {
-              parts.push({ type: 'FormattedValue', value: { type: 'Name', id: currentPart } });
-              currentPart = '';
-            }
-            inBrace = false;
-          } else {
-            currentPart += char;
           }
+          
+          if (currentPart) {
+            parts.push({ type: 'Constant', value: currentPart });
+          }
+          
+          args.push({
+            type: 'JoinedStr',
+            values: parts
+          });
+        } else if (trimmedArg.startsWith('"') && trimmedArg.endsWith('"')) {
+          // 文字列リテラル
+          args.push({ type: 'Constant', value: trimmedArg.slice(1, -1) });
+        } else {
+          // 変数名
+          args.push({ type: 'Name', id: trimmedArg });
         }
-        
-        if (currentPart) {
-          parts.push({ type: 'Constant', value: currentPart });
-        }
-        
-        arg = {
-          type: 'JoinedStr',
-          values: parts
-        };
-      } else {
-        arg = { type: 'Constant', value: content };
       }
       
       return {
@@ -532,7 +668,7 @@ export class PythonASTVisitor extends BaseParser {
         value: {
           type: 'Call',
           func: { type: 'Name', id: 'print' },
-          args: [arg]
+          args: args
         },
         lineno: lineNumber
       };
@@ -696,24 +832,72 @@ export class PythonASTVisitor extends BaseParser {
       const dataType = 'STRING'; // inputは通常文字列を返す
       this.registerVariable(varName, dataType, node.lineno);
       
-      // INPUT文のテキストを作成
-      const inputText = prompt ? `INPUT ${prompt}, ${varName}` : `INPUT ${varName}`;
-      
-      const inputMeta: IRMeta = {
-        name: varName,
-        dataType
-      };
-      if (node.lineno !== undefined) {
-        inputMeta.lineNumber = node.lineno;
+      // プロンプトがある場合は、OUTPUT文とINPUT文を分けて生成
+       if (prompt) {
+         const outputMeta: IRMeta = {};
+         if (node.lineno !== undefined) {
+           outputMeta.lineNumber = node.lineno;
+         }
+         
+         const inputMeta: IRMeta = {
+           name: varName,
+           dataType
+         };
+         if (node.lineno !== undefined) {
+           inputMeta.lineNumber = node.lineno;
+         }
+         
+         const outputNode = this.createIRNode('output', `OUTPUT ${prompt}`, [], outputMeta);
+         const inputNode = this.createIRNode('input', `INPUT ${varName}`, [], inputMeta);
+         
+         // 複数のIRノードを返すため、親ノードを作成
+         const blockMeta: IRMeta = {};
+         if (node.lineno !== undefined) {
+           blockMeta.lineNumber = node.lineno;
+         }
+         
+         return this.createIRNode('block', '', [outputNode, inputNode], blockMeta);
+      } else {
+        // プロンプトがない場合は従来通り
+        const inputMeta: IRMeta = {
+          name: varName,
+          dataType
+        };
+        if (node.lineno !== undefined) {
+          inputMeta.lineNumber = node.lineno;
+        }
+        
+        return this.createIRNode('input', `INPUT ${varName}`, [], inputMeta);
       }
-      
-      return this.createIRNode('input', inputText, [], inputMeta);
     }
     
-    const value = this.getValueString(node.value);
+    // 値とデータ型を取得
+    let value: string;
+    let actualValue: any;
+    let dataType: IGCSEDataType;
     
-    // 変数を登録
-    const dataType = inferDataType(value);
+    if (node.value.type === 'Constant') {
+      // Constantノードの場合は直接値を取得
+      actualValue = node.value.value;
+      dataType = inferDataType(actualValue);
+      
+      // 文字列の場合のみ引用符を追加（ただし配列リテラルは除く）
+      if (typeof actualValue === 'string') {
+        // 配列リテラルの場合は引用符を付けない
+        if (actualValue.startsWith('[') && actualValue.endsWith(']')) {
+          value = actualValue;
+        } else {
+          value = `"${actualValue}"`;
+        }
+      } else {
+        value = String(actualValue);
+      }
+    } else {
+      // その他の場合は従来通り
+      value = this.getValueString(node.value);
+      actualValue = value;
+      dataType = inferDataType(actualValue);
+    }
     this.registerVariable(varName, dataType, node.lineno);
     
     const text = `${varName} ← ${value}`;
@@ -757,21 +941,52 @@ export class PythonASTVisitor extends BaseParser {
     
     switch (funcName) {
       case 'print':
-        const args = node.args.map((arg: ASTNode) => this.getValueString(arg)).join(', ');
-        const outputMeta: IRMeta = {};
+        // 引数を詳細に分析してIRArgument構造を作成
+        const irArguments = node.args.map((arg: ASTNode) => this.analyzeArgument(arg));
+        
+        // 引数をカンマのみで連結（スペースは追加しない）
+        const formattedArgs = irArguments.map((arg: IRArgument) => arg.value).join(',');
+        
+        const outputMeta: IRMeta = {
+          arguments: irArguments
+        };
         if (lineNumber !== undefined) {
           outputMeta.lineNumber = lineNumber;
         }
-        return this.createIRNode('output', `OUTPUT ${args}`, [], outputMeta);
+        return this.createIRNode('output', `OUTPUT ${formattedArgs}`, [], outputMeta);
         
       case 'input':
-        const prompt = node.args.length > 0 ? this.getValueString(node.args[0]) : '';
-        const inputText = prompt ? `INPUT ${prompt}` : 'INPUT';
-        const inputMeta: IRMeta = {};
-        if (lineNumber !== undefined) {
-          inputMeta.lineNumber = lineNumber;
+        // プロンプトがある場合は、まずOUTPUTでプロンプトを表示
+        if (node.args.length > 0) {
+          const prompt = this.getValueString(node.args[0]);
+          // プロンプトのOUTPUT文を作成
+          const outputMeta: IRMeta = {};
+          if (lineNumber !== undefined) {
+            outputMeta.lineNumber = lineNumber;
+          }
+          const outputIR = this.createIRNode('output', `OUTPUT ${prompt}`, [], outputMeta);
+          
+          // INPUT文を作成
+          const inputMeta: IRMeta = {};
+          if (lineNumber !== undefined) {
+            inputMeta.lineNumber = lineNumber;
+          }
+          const inputIR = this.createIRNode('input', 'INPUT', [], inputMeta);
+          
+          // 複合文として返す
+          const compoundMeta: IRMeta = {};
+          if (lineNumber !== undefined) {
+            compoundMeta.lineNumber = lineNumber;
+          }
+          return this.createIRNode('compound', '', [outputIR, inputIR], compoundMeta);
+        } else {
+          // プロンプトなしの場合
+          const inputMeta: IRMeta = {};
+          if (lineNumber !== undefined) {
+            inputMeta.lineNumber = lineNumber;
+          }
+          return this.createIRNode('input', 'INPUT', [], inputMeta);
         }
-        return this.createIRNode('input', inputText, [], inputMeta);
         
       default:
         const callArgs = node.args.map((arg: ASTNode) => this.getValueString(arg)).join(', ');
@@ -825,7 +1040,7 @@ export class PythonASTVisitor extends BaseParser {
     const children = [...bodyChildren, ...elseChildren, endifIR];
     
     const meta: IRMeta = {
-      condition
+      condition: condition
     };
     if (node.lineno !== undefined) {
       meta.lineNumber = node.lineno;
@@ -881,19 +1096,19 @@ export class PythonASTVisitor extends BaseParser {
       if (args.length === 1) {
         // range(n) -> 0 to n-1
         startValue = '0';
-        const n = parseInt(this.getValueString(args[0]));
+        const n = this.getNumericValue(args[0]);
         endValue = (n - 1).toString();
       } else if (args.length === 2) {
         // range(start, end) -> start to end-1
-        startValue = this.getValueString(args[0]);
-        const end = parseInt(this.getValueString(args[1]));
+        startValue = this.getNumericValue(args[0]).toString();
+        const end = this.getNumericValue(args[1]);
         endValue = (end - 1).toString();
       } else if (args.length === 3) {
         // range(start, end, step)
-        startValue = this.getValueString(args[0]);
-        const end = parseInt(this.getValueString(args[1]));
-        stepValue = this.getValueString(args[2]);
-        const step = parseInt(stepValue);
+        startValue = this.getNumericValue(args[0]).toString();
+        const end = this.getNumericValue(args[1]);
+        stepValue = this.getNumericValue(args[2]).toString();
+        const step = this.getNumericValue(args[2]);
         
         if (step > 0) {
           // 正のstep: start to end-1
@@ -986,6 +1201,9 @@ export class PythonASTVisitor extends BaseParser {
     const funcName = node.name;
     const params = node.args.args.map((arg: ASTNode) => arg.arg);
     
+    // 関数名を大文字化（最初の文字のみ）
+    const capitalizedFuncName = funcName.charAt(0).toUpperCase() + funcName.slice(1);
+    
     // パラメータ情報を作成
     const parameterInfo: ParameterInfo[] = params.map((param: string) => ({
       name: param,
@@ -996,7 +1214,8 @@ export class PythonASTVisitor extends BaseParser {
     // 関数を登録（戻り値の有無は後で判定）
     this.registerFunction(funcName, parameterInfo, undefined, node.lineno);
     
-    const paramText = params.join(', ');
+    // パラメータに型注釈を追加
+    const paramTextWithTypes = params.map((param: string) => `${param} : STRING`).join(', ');
     
     this.enterScope(funcName, 'function');
     this.increaseIndent();
@@ -1014,11 +1233,11 @@ export class PythonASTVisitor extends BaseParser {
     let irType: IRKind;
     
     if (hasReturn) {
-      funcText = `FUNCTION ${funcName}(${paramText}) RETURNS INTEGER`;
+      funcText = `FUNCTION ${capitalizedFuncName}(${paramTextWithTypes}) RETURNS INTEGER`;
       endText = 'ENDFUNCTION';
       irType = 'function';
     } else {
-      funcText = `PROCEDURE ${funcName}(${paramText})`;
+      funcText = `PROCEDURE ${capitalizedFuncName}(${paramTextWithTypes})`;
       endText = 'ENDPROCEDURE';
       irType = 'procedure';
     }
@@ -1109,7 +1328,7 @@ export class PythonASTVisitor extends BaseParser {
     
     const meta: IRMeta = {
       name: arrayName,
-      index
+      index: typeof node.index === 'number' ? node.index + 1 : node.index
     };
     if (node.lineno !== undefined) {
       meta.lineNumber = node.lineno;
@@ -1123,7 +1342,15 @@ export class PythonASTVisitor extends BaseParser {
    */
   private visitArrayAccess(node: ASTNode): IR {
     const arrayName = node.array.id;
-    const index = node.index + 1; // Pythonの0ベースからIGCSEの1ベースに変換
+    let index: string;
+    
+    if (typeof node.index === 'number') {
+      // 数値インデックスの場合、そのまま使用（0ベースを維持）
+      index = node.index.toString();
+    } else {
+      // 変数インデックスの場合、そのまま使用
+      index = node.index.toString();
+    }
     
     const accessText = `${arrayName}[${index}]`;
     
@@ -1154,6 +1381,82 @@ export class PythonASTVisitor extends BaseParser {
   }
 
   /**
+   * 引数を分析してIRArgument構造を作成
+   */
+  private analyzeArgument(node: ASTNode): IRArgument {
+    if (node.type === 'Constant') {
+      if (typeof node.value === 'string') {
+        // 文字列リテラル
+        return {
+          value: `"${node.value}"`,
+          type: 'literal',
+          dataType: 'STRING'
+        };
+      } else if (typeof node.value === 'number') {
+        // 数値リテラル
+        return {
+          value: String(node.value),
+          type: 'literal',
+          dataType: Number.isInteger(node.value) ? 'INTEGER' : 'REAL'
+        };
+      } else {
+        // その他の定数
+        return {
+          value: String(node.value),
+          type: 'literal',
+          dataType: 'STRING'
+        };
+      }
+    } else if (node.type === 'Name') {
+       // 変数
+       return {
+         value: node.id, // 大文字化しない
+         type: 'variable',
+         dataType: this.getVariableType(node.id)
+       };
+    } else {
+      // その他の式
+      return {
+        value: this.getValueString(node),
+        type: 'expression'
+      };
+    }
+  }
+
+   /**
+     * 変数の型を取得（簡易実装）
+     */
+    private getVariableType(_variableName: string): IGCSEDataType {
+      // 簡易的な型推定（実際のプロジェクトではより詳細な実装が必要）
+      return 'STRING'; // デフォルトでSTRING型とする
+    }
+
+   /**
+   * 数値を取得
+   */
+  private getNumericValue(node: ASTNode): number {
+    if (!node) return 0;
+    
+    switch (node.type) {
+      case 'Constant':
+        if (typeof node.value === 'number') {
+          return node.value;
+        } else if (typeof node.value === 'string') {
+          const parsed = parseFloat(node.value);
+          return isNaN(parsed) ? 0 : parsed;
+        }
+        return 0;
+      case 'Num':
+        return node.n;
+      case 'Name':
+        // 変数の場合は0を返す（実際の値は実行時に決まる）
+        return 0;
+      default:
+        return 0;
+    }
+  }
+
+  /**
    * 値を文字列として取得
    */
   private getValueString(node: ASTNode): string {
@@ -1161,6 +1464,21 @@ export class PythonASTVisitor extends BaseParser {
     
     switch (node.type) {
       case 'Constant':
+        // 文字列の場合は引用符を追加、数値の場合はそのまま
+        if (typeof node.value === 'string') {
+          const stringValue = node.value;
+          // 配列リテラルの場合は引用符を付けない
+          if (stringValue.startsWith('[') && stringValue.endsWith(']')) {
+            return stringValue;
+          }
+          // 既に引用符で囲まれている場合はそのまま、そうでなければ追加
+          if (stringValue.startsWith('"') && stringValue.endsWith('"')) {
+            return stringValue;
+          }
+          return `"${stringValue}"`;
+        } else if (typeof node.value === 'number') {
+          return String(node.value);
+        }
         return String(node.value);
       case 'Name':
         return node.id;
@@ -1179,14 +1497,14 @@ export class PythonASTVisitor extends BaseParser {
             parts.push(varName);
           }
         }
-        return parts.join(', ');
+        return parts.join(',');
       case 'Call':
         const funcName = node.func.id || node.func.name;
         if (funcName === 'input') {
           const prompt = node.args.length > 0 ? this.getValueString(node.args[0]) : '';
           return prompt ? `INPUT(${prompt})` : 'INPUT()';
         }
-        const args = node.args.map((arg: ASTNode) => this.getValueString(arg)).join(', ');
+        const args = node.args.map((arg: ASTNode) => this.getValueString(arg)).join(',');
         return `${funcName}(${args})`;
       case 'BinOp':
         const left = this.getValueString(node.left);
@@ -1200,11 +1518,54 @@ export class PythonASTVisitor extends BaseParser {
         return `${leftComp} ${opComp} ${rightComp}`;
       case 'ArrayAccess':
         const arrayName = node.array.id;
-        const index = node.index + 1; // Pythonの0ベースからIGCSEの1ベースに変換
+        let index: string;
+        
+        if (typeof node.index === 'number') {
+          // 数値インデックスの場合、そのまま使用（0ベースを維持）
+          index = node.index.toString();
+        } else {
+          // 変数インデックスの場合、そのまま使用
+          index = node.index.toString();
+        }
+        
         return `${arrayName}[${index}]`;
       default:
         return node.value || node.id || 'unknown';
     }
+  }
+
+  /**
+   * print文の引数を分割する（文字列内のカンマは無視）
+   */
+  private splitPrintArgs(content: string): string[] {
+    const args: string[] = [];
+    let currentArg = '';
+    let inString = false;
+    let stringChar = '';
+    
+    for (let i = 0; i < content.length; i++) {
+      const char = content[i];
+      
+      if (!inString && (char === '"' || char === "'")) {
+        inString = true;
+        stringChar = char;
+        currentArg += char;
+      } else if (inString && char === stringChar) {
+        inString = false;
+        currentArg += char;
+      } else if (!inString && char === ',') {
+        args.push(currentArg.trim());
+        currentArg = '';
+      } else {
+        currentArg += char;
+      }
+    }
+    
+    if (currentArg.trim()) {
+      args.push(currentArg.trim());
+    }
+    
+    return args;
   }
 
   /**

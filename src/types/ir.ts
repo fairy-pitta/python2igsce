@@ -48,9 +48,24 @@ export type IRKind =
   | 'class'      // CLASS定義
   
   // その他
+  | 'block'      // 複数のIRノードのグループ化
   | 'case'       // CASE文
+  | 'statement'  // 一般的な文
   | 'expression' // 式
-  | 'statement'; // 文
+  | 'compound'   // 複合文（複数の文をまとめる）
+  | 'module';    // モジュール
+
+/**
+ * 引数の詳細情報（文字列リテラルと変数を区別）
+ */
+export interface IRArgument {
+  /** 引数の値 */
+  value: string;
+  /** 引数の型 */
+  type: 'literal' | 'variable' | 'expression';
+  /** データ型 */
+  dataType?: IGCSEDataType;
+}
 
 /**
  * IRノードのメタデータ
@@ -79,7 +94,11 @@ export interface IRMeta {
   /** 配列のサイズ */
   size?: number;
   /** 配列のインデックス */
-  index?: number;
+  index?: number | string;
+  /** 文字列リテラルかどうか */
+  isStringLiteral?: boolean;
+  /** 引数の詳細情報（型と値を区別） */
+  arguments?: IRArgument[];
 }
 
 /**
