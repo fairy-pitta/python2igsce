@@ -60,7 +60,8 @@ export abstract class BaseParser {
       scopeStack: [globalScope],
       indentLevel: 0,
       errors: [],
-      warnings: []
+      warnings: [],
+      arrayInfo: {}
     };
   }
 

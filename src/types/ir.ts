@@ -44,6 +44,7 @@ export type IRKind =
   
   // データ構造
   | 'array'      // 配列宣言
+  | 'array_literal' // 配列リテラル
   | 'type'       // TYPE定義
   | 'class'      // CLASS定義
   
@@ -99,6 +100,10 @@ export interface IRMeta {
   isStringLiteral?: boolean;
   /** 引数の詳細情報（型と値を区別） */
   arguments?: IRArgument[];
+  /** 配列の要素型 */
+  elementType?: string;
+  /** 配列の要素 */
+  elements?: any[];
 }
 
 /**

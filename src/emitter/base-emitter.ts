@@ -303,16 +303,21 @@ export abstract class BaseEmitter {
     const emitTime = endTime - this.startTime;
     
     const code = this.context.output.join(this.options.lineEnding);
+    const linesGenerated = this.context.output.length;
+    const charactersGenerated = code.length;
     
     return {
       code,
       errors: [...this.context.errors],
       warnings: [...this.context.warnings],
       stats: {
-        linesGenerated: this.context.output.length,
-        charactersGenerated: code.length,
+        linesGenerated,
+        lineCount: linesGenerated, // テスト用エイリアス
+        charactersGenerated,
+        characterCount: charactersGenerated, // テスト用エイリアス
         nodesProcessed: 0, // 実装時に設定
         emitTime,
+        processingTime: emitTime, // テスト用エイリアス
         maxNestingDepth: this.context.indent.level,
         maxLineLength: Math.max(...this.context.output.map(line => line.length))
       }

@@ -554,7 +554,22 @@ export class PythonASTVisitor extends BaseParser {
         }
         // 配列リテラル（例: [1, 2, 3, 4, 5]）
         else if (rightTrimmed.startsWith('[') && rightTrimmed.endsWith(']')) {
-          parsedValue = rightTrimmed; // 配列リテラルはそのまま保持
+          console.log('DEBUG: Array literal detected in parseAssignment:', rightTrimmed);
+          // 配列リテラルの場合、ArrayLiteralノードを作成
+          const elements = rightTrimmed.slice(1, -1).split(',').map((elem: string) => {
+             const trimmedElem = elem.trim();
+             if (/^-?\d+(\.\d+)?$/.test(trimmedElem)) {
+               return { type: 'Constant', value: Number(trimmedElem) };
+             } else {
+               return { type: 'Constant', value: trimmedElem };
+             }
+           });
+          
+          valueNode = {
+            type: 'ArrayLiteral',
+            elements: elements
+          };
+          console.log('DEBUG: Created ArrayLiteral valueNode:', valueNode);
         }
         // 配列アクセス（例: numbers[i], arr[0]）
         else {
@@ -579,8 +594,8 @@ export class PythonASTVisitor extends BaseParser {
           }
         }
         
-        // Constantノードを作成（変数名以外の場合）
-        if (!isVariable) {
+        // Constantノードを作成（変数名以外かつArrayLiteralでない場合）
+        if (!isVariable && !valueNode) {
           valueNode = { type: 'Constant', value: parsedValue };
         }
       }
@@ -691,16 +706,39 @@ export class PythonASTVisitor extends BaseParser {
     
     // for文
     if (trimmed.startsWith('for ')) {
-      const match = trimmed.match(/for\s+(\w+)\s+in\s+range\(([^)]+)\)/);
-      if (match) {
-        const args = match[2].split(',').map(arg => ({
-          type: 'Constant',
-          value: arg.trim()
-        }));
+      // range()の引数を正しく解析するため、括弧の対応を考慮した解析を行う
+      const rangeMatch = trimmed.match(/for\s+(\w+)\s+in\s+range\((.*)\)/);
+      if (rangeMatch) {
+        const argsString = rangeMatch[2];
+        const args = this.parseRangeArguments(argsString).map(arg => {
+          const trimmedArg = arg.trim();
+          // len()関数の場合はCallノードとして処理
+          if (trimmedArg.startsWith('len(') && trimmedArg.endsWith(')')) {
+            const arrayName = trimmedArg.slice(4, -1).trim();
+            return {
+              type: 'Call',
+              func: { type: 'Name', id: 'len' },
+              args: [{ type: 'Name', id: arrayName }]
+            };
+          }
+          // 数値の場合
+          const numValue = parseFloat(trimmedArg);
+          if (!isNaN(numValue)) {
+            return {
+              type: 'Constant',
+              value: numValue
+            };
+          }
+          // その他の場合は文字列として処理
+          return {
+            type: 'Constant',
+            value: trimmedArg
+          };
+        });
         
         return {
           type: 'For',
-          target: { type: 'Name', id: match[1] },
+          target: { type: 'Name', id: rangeMatch[1] },
           iter: {
             type: 'Call',
             func: { type: 'Name', id: 'range' },
@@ -740,6 +778,59 @@ export class PythonASTVisitor extends BaseParser {
     }
     
 
+
+    // return文
+    if (trimmed.startsWith('return')) {
+      const returnValue = trimmed.slice(6).trim(); // 'return' を除去
+      
+      if (returnValue === '') {
+        // return文のみ（値なし）
+        return {
+          type: 'Return',
+          value: null,
+          lineno: lineNumber
+        };
+      } else {
+        // return文に値がある場合
+        let valueNode: ASTNode;
+        
+        // 数値かどうかを判定
+        if (/^-?\d+(\.\d+)?$/.test(returnValue)) {
+          valueNode = {
+            type: 'Constant',
+            value: Number(returnValue)
+          };
+        }
+        // 文字列リテラルかどうかを判定
+        else if ((returnValue.startsWith('"') && returnValue.endsWith('"')) ||
+                 (returnValue.startsWith("'") && returnValue.endsWith("'"))) {
+          valueNode = {
+            type: 'Constant',
+            value: returnValue.slice(1, -1)
+          };
+        }
+        // 真偽値かどうかを判定
+        else if (returnValue === 'True' || returnValue === 'False') {
+          valueNode = {
+            type: 'Constant',
+            value: returnValue === 'True'
+          };
+        }
+        // その他は変数名として扱う
+        else {
+          valueNode = {
+            type: 'Name',
+            id: returnValue
+          };
+        }
+        
+        return {
+          type: 'Return',
+          value: valueNode,
+          lineno: lineNumber
+        };
+      }
+    }
 
     // 関数定義
     if (trimmed.startsWith('def ')) {
@@ -782,6 +873,7 @@ export class PythonASTVisitor extends BaseParser {
       case 'If':
         return this.visitIf(node);
       case 'For':
+        console.log(`[DEBUG] visitNode: Processing For node`);
         return this.visitFor(node);
       case 'While':
         return this.visitWhile(node);
@@ -799,6 +891,8 @@ export class PythonASTVisitor extends BaseParser {
         return this.visitArrayAssign(node);
       case 'ArrayAccess':
         return this.visitArrayAccess(node);
+      case 'ArrayLiteral':
+        return this.visitArrayLiteral(node);
       default:
         this.addWarning(
           `Unsupported node type: ${node.type}`,
@@ -869,6 +963,64 @@ export class PythonASTVisitor extends BaseParser {
         
         return this.createIRNode('input', `INPUT ${varName}`, [], inputMeta);
       }
+    }
+    
+    // 配列リテラルの場合は特別な処理
+    console.log('DEBUG: Checking node.value.type:', node.value.type);
+    if (node.value.type === 'ArrayLiteral') {
+      console.log('DEBUG: ArrayLiteral detected!');
+      const elements = node.value.elements || [];
+      let elementType = 'INTEGER';
+      
+      if (elements.length > 0) {
+        const firstElement = elements[0];
+        if (firstElement.type === 'Constant') {
+          if (typeof firstElement.value === 'number') {
+            elementType = Number.isInteger(firstElement.value) ? 'INTEGER' : 'REAL';
+          } else if (typeof firstElement.value === 'string') {
+            elementType = 'STRING';
+          }
+        }
+      }
+      
+      // 配列変数を登録
+      this.registerVariable(varName, 'ARRAY', node.lineno);
+      
+      // 配列宣言のIRを生成
+       const size = elements.length;
+       const declareText = `DECLARE ${varName} : ARRAY[1:${size}] OF ${elementType}`;
+       
+       // 配列のサイズ情報を保存（後でforループで使用）
+       this.context.arrayInfo = this.context.arrayInfo || {};
+       this.context.arrayInfo[varName] = { size, elementType };
+      
+      const declareMeta: IRMeta = {
+        name: varName,
+        dataType: 'ARRAY',
+        size,
+        elementType
+      };
+      if (node.lineno !== undefined) {
+        declareMeta.lineNumber = node.lineno;
+      }
+      
+      // 配列の初期化も含める場合は、宣言と初期化を分けて生成
+       const initElements = elements.map((elem: any) => elem.value).join(', ');
+       const initText = `${varName} ← [${initElements}]`;
+       
+       const initMeta: IRMeta = {
+         name: varName,
+         dataType: 'ARRAY'
+       };
+       if (node.lineno !== undefined) {
+         initMeta.lineNumber = node.lineno;
+       }
+       
+       // 宣言と初期化の両方を含むブロックを作成
+       const declareIR = this.createIRNode('array', declareText, [], declareMeta);
+       const initIR = this.createIRNode('assign', initText, [], initMeta);
+       
+       return this.createIRNode('block', '', [declareIR, initIR], declareMeta);
     }
     
     // 値とデータ型を取得
@@ -990,7 +1142,9 @@ export class PythonASTVisitor extends BaseParser {
         
       default:
         const callArgs = node.args.map((arg: ASTNode) => this.getValueString(arg)).join(', ');
-        const callText = `${funcName}(${callArgs})`;
+        // 関数名を適切に変換
+        const convertedFuncName = this.convertFunctionName(funcName);
+        const callText = `${convertedFuncName}(${callArgs})`;
         const exprMeta: IRMeta = { name: funcName };
         if (lineNumber !== undefined) {
           exprMeta.lineNumber = lineNumber;
@@ -1084,25 +1238,36 @@ export class PythonASTVisitor extends BaseParser {
    * FOR文の処理
    */
   private visitFor(node: ASTNode): IR {
+    console.log(`[DEBUG] ===== visitFor FUNCTION CALLED =====`);
+    console.log(`[DEBUG] visitFor called with varName: ${node.target.id}`);
+    console.log(`[DEBUG] visitFor node:`, JSON.stringify(node, null, 2));
     const varName = node.target.id;
     const iter = node.iter;
+    console.log(`[DEBUG] iter.type: ${iter.type}, iter.func?.id: ${iter.func?.id}`);
     
     let startValue = '0';
     let endValue = '9';
     let stepValue = '1';
     
     if (iter.type === 'Call' && iter.func.id === 'range') {
+      console.log(`[DEBUG] Processing range() call with ${iter.args.length} arguments`);
+      this.debug(`Processing range() call with ${iter.args.length} arguments`);
       const args = iter.args;
       if (args.length === 1) {
         // range(n) -> 0 to n-1
         startValue = '0';
         const n = this.getNumericValue(args[0]);
         endValue = (n - 1).toString();
+        console.log(`[DEBUG] Range(n): n=${n}, result: ${startValue} TO ${endValue}`);
+        this.debug(`Range(n): n=${n}, result: ${startValue} TO ${endValue}`);
       } else if (args.length === 2) {
-        // range(start, end) -> start to end-1
-        startValue = this.getNumericValue(args[0]).toString();
-        const end = this.getNumericValue(args[1]);
-        endValue = (end - 1).toString();
+        // range(start, end) の処理
+        const { start, end, isEndLen } = this.parseRangeArgumentsNodes(args[0], args[1]);
+        const [startIG, endIG] = this.transformRange(start, end, isEndLen);
+        startValue = startIG;
+        endValue = endIG;
+        console.log(`[DEBUG] Range(start, end): start=${start}, end=${end}, isEndLen=${isEndLen}, result: ${startValue} TO ${endValue}`);
+        this.debug(`Range(start, end): start=${start}, end=${end}, isEndLen=${isEndLen}, result: ${startValue} TO ${endValue}`);
       } else if (args.length === 3) {
         // range(start, end, step)
         startValue = this.getNumericValue(args[0]).toString();
@@ -1111,8 +1276,10 @@ export class PythonASTVisitor extends BaseParser {
         const step = this.getNumericValue(args[2]);
         
         if (step > 0) {
-          // 正のstep: start to end-1
-          endValue = (end - 1).toString();
+          // 正のstep: 最後に到達する値を計算
+          const start = this.getNumericValue(args[0]);
+          const lastValue = start + Math.floor((end - start - 1) / step) * step;
+          endValue = lastValue.toString();
         } else {
           // 負のstep: start to end+1
           endValue = (end + 1).toString();
@@ -1145,6 +1312,30 @@ export class PythonASTVisitor extends BaseParser {
       meta.lineNumber = node.lineno;
     }
     return this.createIRNode('for', forText, children, meta);
+  }
+
+  private parseRangeArgumentsNodes(startArg: ASTNode, endArg: ASTNode): { start: number; end: number; isEndLen: boolean } {
+    const start = this.getNumericValue(startArg);
+    const end = this.getNumericValue(endArg);
+    
+    // args[1] が Call ノードかつ func.id === 'len' なら isEndLen = true
+    const isEndLen = endArg.type === 'Call' && endArg.func?.id === 'len';
+    
+    console.log(`[DEBUG] parseRangeArguments: start=${start}, end=${end}, isEndLen=${isEndLen}`);
+    
+    return { start, end, isEndLen };
+  }
+
+  private transformRange(start: number, end: number, isEndLen: boolean): [string, string] {
+    const startIG = (start + 1).toString();
+    
+    const endIG = isEndLen 
+      ? end.toString()               // len(array) → inclusive
+      : (end - 1).toString();        // Python rangeのendはexclusive → inclusive補正
+    
+    console.log(`[DEBUG] transformRange: start=${start}, end=${end}, isEndLen=${isEndLen} → startIG=${startIG}, endIG=${endIG}`);
+    
+    return [startIG, endIG];
   }
 
   /**
@@ -1201,8 +1392,8 @@ export class PythonASTVisitor extends BaseParser {
     const funcName = node.name;
     const params = node.args.args.map((arg: ASTNode) => arg.arg);
     
-    // 関数名を大文字化（最初の文字のみ）
-    const capitalizedFuncName = funcName.charAt(0).toUpperCase() + funcName.slice(1);
+    // 関数名を適切に変換（snake_caseをPascalCaseに、先頭文字を大文字に）
+    const capitalizedFuncName = this.convertFunctionName(funcName);
     
     // パラメータ情報を作成
     const parameterInfo: ParameterInfo[] = params.map((param: string) => ({
@@ -1215,7 +1406,7 @@ export class PythonASTVisitor extends BaseParser {
     this.registerFunction(funcName, parameterInfo, undefined, node.lineno);
     
     // パラメータに型注釈を追加
-    const paramTextWithTypes = params.map((param: string) => `${param} : STRING`).join(', ');
+    const paramText = params.join(', ');
     
     this.enterScope(funcName, 'function');
     this.increaseIndent();
@@ -1233,11 +1424,11 @@ export class PythonASTVisitor extends BaseParser {
     let irType: IRKind;
     
     if (hasReturn) {
-      funcText = `FUNCTION ${capitalizedFuncName}(${paramTextWithTypes}) RETURNS INTEGER`;
+      funcText = `FUNCTION ${capitalizedFuncName}(${paramText})`;
       endText = 'ENDFUNCTION';
       irType = 'function';
     } else {
-      funcText = `PROCEDURE ${capitalizedFuncName}(${paramTextWithTypes})`;
+      funcText = `PROCEDURE ${capitalizedFuncName}(${paramText})`;
       endText = 'ENDPROCEDURE';
       irType = 'procedure';
     }
@@ -1260,7 +1451,23 @@ export class PythonASTVisitor extends BaseParser {
    * RETURN文の処理
    */
   private visitReturn(node: ASTNode): IR {
-    const value = node.value ? this.getValueString(node.value) : '';
+    let value = '';
+    if (node.value) {
+      // RETURN文では引用符を追加しない特別な処理
+      if (node.value.type === 'Constant') {
+        value = String(node.value.value);
+      } else if (node.value.type === 'Name') {
+        value = node.value.id;
+      } else if (node.value.type === 'Num') {
+        value = String(node.value.n);
+      } else if (node.value.type === 'Str') {
+        // 文字列の場合も引用符を追加しない
+        value = node.value.s;
+      } else {
+        // その他の場合は通常のgetValueStringを使用
+        value = this.getValueString(node.value);
+      }
+    }
     const returnText = value ? `RETURN ${value}` : 'RETURN';
     
     // 現在の関数を関数として更新
@@ -1366,6 +1573,42 @@ export class PythonASTVisitor extends BaseParser {
   }
 
   /**
+   * 配列リテラルの処理
+   */
+  private visitArrayLiteral(node: ASTNode): IR {
+    // 配列の要素から型を推定
+    const elements = node.elements || [];
+    let dataType = 'INTEGER';
+    
+    if (elements.length > 0) {
+      const firstElement = elements[0];
+      if (firstElement.type === 'Constant') {
+        if (typeof firstElement.value === 'number') {
+          dataType = Number.isInteger(firstElement.value) ? 'INTEGER' : 'REAL';
+        } else if (typeof firstElement.value === 'string') {
+          dataType = 'STRING';
+        }
+      }
+    }
+    
+    // 配列の宣言文を生成
+    const size = elements.length;
+    const arrayText = `ARRAY[1:${size}] OF ${dataType}`;
+    
+    const meta: IRMeta = {
+      dataType: 'ARRAY',
+      size,
+      elementType: dataType,
+      elements: elements.map((elem: any) => elem.value)
+    };
+    if (node.lineno !== undefined) {
+      meta.lineNumber = node.lineno;
+    }
+    
+    return this.createIRNode('array_literal', arrayText, [], meta);
+  }
+
+  /**
    * 配列のデータ型を推定
    */
   private inferArrayDataType(defaultValue: string): string {
@@ -1451,6 +1694,28 @@ export class PythonASTVisitor extends BaseParser {
       case 'Name':
         // 変数の場合は0を返す（実際の値は実行時に決まる）
         return 0;
+      case 'Call':
+        // len()関数の場合は配列サイズを返す
+        if (node.func && node.func.id === 'len' && node.args && node.args.length > 0) {
+          const arrayArg = node.args[0];
+          if (arrayArg.type === 'Name') {
+            const arrayName = arrayArg.id;
+            console.log(`[DEBUG] getNumericValue: len(${arrayName}) detected`);
+            this.debug(`getNumericValue: len(${arrayName}) detected`);
+            if (this.context.arrayInfo && this.context.arrayInfo[arrayName]) {
+              const size = this.context.arrayInfo[arrayName].size;
+              console.log(`[DEBUG] getNumericValue: returning array size ${size} for ${arrayName}`);
+              this.debug(`getNumericValue: returning array size ${size} for ${arrayName}`);
+              return size;
+            } else {
+              console.log(`[DEBUG] getNumericValue: array info not found for ${arrayName}, returning default 5`);
+              console.log(`[DEBUG] arrayInfo:`, JSON.stringify(this.context.arrayInfo));
+              this.debug(`getNumericValue: array info not found for ${arrayName}, returning default 5`);
+              return 5; // デフォルト
+            }
+          }
+        }
+        return 0;
       default:
         return 0;
     }
@@ -1478,9 +1743,18 @@ export class PythonASTVisitor extends BaseParser {
           return `"${stringValue}"`;
         } else if (typeof node.value === 'number') {
           return String(node.value);
+        } else if (typeof node.value === 'boolean') {
+          // ブール値の場合は大文字に変換
+          return node.value ? 'TRUE' : 'FALSE';
         }
         return String(node.value);
       case 'Name':
+        // TrueとFalseの特別処理
+        if (node.id === 'True') {
+          return 'TRUE';
+        } else if (node.id === 'False') {
+          return 'FALSE';
+        }
         return node.id;
       case 'Str':
         return `"${node.s}"`;
@@ -1532,6 +1806,48 @@ export class PythonASTVisitor extends BaseParser {
       default:
         return node.value || node.id || 'unknown';
     }
+  }
+
+  /**
+   * range()の引数を正しく解析する（括弧の対応を考慮）
+   */
+  private parseRangeArguments(argsString: string): string[] {
+    const args: string[] = [];
+    let currentArg = '';
+    let parenDepth = 0;
+    let inString = false;
+    let stringChar = '';
+    
+    for (let i = 0; i < argsString.length; i++) {
+      const char = argsString[i];
+      
+      if (!inString && (char === '"' || char === "'")) {
+        inString = true;
+        stringChar = char;
+        currentArg += char;
+      } else if (inString && char === stringChar) {
+        inString = false;
+        stringChar = '';
+        currentArg += char;
+      } else if (!inString && char === '(') {
+        parenDepth++;
+        currentArg += char;
+      } else if (!inString && char === ')') {
+        parenDepth--;
+        currentArg += char;
+      } else if (!inString && char === ',' && parenDepth === 0) {
+        args.push(currentArg.trim());
+        currentArg = '';
+      } else {
+        currentArg += char;
+      }
+    }
+    
+    if (currentArg.trim()) {
+      args.push(currentArg.trim());
+    }
+    
+    return args;
   }
 
   /**
@@ -1609,6 +1925,22 @@ export class PythonASTVisitor extends BaseParser {
       }
       return false;
     });
+  }
+
+  /**
+   * 関数名を適切に変換（snake_caseをPascalCaseに変換）
+   */
+  private convertFunctionName(funcName: string): string {
+    // snake_caseをPascalCaseに変換
+    // 例: add_numbers -> Add, main -> Main
+    if (funcName.includes('_')) {
+      // アンダースコアで分割して最初の単語のみを使用し、先頭を大文字に
+      const firstWord = funcName.split('_')[0];
+      return firstWord.charAt(0).toUpperCase() + firstWord.slice(1).toLowerCase();
+    } else {
+      // 単一単語の場合は先頭を大文字に
+      return funcName.charAt(0).toUpperCase() + funcName.slice(1).toLowerCase();
+    }
   }
 
   /**

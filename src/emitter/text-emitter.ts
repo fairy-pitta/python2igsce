@@ -399,8 +399,8 @@ export class TextEmitter extends BaseEmitter {
    * RETURN文の出力
    */
   private emitReturn(node: IR): void {
-    const text = this.formatText(node.text);
-    this.emitLine(text);
+    // RETURN文は引用符で囲まずに直接出力（formatTextを使わない）
+    this.emitLine(node.text);
     this.emitChildren(node);
   }
 
@@ -498,8 +498,13 @@ export class TextEmitter extends BaseEmitter {
    */
   private emitStatement(node: IR): void {
     if (node.text.trim()) {
-      const text = this.formatText(node.text);
-      this.emitLine(text);
+      // RETURN文の場合は引用符で囲まずに直接出力
+      if (node.text.includes('RETURN')) {
+        this.emitLine(node.text);
+      } else {
+        const text = this.formatText(node.text);
+        this.emitLine(text);
+      }
     }
     
     this.emitChildren(node);

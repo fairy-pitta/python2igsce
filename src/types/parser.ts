@@ -230,6 +230,8 @@ export interface ParserContext {
   errors: ParseError[];
   /** 警告リスト */
   warnings: ParseWarning[];
+  /** 配列情報 */
+  arrayInfo: { [key: string]: { size: number; elementType: string } };
 }
 
 /**

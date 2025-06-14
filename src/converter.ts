@@ -73,7 +73,7 @@ export class Converter {
         ? this.markdownEmitter 
         : this.textEmitter;
       
-      const emitResult = await emitter.emit(parseResult.ir);
+      const emitResult = emitter.emit(parseResult.ir);
       
       // 結果の作成
       const endTime = Date.now();
@@ -143,8 +143,11 @@ export class Converter {
             stats: {
               emitTime: 0,
               linesGenerated: 0,
+              lineCount: 0,
               charactersGenerated: 0,
+              characterCount: 0,
               nodesProcessed: 0,
+              processingTime: 0,
               maxNestingDepth: 0,
               maxLineLength: 0
             }
@@ -322,8 +325,11 @@ export class Converter {
          stats: {
             emitTime: 0,
             linesGenerated: 0,
+            lineCount: 0,
             charactersGenerated: 0,
+            characterCount: 0,
             nodesProcessed: 0,
+            processingTime: 0,
             maxNestingDepth: 0,
             maxLineLength: 0
           }

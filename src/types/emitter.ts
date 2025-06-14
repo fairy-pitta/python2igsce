@@ -101,12 +101,18 @@ export type EmitWarningType =
 export interface EmitStats {
   /** 出力行数 */
   linesGenerated: number;
+  /** 出力行数（テスト用エイリアス） */
+  lineCount: number;
   /** 出力文字数 */
   charactersGenerated: number;
+  /** 出力文字数（テスト用エイリアス） */
+  characterCount: number;
   /** 処理したIRノード数 */
   nodesProcessed: number;
   /** エミット時間（ミリ秒） */
   emitTime: number;
+  /** 処理時間（テスト用エイリアス） */
+  processingTime: number;
   /** 最大ネスト深度 */
   maxNestingDepth: number;
   /** 最大行長 */

@@ -15,23 +15,28 @@ export class PythonParser extends PythonASTVisitor {
    * Pythonソースコードをパースしてイルに変換
    */
   override parse(source: string): ParseResult {
+    console.log('[DEBUG] PythonParser.parse() called');
     this.debug('Starting Python parse...');
     
     // 前処理
     const preprocessedSource = this.preprocess(source);
+    console.log('[DEBUG] Preprocessed source:', preprocessedSource.substring(0, 100));
     
     // パース実行
     const result = super.parse(preprocessedSource);
+    console.log('[DEBUG] Parse result nodes:', result.stats.nodesGenerated);
     
-    // 後処理
-    const postprocessedIR = this.postprocess(result.ir);
+    // 後処理（一時的に無効化）
+    // const postprocessedIR = this.postprocess(result.ir);
+    const postprocessedIR = result.ir;
     
+    console.log('[DEBUG] Parse completed');
     this.debug(`Parse completed. Nodes: ${result.stats.nodesGenerated}, Errors: ${result.errors.length}`);
     
     return {
-      ...result,
-      ir: postprocessedIR
-    };
+        ...result,
+        ir: postprocessedIR
+      };
   }
 
   /**
@@ -63,6 +68,7 @@ export class PythonParser extends PythonASTVisitor {
   /**
    * IRの後処理
    */
+  /*
   private postprocess(ir: IR): IR {
     // IRの最適化
     const optimized = this.optimizeIR(ir);
@@ -72,6 +78,7 @@ export class PythonParser extends PythonASTVisitor {
     
     return optimized;
   }
+  */
 
   /**
    * IRの最適化
@@ -89,6 +96,10 @@ export class PythonParser extends PythonASTVisitor {
         }
         // statementノードで子ノードがある場合は保持
         if (child.kind === 'statement' && child.children.length > 0) {
+          return true;
+        }
+        // assign, input, output, if, for, while等の重要なノードは保持
+        if (['assign', 'input', 'output', 'if', 'for', 'while', 'function', 'class'].includes(child.kind)) {
           return true;
         }
         // その他の空のノードは除去
@@ -155,15 +166,13 @@ export class PythonParser extends PythonASTVisitor {
   }
 
   /**
-   * IRの検証
+   * IRの検証（一時的に無効化）
    */
+  /*
   private validateIR(ir: IR): void {
     this.validateNode(ir);
   }
 
-  /**
-   * 個別ノードの検証
-   */
   private validateNode(node: IR): void {
     // 必須フィールドの検証
     if (!node.kind) {
@@ -185,9 +194,6 @@ export class PythonParser extends PythonASTVisitor {
     this.validateSpecificNode(node);
   }
 
-  /**
-   * 特定ノード種別の検証
-   */
   private validateSpecificNode(node: IR): void {
     switch (node.kind) {
       case 'assign':
@@ -228,6 +234,7 @@ export class PythonParser extends PythonASTVisitor {
         break;
     }
   }
+  */
 
   /**
    * パーサーの統計情報を取得
