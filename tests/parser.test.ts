@@ -184,4 +184,63 @@ describe('Python to IGCSE Pseudocode Parser', () => {
       expect(result.code).toContain('import os');
     });
   });
+
+  // 配列処理のテスト
+  describe.skip('Array Processing', () => {
+    it('should convert array declaration and initialization', async () => {
+      const pythonCode = 'numbers = [1, 2, 3, 4, 5]';
+      const result = await converter.convert(pythonCode);
+      expect(result.code).toContain('DECLARE numbers : ARRAY[1:5] OF INTEGER');
+      expect(result.code).toContain('numbers[1] ← 1');
+      expect(result.code).toContain('numbers[5] ← 5');
+    });
+
+    it('should convert array access with 0-based to 1-based indexing', async () => {
+      const pythonCode = 'value = numbers[0]\nnumbers[2] = 10';
+      const result = await converter.convert(pythonCode);
+      expect(result.code).toContain('value ← numbers[1]');
+      expect(result.code).toContain('numbers[3] ← 10');
+    });
+
+    it('should convert array operations with len()', async () => {
+      const pythonCode = 'size = len(numbers)\nfor i in range(len(numbers)):\n    print(numbers[i])';
+      const result = await converter.convert(pythonCode);
+      expect(result.code).toContain('size ← LENGTH(numbers)');
+      expect(result.code).toContain('FOR i ← 1 TO LENGTH(numbers)');
+    });
+  });
+
+  // CASE文のテスト
+  describe.skip('CASE Statements', () => {
+    it('should convert match statement to CASE', async () => {
+      const pythonCode = 'match grade:\n    case "A":\n        points = 4\n    case "B":\n        points = 3\n    case _:\n        points = 0';
+      const result = await converter.convert(pythonCode);
+      expect(result.code).toContain('CASE OF grade');
+      expect(result.code).toContain('"A" : points ← 4');
+      expect(result.code).toContain('"B" : points ← 3');
+      expect(result.code).toContain('OTHERWISE : points ← 0');
+      expect(result.code).toContain('ENDCASE');
+    });
+
+    it('should convert if-elif chain to CASE when appropriate', async () => {
+      const pythonCode = 'if day == "Monday":\n    work = True\nelif day == "Tuesday":\n    work = True\nelif day == "Saturday":\n    work = False\nelse:\n    work = False';
+      const result = await converter.convert(pythonCode);
+      // 現在の実装では通常のIF-ELSE文として処理される
+      expect(result.code).toContain('IF day = "Monday" THEN');
+      expect(result.code).toContain('ELSE IF day = "Tuesday" THEN');
+      expect(result.code).toContain('ELSE IF day = "Saturday" THEN');
+    });
+  });
+
+  // 型宣言のテスト
+  describe.skip('Type Declarations', () => {
+    it('should convert typed variable declarations', async () => {
+      const pythonCode = 'counter: int = 0\nname: str = "John"\npi: float = 3.14\nis_valid: bool = True';
+      const result = await converter.convert(pythonCode);
+      expect(result.code).toContain('DECLARE counter : INTEGER');
+      expect(result.code).toContain('DECLARE name : STRING');
+      expect(result.code).toContain('DECLARE pi : REAL');
+      expect(result.code).toContain('DECLARE is_valid : BOOLEAN');
+    });
+  });
 });

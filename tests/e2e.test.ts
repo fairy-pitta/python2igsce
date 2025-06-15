@@ -384,7 +384,7 @@ x = 5  # Another comment
 # Final comment
 `;
       const expected = `// This is a comment
-x ← 5  // Another comment
+x ← 5 // Another comment
 // Final comment`;
       
       const result = convertPython(python);
@@ -492,6 +492,107 @@ OUTPUT "Maximum value is: ", max_value`;
       expect(result).toContain('DECLARE numbers : ARRAY');
       expect(result).toContain('FOR i ← 2 TO 5');
       expect(result).toContain('IF numbers[i] > max_value THEN');
+    });
+  });
+
+  describe.skip('Array Declarations', () => {
+    it('should convert array initialization', () => {
+      const python = `
+numbers = [0] * 5
+names = ["Alice", "Bob", "Charlie"]
+`;
+      const expected = `DECLARE numbers : ARRAY[1:5] OF INTEGER
+DECLARE names : ARRAY[1:3] OF STRING
+names[1] ← "Alice"
+names[2] ← "Bob"
+names[3] ← "Charlie"`;
+      
+      const result = convertPython(python);
+      expect(result.trim()).toBe(expected);
+    });
+
+    it('should convert array access and assignment', () => {
+      const python = `
+numbers[0] = 10
+value = numbers[2]
+`;
+      const expected = `numbers[1] ← 10
+value ← numbers[3]`;
+      
+      const result = convertPython(python);
+      expect(result.trim()).toBe(expected);
+    });
+  });
+
+  describe.skip('Type Declarations', () => {
+    it('should convert typed variable declarations', () => {
+      const python = `
+counter: int = 0
+name: str = "John"
+pi: float = 3.14
+is_valid: bool = True
+`;
+      const expected = `DECLARE counter : INTEGER
+counter ← 0
+DECLARE name : STRING
+name ← "John"
+DECLARE pi : REAL
+pi ← 3.14
+DECLARE is_valid : BOOLEAN
+is_valid ← TRUE`;
+      
+      const result = convertPython(python);
+      expect(result.trim()).toBe(expected);
+    });
+  });
+
+  describe.skip('CASE Statements', () => {
+    it('should convert match statement to CASE', () => {
+      const python = `
+match direction:
+    case "N":
+        y = y + 1
+    case "S":
+        y = y - 1
+    case "E":
+        x = x + 1
+    case "W":
+        x = x - 1
+    case _:
+        print("Invalid direction")
+`;
+      const expected = `CASE OF direction
+   "N" : y ← y + 1
+   "S" : y ← y - 1
+   "E" : x ← x + 1
+   "W" : x ← x - 1
+   OTHERWISE : OUTPUT "Invalid direction"
+ENDCASE`;
+      
+      const result = convertPython(python);
+      expect(result.trim()).toBe(expected);
+    });
+
+    it('should convert if-elif-else to CASE when appropriate', () => {
+      const python = `
+if grade == "A":
+    points = 4.0
+elif grade == "B":
+    points = 3.0
+elif grade == "C":
+    points = 2.0
+else:
+    points = 0.0
+`;
+      const expected = `CASE OF grade
+   "A" : points ← 4.0
+   "B" : points ← 3.0
+   "C" : points ← 2.0
+   OTHERWISE : points ← 0.0
+ENDCASE`;
+      
+      const result = convertPython(python);
+      expect(result.trim()).toBe(expected);
     });
   });
 });

@@ -31,7 +31,7 @@ export class Converter {
     // エミッターの初期化
     const emitterOptions: EmitterOptions = {
       format: this.options.outputFormat ?? 'plain',
-      indentSize: this.options.indentSize ?? 4,
+      indentSize: this.options.indentSize ?? 3,
       indentChar: ' ',
       indentType: this.options.indentType ?? 'spaces',
       lineEnding: this.options.lineEnding ?? '\n',
@@ -180,7 +180,7 @@ export class Converter {
     // エミッターオプションの更新
     const emitterOptions: EmitterOptions = {
       format: this.options.outputFormat ?? 'plain',
-      indentSize: this.options.indentSize ?? 4,
+      indentSize: this.options.indentSize ?? 3,
       indentChar: ' ',
       indentType: this.options.indentType ?? 'spaces',
       lineEnding: this.options.lineEnding ?? '\n',
@@ -265,7 +265,7 @@ export class Converter {
   private mergeDefaultOptions(options: Partial<ConversionOptions>): ConversionOptions {
     const defaults: ConversionOptions = {
       outputFormat: 'plain',
-      indentSize: 4,
+      indentSize: 3,
       indentType: 'spaces',
       lineEnding: '\n',
       maxLineLength: 80,

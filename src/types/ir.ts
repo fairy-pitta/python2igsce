@@ -36,6 +36,7 @@ export type IRKind =
   | 'endwhile'   // ENDWHILE文
   | 'repeat'     // REPEAT文
   | 'until'      // UNTIL文
+  | 'break'      // BREAK文（EXIT WHILE/FOR）
   
   // 関数・プロシージャ
   | 'procedure'  // PROCEDURE定義
@@ -98,6 +99,8 @@ export interface IRMeta {
   index?: number | string;
   /** 文字列リテラルかどうか */
   isStringLiteral?: boolean;
+  /** インラインコメントがあるかどうか */
+  hasInlineComment?: boolean;
   /** 引数の詳細情報（型と値を区別） */
   arguments?: IRArgument[];
   /** 配列の要素型 */

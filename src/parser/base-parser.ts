@@ -37,7 +37,7 @@ export abstract class BaseParser {
       preserveComments: options.preserveComments ?? true,
       includeComments: options.includeComments ?? true,
       preserveWhitespace: options.preserveWhitespace ?? false,
-      indentSize: options.indentSize ?? 4,
+      indentSize: options.indentSize ?? 3,
       maxDepth: options.maxDepth ?? 50,
       maxErrors: options.maxErrors ?? 100,
       timeout: options.timeout ?? 30000
@@ -128,6 +128,20 @@ export abstract class BaseParser {
       this.context.scopeStack.pop();
       this.context.currentScope = this.context.scopeStack[this.context.scopeStack.length - 1];
     }
+  }
+
+  /**
+   * 現在のループタイプを取得
+   */
+  protected getCurrentLoopType(): 'while' | 'for' | null {
+    // スコープスタックを逆順で検索して最初に見つかったループスコープを返す
+    for (let i = this.context.scopeStack.length - 1; i >= 0; i--) {
+      const scope = this.context.scopeStack[i];
+      if (scope.type === 'while' || scope.type === 'for') {
+        return scope.type;
+      }
+    }
+    return null;
   }
 
   /**

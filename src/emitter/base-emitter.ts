@@ -215,22 +215,42 @@ export abstract class BaseEmitter {
   private convertOperators(text: string): string {
     let result = text;
     
+    // コメント部分を保護（//で始まるコメントを一時的に置き換え）
+    const commentMatches: string[] = [];
+    result = result.replace(/\/\/.*$/gm, (match) => {
+      const index = commentMatches.length;
+      commentMatches.push(match);
+      return `__COMMENT_${index}__`;
+    });
+    
+    // 比較演算子を一時的なプレースホルダーに置き換え
+    result = result.replace(/!=/g, '__NE__');
+    result = result.replace(/<=/g, '__LE__');
+    result = result.replace(/>=/g, '__GE__');
+    result = result.replace(/==/g, '__EQ__');
+    
     // 代入演算子の変換
     result = result.replace(/\s*=\s*/g, ' ← ');
     
-    // 比較演算子の変換
-    result = result.replace(/!=/g, '≠');
-    result = result.replace(/<=/g, '≤');
-    result = result.replace(/>=/g, '≥');
+    // プレースホルダーを正しい比較演算子に戻す
+    result = result.replace(/__NE__/g, '≠');
+    result = result.replace(/__LE__/g, '≤');
+    result = result.replace(/__GE__/g, '≥');
+    result = result.replace(/__EQ__/g, '=');
     
     // 論理演算子の変換
     result = result.replace(/\band\b/gi, 'AND');
     result = result.replace(/\bor\b/gi, 'OR');
     result = result.replace(/\bnot\b/gi, 'NOT');
     
-    // 算術演算子の変換
+    // 算術演算子の変換（コメント以外の//のみ）
     result = result.replace(/\s*%\s*/g, ' MOD ');
     result = result.replace(/\s*\/\/\s*/g, ' DIV ');
+    
+    // コメントを復元
+    commentMatches.forEach((comment, index) => {
+      result = result.replace(`__COMMENT_${index}__`, comment);
+    });
     
     return result;
   }

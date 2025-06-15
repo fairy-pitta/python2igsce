@@ -273,7 +273,7 @@ export function createIndentInfo(
 export function getDefaultEmitterOptions(): EmitterOptions {
   return {
     format: 'plain',
-    indentSize: 4,
+    indentSize: 3,
     indentChar: ' ',
     lineEnding: '\n',
     maxLineLength: 80,

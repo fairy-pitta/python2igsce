@@ -34,7 +34,7 @@ class CLI {
       .argument('<input>', 'Input Python file or directory')
       .option('-o, --output <path>', 'Output file or directory')
       .option('-f, --format <format>', 'Output format (plain|markdown)', 'plain')
-      .option('--indent-size <size>', 'Indentation size', '4')
+      .option('--indent-size <size>', 'Indentation size', '3')
       .option('--indent-type <type>', 'Indentation type (spaces|tabs)', 'spaces')
       .option('--line-ending <type>', 'Line ending type (lf|crlf)', 'lf')
       .option('--max-line-length <length>', 'Maximum line length', '80')
@@ -250,7 +250,7 @@ class CLI {
       if (options.init) {
         const defaultConfig = {
           outputFormat: 'plain',
-          indentSize: 4,
+          indentSize: 3,
           indentType: 'spaces',
           beautify: true,
           includeComments: true,
@@ -439,7 +439,7 @@ class CLI {
   private buildConversionOptions(cliOptions: any): ConversionOptions {
     return {
       outputFormat: cliOptions.format || 'plain',
-      indentSize: parseInt(cliOptions.indentSize) || 4,
+      indentSize: parseInt(cliOptions.indentSize) || 3,
       indentType: cliOptions.indentType || 'spaces',
       lineEnding: (cliOptions.lineEnding === 'crlf') ? '\r\n' : '\n',
       maxLineLength: parseInt(cliOptions.maxLineLength) || 80,

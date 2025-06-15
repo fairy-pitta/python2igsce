@@ -85,7 +85,7 @@ export class PythonASTVisitor extends BaseParser {
           // 現在のIF文のインデントレベルを取得
           const currentLine = lines[i - 1];
           const ifIndentLevel = currentLine.length - currentLine.trimStart().length;
-          const expectedBodyIndent = ifIndentLevel + 4; // IF文の本体は4スペース深い
+          const expectedBodyIndent = ifIndentLevel + 3; // IF文の本体は3スペース深い
           
           while (i < lines.length && !lines[i].trim().startsWith('elif') && !lines[i].trim().startsWith('else')) {
             const line = lines[i];
@@ -502,7 +502,9 @@ export class PythonASTVisitor extends BaseParser {
     // 代入文
     if (trimmed.includes('=') && !trimmed.includes('==')) {
       const [left, right] = trimmed.split('=', 2);
-      const rightTrimmed = right.trim();
+      // インラインコメントを除去
+      const rightWithoutComment = right.includes('#') ? right.split('#')[0] : right;
+      const rightTrimmed = rightWithoutComment.trim();
       
       // 右辺の式を解析
       let valueNode: ASTNode | undefined = undefined;
@@ -583,6 +585,21 @@ export class PythonASTVisitor extends BaseParser {
               index: isNaN(parseInt(index)) ? index : parseInt(index)
             };
           }
+          // メソッド呼び出し（例: text.upper(), text.lower()）
+          else if (rightTrimmed.includes('.')) {
+            const methodMatch = rightTrimmed.match(/(\w+)\.(\w+)\(\)/);
+            if (methodMatch) {
+              const [, objName, methodName] = methodMatch;
+              isVariable = true;
+              valueNode = {
+                type: 'Attribute',
+                value: { type: 'Name', id: objName },
+                attr: methodName
+              };
+            } else {
+              parsedValue = rightTrimmed;
+            }
+          }
           // 変数名
           else if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(rightTrimmed)) {
             isVariable = true;
@@ -605,12 +622,31 @@ export class PythonASTVisitor extends BaseParser {
         valueNode = { type: 'Constant', value: rightTrimmed };
       }
       
-      return {
+      const assignNode = {
         type: 'Assign',
         targets: [{ type: 'Name', id: left.trim() }],
         value: valueNode,
         lineno: lineNumber
       };
+      
+      // インラインコメントがある場合は、コメントノードも作成
+      if (right.includes('#')) {
+        const commentPart = right.split('#')[1].trim();
+        const commentNode = {
+          type: 'Comment',
+          value: commentPart,
+          lineno: lineNumber
+        };
+        // 代入文とコメントの両方を含む複合ノードを返す
+        return {
+          type: 'AssignWithComment',
+          assign: assignNode,
+          comment: commentNode,
+          lineno: lineNumber
+        };
+      }
+      
+      return assignNode;
     }
     
     // print文
@@ -885,6 +921,8 @@ export class PythonASTVisitor extends BaseParser {
         return this.visitReturn(node);
       case 'Comment':
         return this.visitComment(node);
+      case 'AssignWithComment':
+        return this.visitAssignWithComment(node);
       case 'ArrayInit':
         return this.visitArrayInit(node);
       case 'ArrayAssign':
@@ -893,6 +931,10 @@ export class PythonASTVisitor extends BaseParser {
         return this.visitArrayAccess(node);
       case 'ArrayLiteral':
         return this.visitArrayLiteral(node);
+      case 'Break':
+        return this.visitBreak(node);
+      case 'Attribute':
+        return this.visitAttribute(node);
       default:
         this.addWarning(
           `Unsupported node type: ${node.type}`,
@@ -1140,6 +1182,15 @@ export class PythonASTVisitor extends BaseParser {
           return this.createIRNode('input', 'INPUT', [], inputMeta);
         }
         
+      case 'len':
+        // len()関数をLENGTH()に変換
+        const lenArgs = node.args.map((arg: ASTNode) => this.getValueString(arg)).join(', ');
+        const lenMeta: IRMeta = { name: 'len' };
+        if (lineNumber !== undefined) {
+          lenMeta.lineNumber = lineNumber;
+        }
+        return this.createIRNode('expression', `LENGTH(${lenArgs})`, [], lenMeta);
+        
       default:
         const callArgs = node.args.map((arg: ASTNode) => this.getValueString(arg)).join(', ');
         // 関数名を適切に変換
@@ -1295,9 +1346,12 @@ export class PythonASTVisitor extends BaseParser {
     // 変数を登録
     this.registerVariable(varName, 'INTEGER', node.lineno);
     
+    // forスコープを開始
+    this.enterScope('for', 'for');
     this.increaseIndent();
     const bodyChildren = node.body.map((child: ASTNode) => this.visitNode(child));
     this.decreaseIndent();
+    this.exitScope();
     
     const nextIR = this.createIRNode('statement', `NEXT ${varName}`);
     const children = [...bodyChildren, nextIR];
@@ -1345,9 +1399,12 @@ export class PythonASTVisitor extends BaseParser {
     const condition = this.getValueString(node.test);
     const whileText = `WHILE ${condition}`;
     
+    // whileスコープを開始
+    this.enterScope('while', 'while');
     this.increaseIndent();
     const bodyChildren = node.body.map((child: ASTNode) => this.visitNode(child));
     this.decreaseIndent();
+    this.exitScope();
     
     const endwhileIR = this.createIRNode('endwhile', 'ENDWHILE');
     const children = [...bodyChildren, endwhileIR];
@@ -1493,6 +1550,83 @@ export class PythonASTVisitor extends BaseParser {
       meta.lineNumber = node.lineno;
     }
     return this.createIRNode('comment', text, [], meta);
+  }
+
+  /**
+   * インラインコメント付き代入文の処理
+   */
+  private visitAssignWithComment(node: ASTNode): IR {
+    // 代入文とコメントを別々に処理
+    const assignIR = this.visitAssign(node.assign);
+    const commentIR = this.visitComment(node.comment);
+    
+    // 代入文のテキストにインラインコメントを追加
+    const assignText = assignIR.text;
+    const commentText = commentIR.text.replace('//', '  //');
+    const combinedText = `${assignText}${commentText}`;
+    
+    return this.createIRNode('assign', combinedText, [], {
+      ...assignIR.meta,
+      hasInlineComment: true
+    });
+  }
+
+  /**
+   * Break文の処理
+   */
+  private visitBreak(node: ASTNode): IR {
+    // 現在のスコープを確認してEXIT文を生成
+    const currentScope = this.getCurrentLoopType();
+    let breakText: string;
+    
+    if (currentScope === 'while') {
+      breakText = 'EXIT WHILE';
+    } else if (currentScope === 'for') {
+      breakText = 'EXIT FOR';
+    } else {
+      // ループ外のbreak文は警告を出す
+      this.addWarning(
+        'Break statement outside of loop',
+        'implicit_conversion',
+        node.lineno
+      );
+      breakText = '// Break statement outside of loop';
+    }
+    
+    const meta: IRMeta = {};
+    if (node.lineno !== undefined) {
+      meta.lineNumber = node.lineno;
+    }
+    return this.createIRNode('break', breakText, [], meta);
+  }
+
+  /**
+   * Attributeノード（メソッド呼び出し）の処理
+   */
+  private visitAttribute(node: ASTNode): IR {
+    const objName = this.getValueString(node.value);
+    const methodName = node.attr;
+    
+    let convertedMethod: string;
+    switch (methodName) {
+      case 'upper':
+        convertedMethod = 'UCASE';
+        break;
+      case 'lower':
+        convertedMethod = 'LCASE';
+        break;
+      default:
+        convertedMethod = methodName;
+        break;
+    }
+    
+    const text = `${convertedMethod}(${objName})`;
+    const meta: IRMeta = { name: methodName };
+    if (node.lineno !== undefined) {
+      meta.lineNumber = node.lineno;
+    }
+    
+    return this.createIRNode('expression', text, [], meta);
   }
 
   /**
@@ -1777,9 +1911,23 @@ export class PythonASTVisitor extends BaseParser {
         if (funcName === 'input') {
           const prompt = node.args.length > 0 ? this.getValueString(node.args[0]) : '';
           return prompt ? `INPUT(${prompt})` : 'INPUT()';
+        } else if (funcName === 'len') {
+          const args = node.args.map((arg: ASTNode) => this.getValueString(arg)).join(',');
+          return `LENGTH(${args})`;
         }
         const args = node.args.map((arg: ASTNode) => this.getValueString(arg)).join(',');
         return `${funcName}(${args})`;
+      case 'Attribute':
+        const objName = this.getValueString(node.value);
+        const methodName = node.attr;
+        switch (methodName) {
+          case 'upper':
+            return `UCASE(${objName})`;
+          case 'lower':
+            return `LCASE(${objName})`;
+          default:
+            return `${objName}.${methodName}`;
+        }
       case 'BinOp':
         const left = this.getValueString(node.left);
         const right = this.getValueString(node.right);
@@ -1896,7 +2044,7 @@ export class PythonASTVisitor extends BaseParser {
       'FloorDiv': 'DIV',
       'Mod': 'MOD',
       'Pow': '^',
-      'Eq': '=',
+      'Eq': '==',
       'NotEq': '≠',
       'Lt': '<',
       'LtE': '≤',

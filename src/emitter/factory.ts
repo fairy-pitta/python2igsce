@@ -70,7 +70,7 @@ export class EmitterFactory {
     const options: Partial<EmitterOptions> = {
       beautify: true,
       includeComments: true,
-      indentSize: 4,
+      indentSize: 3,
       maxLineLength: 80
     };
     
@@ -148,7 +148,7 @@ export function getFormatSpecificOptions(format: OutputFormat): {
     case 'plain':
       return {
         recommendedOptions: {
-          indentSize: 4,
+          indentSize: 3,
           indentChar: ' ',
           lineEnding: '\n',
           includeComments: true,
@@ -161,7 +161,7 @@ export function getFormatSpecificOptions(format: OutputFormat): {
     case 'markdown':
       return {
         recommendedOptions: {
-          indentSize: 4,
+          indentSize: 3,
           indentChar: ' ',
           lineEnding: '\n',
           includeComments: true,
@@ -187,7 +187,7 @@ export function getFormatSpecificOptions(format: OutputFormat): {
     case 'latex':
       return {
         recommendedOptions: {
-          indentSize: 4,
+          indentSize: 3,
           indentChar: ' ',
           lineEnding: '\n',
           includeComments: false,

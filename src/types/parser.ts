@@ -180,7 +180,9 @@ export type ScopeType =
   | 'global'     // グローバルスコープ
   | 'function'   // 関数スコープ
   | 'class'      // クラススコープ
-  | 'block';     // ブロックスコープ
+  | 'block'      // ブロックスコープ
+  | 'while'      // whileループスコープ
+  | 'for';       // forループスコープ
 
 /**
  * 位置情報

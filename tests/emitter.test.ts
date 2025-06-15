@@ -23,7 +23,7 @@ describe('IGCSE Pseudocode Emitter', () => {
     });
 
     it('should emit with proper indentation', () => {
-      const options: Partial<EmitterOptions> = { indentSize: 4 };
+      const options: Partial<EmitterOptions> = { indentSize: 3 };
       const emitter = new TextEmitter(options);
       
       const childIR = createIR('assign', 'y ← 10', []);
@@ -32,7 +32,7 @@ describe('IGCSE Pseudocode Emitter', () => {
       const result = emitter.emit(parentIR);
       
       expect(result.code).toContain('IF x > 0 THEN');
-      expect(result.code).toContain('    y ← 10'); // 4スペースのインデント
+      expect(result.code).toContain('   y ← 10'); // 3スペースのインデント
     });
   });
 
