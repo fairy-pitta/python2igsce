@@ -1,3 +1,0 @@
-Welcome to Node.js v24.1.0.
-Type ".help" for more information.
-> 
