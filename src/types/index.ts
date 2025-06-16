@@ -63,6 +63,8 @@ export interface ConversionResult {
   emitResult: import('./emitter').EmitResult;
   /** 変換統計 */
   stats: ConversionStats;
+  /** パースされたAST（デバッグ用） */
+  ast?: any;
 }
 
 export interface ConversionStats {

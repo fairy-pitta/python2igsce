@@ -61,7 +61,8 @@ export abstract class BaseParser {
       indentLevel: 0,
       errors: [],
       warnings: [],
-      arrayInfo: {}
+      arrayInfo: {},
+      startTime: Date.now()
     };
   }
 
@@ -280,7 +281,7 @@ export abstract class BaseParser {
   /**
    * IRノード数のカウント
    */
-  private countNodes(ir: IR): number {
+  protected countNodes(ir: IR): number {
     return 1 + ir.children.reduce((sum, child) => sum + this.countNodes(child), 0);
   }
 
@@ -316,10 +317,8 @@ export abstract class BaseParser {
   /**
    * デバッグ情報の出力
    */
-  protected debug(message: string): void {
-    if (this.options.debug) {
-      console.log(`[Parser Debug] ${message}`);
-    }
+  protected debug(_message: string): void {
+    // Debug logging disabled
   }
 
   /**

@@ -230,6 +230,7 @@ export class TextEmitter extends BaseEmitter {
       }
     }
     this.decreaseIndent();
+    // emitChildren(node)は呼ばない（手動で処理済み）
   }
 
   /**

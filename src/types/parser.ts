@@ -234,6 +234,8 @@ export interface ParserContext {
   warnings: ParseWarning[];
   /** 配列情報 */
   arrayInfo: { [key: string]: { size: number; elementType: string } };
+  /** パース開始時刻 */
+  startTime: number;
 }
 
 /**

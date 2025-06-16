@@ -20,6 +20,9 @@ export interface IR {
  * IRノードの種類
  */
 export type IRKind = 
+  // プログラム構造
+  | 'program'    // プログラム全体
+  
   // 基本構文
   | 'assign'     // 代入文
   | 'output'     // 出力文

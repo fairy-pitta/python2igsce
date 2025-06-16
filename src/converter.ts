@@ -56,8 +56,8 @@ export class Converter {
     const startTime = Date.now();
     
     try {
-      // パース
-      const parseResult = await this.parser.parse(pythonCode);
+      // パース処理
+      const parseResult = this.parser.parse(pythonCode);
       
       if (parseResult.errors.length > 0 && this.options.strictMode) {
         return this.createErrorResult(
@@ -68,7 +68,7 @@ export class Converter {
         );
       }
       
-      // エミット
+      // エミット処理
       const emitter = this.options.outputFormat === 'markdown' 
         ? this.markdownEmitter 
         : this.textEmitter;
@@ -84,20 +84,23 @@ export class Converter {
         endTime
       );
       
-      return {
+      const result = {
         code: emitResult.code,
         parseResult,
         emitResult,
-        stats
+        stats,
+        ast: parseResult.ir
       };
+      return result;
       
     } catch (error) {
-      return this.createErrorResult(
+      const errorResult = this.createErrorResult(
         error instanceof Error ? error.message : 'Unknown error occurred',
         [],
         [],
         startTime
       );
+      return errorResult;
     }
   }
 
@@ -342,7 +345,8 @@ export class Converter {
         outputLines: 0,
         errorCount: parseErrors.length + 1,
         warningCount: parseWarnings.length
-      }
+      },
+      ast: undefined
     };
   }
 

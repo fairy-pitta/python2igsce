@@ -1,12 +1,13 @@
 // メインのPythonパーサークラス
-import { PythonASTVisitor } from './visitor';
+import { BaseParser } from './base-parser';
 import { ParserOptions, ParseResult } from '../types/parser';
 import { IR } from '../types/ir';
+import { PythonASTVisitor } from './visitor';
 
 /**
  * PythonからIGCSE Pseudocodeへの変換パーサー
  */
-export class PythonParser extends PythonASTVisitor {
+export class PythonParser extends BaseParser {
   constructor(options: ParserOptions = {}) {
     super(options);
   }
@@ -15,32 +16,107 @@ export class PythonParser extends PythonASTVisitor {
    * Pythonソースコードをパースしてイルに変換
    */
   override parse(source: string): ParseResult {
-    console.log('[DEBUG] PythonParser.parse() called');
-    this.debug('Starting Python parse...');
+    this.resetContext();
     
-    // 前処理
-    const preprocessedSource = this.preprocess(source);
-    console.log('[DEBUG] Preprocessed source:', preprocessedSource.substring(0, 100));
+    const preprocessedSource = this.preprocessSource(source);
     
-    // パース実行
-    const result = super.parse(preprocessedSource);
-    console.log('[DEBUG] Parse result nodes:', result.stats.nodesGenerated);
+    const result = this.parseToIR(preprocessedSource);
     
-    // 後処理（一時的に無効化）
-    // const postprocessedIR = this.postprocess(result.ir);
-    const postprocessedIR = result.ir;
+    // 統計情報の更新
+    result.stats.parseTime = Date.now() - this.context.startTime;
     
-    console.log('[DEBUG] Parse completed');
-    this.debug(`Parse completed. Nodes: ${result.stats.nodesGenerated}, Errors: ${result.errors.length}`);
+    return result;
+  }
+
+  /**
+   * IRへのパース処理
+   */
+  private parseToIR(source: string): ParseResult {
+    this.context.startTime = Date.now();
     
-    return {
-        ...result,
-        ir: postprocessedIR
-      };
+    // ソースコードの前処理
+    const processedSource = this.preprocessSource(source);
+    
+    // PythonASTVisitorを使用してASTからIRへ変換
+    const visitor = new PythonASTVisitor(this.options);
+    const visitorResult = visitor.parse(processedSource);
+    
+    const parseTime = Date.now() - this.context.startTime;
+    
+    const result: ParseResult = {
+       ir: visitorResult.ir,
+       errors: [...this.context.errors, ...visitorResult.errors],
+       warnings: [...this.context.warnings, ...visitorResult.warnings],
+       stats: {
+         parseTime,
+         linesProcessed: processedSource.split('\n').length,
+         nodesGenerated: this.countNodes(visitorResult.ir),
+         functionsFound: this.countFunctionsFromIR(visitorResult.ir),
+         classesFound: this.countClassesFromIR(visitorResult.ir),
+         variablesFound: this.countVariablesFromIR(visitorResult.ir)
+       }
+     };
+    
+    return result;
   }
 
   /**
    * ソースコードの前処理
+   */
+  private preprocessSource(source: string): string {
+    return this.preprocess(source);
+  }
+
+  /**
+   * IRから関数数をカウント
+   */
+  private countFunctionsFromIR(ir: IR): number {
+    let count = 0;
+    if (ir.kind === 'function' || ir.kind === 'procedure') {
+      count = 1;
+    }
+    if (ir.children) {
+      for (const child of ir.children) {
+        count += this.countFunctionsFromIR(child);
+      }
+    }
+    return count;
+  }
+
+  /**
+   * IRからクラス数をカウント
+   */
+  private countClassesFromIR(ir: IR): number {
+    let count = 0;
+    if (ir.kind === 'class') {
+      count = 1;
+    }
+    if (ir.children) {
+      for (const child of ir.children) {
+        count += this.countClassesFromIR(child);
+      }
+    }
+    return count;
+  }
+
+  /**
+   * IRから変数数をカウント
+   */
+  private countVariablesFromIR(ir: IR): number {
+    let count = 0;
+    if (ir.kind === 'assign' && ir.meta?.name) {
+      count = 1;
+    }
+    if (ir.children) {
+      for (const child of ir.children) {
+        count += this.countVariablesFromIR(child);
+      }
+    }
+    return count;
+  }
+
+  /**
+   * ソースコードの前処理（内部実装）
    */
   private preprocess(source: string): string {
     let processed = source;
@@ -239,15 +315,15 @@ export class PythonParser extends PythonASTVisitor {
   /**
    * パーサーの統計情報を取得
    */
-  getStats(): {
+  getStats(ir?: IR): {
     totalVariables: number;
     totalFunctions: number;
     totalScopes: number;
     maxNestingDepth: number;
   } {
     return {
-      totalVariables: this.countVariables(),
-      totalFunctions: this.countFunctions(),
+      totalVariables: ir ? this.countVariablesFromIR(ir) : 0,
+      totalFunctions: ir ? this.countFunctionsFromIR(ir) : 0,
       totalScopes: this.context.scopeStack.length,
       maxNestingDepth: this.context.indentLevel
     };

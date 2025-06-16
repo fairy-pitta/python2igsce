@@ -64,10 +64,30 @@ export class PythonASTVisitor extends BaseParser {
           i++;
           const bodyNodes: ASTNode[] = [];
           
+          // 関数定義のインデントレベルを取得
+          const funcLine = lines[i - 1];
+          const funcIndentLevel = funcLine.length - funcLine.trimStart().length;
+          const expectedBodyIndent = funcIndentLevel + 4; // 関数の本体は4スペース深い
+          
           // インデントされた行を関数の本体として収集
-          while (i < lines.length && (lines[i].startsWith('    ') || lines[i].trim() === '')) {
-            if (lines[i].trim()) {
-              const bodyNode = this.parseLineToAST(lines[i], i + 1);
+          while (i < lines.length) {
+            const line = lines[i];
+            const lineIndentLevel = line.length - line.trimStart().length;
+            
+            // 空行はスキップ
+            if (!line.trim()) {
+              i++;
+              continue;
+            }
+            
+            // 関数の本体より浅いインデントの場合は終了
+            if (lineIndentLevel <= funcIndentLevel) {
+              break;
+            }
+            
+            // 関数の本体として処理
+            if (lineIndentLevel >= expectedBodyIndent || line.trim()) {
+              const bodyNode = this.parseLineToAST(line, i + 1);
               bodyNodes.push(bodyNode);
             }
             i++;
@@ -556,7 +576,7 @@ export class PythonASTVisitor extends BaseParser {
         }
         // 配列リテラル（例: [1, 2, 3, 4, 5]）
         else if (rightTrimmed.startsWith('[') && rightTrimmed.endsWith(']')) {
-          console.log('DEBUG: Array literal detected in parseAssignment:', rightTrimmed);
+          // Array literal detected
           // 配列リテラルの場合、ArrayLiteralノードを作成
           const elements = rightTrimmed.slice(1, -1).split(',').map((elem: string) => {
              const trimmedElem = elem.trim();
@@ -571,7 +591,7 @@ export class PythonASTVisitor extends BaseParser {
             type: 'ArrayLiteral',
             elements: elements
           };
-          console.log('DEBUG: Created ArrayLiteral valueNode:', valueNode);
+          // Created ArrayLiteral valueNode
         }
         // 配列アクセス（例: numbers[i], arr[0]）
         else {
@@ -590,7 +610,7 @@ export class PythonASTVisitor extends BaseParser {
             const funcCallMatch = rightTrimmed.match(/(\w+)\(([^)]*)\)/);
             if (funcCallMatch) {
               const [, funcName, argsString] = funcCallMatch;
-              console.log(`[DEBUG] parseLineToAST: Function call detected: ${funcName}(${argsString})`);
+              // Function call detected
               
               // 引数を解析
               const args = argsString.trim() ? [{ type: 'Name', id: argsString.trim() }] : [];
@@ -601,7 +621,7 @@ export class PythonASTVisitor extends BaseParser {
                 func: { type: 'Name', id: funcName },
                 args: args
               };
-              console.log(`[DEBUG] parseLineToAST: Created Call node:`, valueNode);
+              // Created Call node
             } else {
               parsedValue = rightTrimmed;
             }
@@ -918,9 +938,6 @@ export class PythonASTVisitor extends BaseParser {
    * ASTノードをIRに変換
    */
   private visitNode(node: ASTNode): IR {
-    console.log('=== [DEBUG] visitNode CALLED ===');
-    console.log('[DEBUG] visitNode: node.type =', node.type);
-    console.log('[DEBUG] visitNode: node =', JSON.stringify(node, null, 2));
     this.debug(`Visiting node: ${node.type}`);
     
     switch (node.type) {
@@ -933,13 +950,14 @@ export class PythonASTVisitor extends BaseParser {
       case 'If':
         return this.visitIf(node);
       case 'For':
-        console.log(`[DEBUG] visitNode: Processing For node`);
+        // Processing For node
         return this.visitFor(node);
       case 'While':
         return this.visitWhile(node);
       case 'RepeatUntil':
         return this.visitRepeatUntil(node);
       case 'FunctionDef':
+        // Processing FunctionDef node
         return this.visitFunctionDef(node);
       case 'Return':
         return this.visitReturn(node);
@@ -959,6 +977,8 @@ export class PythonASTVisitor extends BaseParser {
         return this.visitBreak(node);
       case 'Attribute':
         return this.visitAttribute(node);
+      case 'Else':
+        return this.visitElse(node);
       default:
         this.addWarning(
           `Unsupported node type: ${node.type}`,
@@ -973,12 +993,6 @@ export class PythonASTVisitor extends BaseParser {
    * Moduleノードの処理
    */
   private visitModule(node: ASTNode): IR {
-    console.log('=== [DEBUG] visitModule CALLED ===');
-    console.log('[DEBUG] visitModule: node.body length =', node.body.length);
-    node.body.forEach((child: ASTNode, index: number) => {
-      console.log(`[DEBUG] visitModule: child[${index}].type =`, child.type);
-      console.log(`[DEBUG] visitModule: child[${index}] =`, JSON.stringify(child, null, 2));
-    });
     const children = node.body.map((child: ASTNode) => this.visitNode(child));
     return this.createIRNode('statement', '', children);
   }
@@ -987,12 +1001,8 @@ export class PythonASTVisitor extends BaseParser {
    * 代入文の処理
    */
   private visitAssign(node: ASTNode): IR {
-    console.log('\n=== [DEBUG] visitAssign CALLED ===');
-    console.log('[DEBUG] visitAssign: node =', JSON.stringify(node, null, 2));
     const target = node.targets[0];
     const varName = target.id || target.name || 'unknown';
-    console.log('[DEBUG] visitAssign: varName =', varName);
-    console.log('[DEBUG] visitAssign: node.value.type =', node.value.type);
     
     // input関数の場合は特別な処理
     if (node.value.type === 'Call' && (node.value.func.id === 'input' || node.value.func.name === 'input')) {
@@ -1042,9 +1052,9 @@ export class PythonASTVisitor extends BaseParser {
     }
     
     // 配列リテラルの場合は特別な処理
-    console.log('DEBUG: Checking node.value.type:', node.value.type);
-    if (node.value.type === 'ArrayLiteral') {
-      console.log('DEBUG: ArrayLiteral detected!');
+    // Checking node.value.type
+      if (node.value.type === 'ArrayLiteral') {
+        // ArrayLiteral detected
       const elements = node.value.elements || [];
       let elementType = 'INTEGER';
       
@@ -1109,7 +1119,7 @@ export class PythonASTVisitor extends BaseParser {
     let actualValue: any;
     let dataType: IGCSEDataType;
     
-    console.log('[DEBUG] visitAssign: node.value.type =', node.value.type);
+    // visitAssign: node.value.type
     
     if (node.value.type === 'Constant') {
       // Constantノードの場合は直接値を取得
@@ -1129,19 +1139,15 @@ export class PythonASTVisitor extends BaseParser {
       }
     } else if (node.value.type === 'Call') {
       // 関数呼び出しの場合は、visitCallを使用してIRを生成し、そのtextを取得
-      console.log('[DEBUG] visitAssign: Call node detected, calling visitCall');
-      console.log('[DEBUG] visitAssign: Call node func name =', node.value.func?.id || node.value.func?.name);
-      const callIR = this.visitCall(node.value, node.lineno);
-      console.log('[DEBUG] visitAssign: callIR =', JSON.stringify(callIR, null, 2));
-      console.log('[DEBUG] visitAssign: callIR.text =', callIR.text);
+      // Call node detected, calling visitCall
+        const callIR = this.visitCall(node.value);
       value = callIR.text;
       dataType = 'STRING'; // デフォルトとして文字列型を設定
       actualValue = value;
     } else {
       // その他の場合は従来通り
-      console.log('[DEBUG] visitAssign: Using getValueString for type:', node.value.type);
+      // Using getValueString
       value = this.getValueString(node.value);
-      console.log('[DEBUG] visitAssign: getValueString returned:', value);
       actualValue = value;
       dataType = inferDataType(actualValue);
     }
@@ -1170,20 +1176,17 @@ export class PythonASTVisitor extends BaseParser {
    * 式文の処理
    */
   private visitExpr(node: ASTNode): IR {
-    console.log('=== [DEBUG] visitExpr CALLED ===');
-    console.log('[DEBUG] visitExpr: node =', JSON.stringify(node, null, 2));
+    // visitExpr called
     const value = node.value;
-    console.log('[DEBUG] visitExpr: value.type =', value.type);
     
     if (value.type === 'Call') {
-      console.log('[DEBUG] visitExpr: Calling visitCall for Call node');
-      return this.visitCall(value, node.lineno);
+      // Calling visitCall for Call node
+      return this.visitCall(value);
+    } else {
+      // Using getValueString for non-Call node
+      const text = this.getValueString(value);
+      return this.createIRNode('expression', text);
     }
-    
-    console.log('[DEBUG] visitExpr: Using getValueString for non-Call node');
-    const text = this.getValueString(value);
-    console.log('[DEBUG] visitExpr: getValueString returned:', text);
-    return this.createIRNode('expression', text);
   }
 
   /**
@@ -1191,9 +1194,7 @@ export class PythonASTVisitor extends BaseParser {
    */
   private visitCall(node: ASTNode, lineNumber?: number): IR {
     const funcName = node.func.id || node.func.name;
-    console.log('\n=== [DEBUG] visitCall CALLED ===');
-    console.log('[DEBUG] visitCall: funcName =', funcName);
-    console.log('[DEBUG] visitCall: node =', JSON.stringify(node, null, 2));
+    // visitCall called
     
     switch (funcName) {
       case 'print':
@@ -1246,15 +1247,14 @@ export class PythonASTVisitor extends BaseParser {
         
       case 'len':
         // len()関数をLENGTH()に変換
-        console.log('[DEBUG] visitCall: Processing len() function');
-        const lenArgs = node.args.map((arg: ASTNode) => this.getValueString(arg)).join(', ');
-        console.log('[DEBUG] visitCall: lenArgs =', lenArgs);
+        // Processing len() function
+        const lenArgs = node.args.map((arg: any) => this.getValueString(arg));
         const lenMeta: IRMeta = { name: 'len' };
         if (lineNumber !== undefined) {
           lenMeta.lineNumber = lineNumber;
         }
         const lenResult = this.createIRNode('expression', `LENGTH(${lenArgs})`, [], lenMeta);
-        console.log('[DEBUG] visitCall: lenResult =', JSON.stringify(lenResult, null, 2));
+        // lenResult created
         return lenResult;
         
       default:
@@ -1279,36 +1279,19 @@ export class PythonASTVisitor extends BaseParser {
     
     this.increaseIndent();
     const bodyChildren = node.body.map((child: ASTNode) => this.visitNode(child));
+    this.decreaseIndent();
     
-    const elseChildren: IR[] = [];
+    const allChildren: IR[] = [...bodyChildren];
+    
+    // else/elif文の処理
     if (node.orelse && node.orelse.length > 0) {
-      // orelse配列の最初の要素をチェック
-      const firstElse = node.orelse[0];
-      
-      if (firstElse.type === 'If') {
-        // elif文の場合: "ELSE IF" として処理
-        const elifCondition = this.getValueString(firstElse.test);
-        const elseIfIR = this.createIRNode('elseif', `ELSE IF ${elifCondition} THEN`);
-        const elifBodyChildren = firstElse.body.map((child: ASTNode) => this.visitNode(child));
-        elseChildren.push(elseIfIR, ...elifBodyChildren);
-        
-        // 再帰的にelif/elseチェーンを処理
-        if (firstElse.orelse && firstElse.orelse.length > 0) {
-          const nestedElseChildren = this.processElseChain(firstElse.orelse);
-          elseChildren.push(...nestedElseChildren);
-        }
-      } else {
-        // 通常のelse文の場合
-        const elseIR = this.createIRNode('else', 'ELSE');
-        const elseBodyChildren = node.orelse.map((child: ASTNode) => this.visitNode(child));
-        elseChildren.push(elseIR, ...elseBodyChildren);
-      }
+      const elseChildren = this.processElseChain(node.orelse);
+      allChildren.push(...elseChildren);
     }
     
-    this.decreaseIndent();
+    // ENDIFを最後に追加
     const endifIR = this.createIRNode('endif', 'ENDIF');
-    
-    const children = [...bodyChildren, ...elseChildren, endifIR];
+    allChildren.push(endifIR);
     
     const meta: IRMeta = {
       condition: condition
@@ -1316,7 +1299,7 @@ export class PythonASTVisitor extends BaseParser {
     if (node.lineno !== undefined) {
       meta.lineNumber = node.lineno;
     }
-    return this.createIRNode('if', ifText, children, meta);
+    return this.createIRNode('if', ifText, allChildren, meta);
   }
   
   /**
@@ -1332,8 +1315,12 @@ export class PythonASTVisitor extends BaseParser {
         // elif文の場合
         const elifCondition = this.getValueString(firstElse.test);
         const elseIfIR = this.createIRNode('elseif', `ELSE IF ${elifCondition} THEN`);
+        result.push(elseIfIR);
+        
+        this.increaseIndent();
         const elifBodyChildren = firstElse.body.map((child: ASTNode) => this.visitNode(child));
-        result.push(elseIfIR, ...elifBodyChildren);
+        this.decreaseIndent();
+        result.push(...elifBodyChildren);
         
         // 再帰的に次のelif/elseを処理
         if (firstElse.orelse && firstElse.orelse.length > 0) {
@@ -1343,8 +1330,12 @@ export class PythonASTVisitor extends BaseParser {
       } else {
         // 最終的なelse文の場合
         const elseIR = this.createIRNode('else', 'ELSE');
+        result.push(elseIR);
+        
+        this.increaseIndent();
         const elseBodyChildren = orelse.map((child: ASTNode) => this.visitNode(child));
-        result.push(elseIR, ...elseBodyChildren);
+        this.decreaseIndent();
+        result.push(...elseBodyChildren);
       }
     }
     
@@ -1355,19 +1346,16 @@ export class PythonASTVisitor extends BaseParser {
    * FOR文の処理
    */
   private visitFor(node: ASTNode): IR {
-    console.log(`[DEBUG] ===== visitFor FUNCTION CALLED =====`);
-    console.log(`[DEBUG] visitFor called with varName: ${node.target.id}`);
-    console.log(`[DEBUG] visitFor node:`, JSON.stringify(node, null, 2));
+    // visitFor function called
     const varName = node.target.id;
     const iter = node.iter;
-    console.log(`[DEBUG] iter.type: ${iter.type}, iter.func?.id: ${iter.func?.id}`);
     
     let startValue = '0';
     let endValue = '9';
     let stepValue = '1';
     
     if (iter.type === 'Call' && iter.func.id === 'range') {
-      console.log(`[DEBUG] Processing range() call with ${iter.args.length} arguments`);
+      // Processing range() call
       this.debug(`Processing range() call with ${iter.args.length} arguments`);
       const args = iter.args;
       if (args.length === 1) {
@@ -1384,7 +1372,7 @@ export class PythonASTVisitor extends BaseParser {
           endValue = (n - 1).toString();
         }
         
-        console.log(`[DEBUG] Range(n): n=${n}, result: ${startValue} TO ${endValue}`);
+        // Range(n) processed
         this.debug(`Range(n): n=${n}, result: ${startValue} TO ${endValue}`);
       } else if (args.length === 2) {
         // range(start, end) の処理
@@ -1392,7 +1380,7 @@ export class PythonASTVisitor extends BaseParser {
         const [startIG, endIG] = this.transformRange(start, end, isEndLen, args[1]);
         startValue = startIG;
         endValue = endIG;
-        console.log(`[DEBUG] Range(start, end): start=${start}, end=${end}, isEndLen=${isEndLen}, result: ${startValue} TO ${endValue}`);
+        // Range(start, end) processed
         this.debug(`Range(start, end): start=${start}, end=${end}, isEndLen=${isEndLen}, result: ${startValue} TO ${endValue}`);
       } else if (args.length === 3) {
         // range(start, end, step)
@@ -1450,7 +1438,7 @@ export class PythonASTVisitor extends BaseParser {
     // args[1] が Call ノードかつ func.id === 'len' なら isEndLen = true
     const isEndLen = endArg.type === 'Call' && endArg.func?.id === 'len';
     
-    console.log(`[DEBUG] parseRangeArguments: start=${start}, end=${end}, isEndLen=${isEndLen}`);
+    // parseRangeArguments called
     
     return { start, end, isEndLen };
   }
@@ -1469,7 +1457,7 @@ export class PythonASTVisitor extends BaseParser {
       endIG = (end - 1).toString();        // Python rangeのendはexclusive → inclusive補正
     }
     
-    console.log(`[DEBUG] transformRange: start=${start}, end=${end}, isEndLen=${isEndLen} → startIG=${startIG}, endIG=${endIG}`);
+    // transformRange processed
     
     return [startIG, endIG];
   }
@@ -1916,16 +1904,15 @@ export class PythonASTVisitor extends BaseParser {
           const arrayArg = node.args[0];
           if (arrayArg.type === 'Name') {
             const arrayName = arrayArg.id;
-            console.log(`[DEBUG] getNumericValue: len(${arrayName}) detected`);
+            // len() detected
             this.debug(`getNumericValue: len(${arrayName}) detected`);
             if (this.context.arrayInfo && this.context.arrayInfo[arrayName]) {
               const size = this.context.arrayInfo[arrayName].size;
-              console.log(`[DEBUG] getNumericValue: returning array size ${size} for ${arrayName}`);
+              // returning array size
               this.debug(`getNumericValue: returning array size ${size} for ${arrayName}`);
               return size;
             } else {
-              console.log(`[DEBUG] getNumericValue: array info not found for ${arrayName}, returning default 5`);
-              console.log(`[DEBUG] arrayInfo:`, JSON.stringify(this.context.arrayInfo));
+              // array info not found, returning default
               this.debug(`getNumericValue: array info not found for ${arrayName}, returning default 5`);
               return 5; // デフォルト
             }
@@ -1941,11 +1928,7 @@ export class PythonASTVisitor extends BaseParser {
    * 値を文字列として取得
    */
   private getValueString(node: ASTNode): string {
-    console.log('\n=== [DEBUG] getValueString CALLED ===');
-    console.log('[DEBUG] getValueString: node.type =', node.type);
-    if (node.type === 'Call') {
-      console.log('[DEBUG] getValueString: Call node detected, func =', node.func?.id || node.func?.name);
-    }
+    // getValueString called
     if (!node) return '';
     
     switch (node.type) {
@@ -1994,11 +1977,9 @@ export class PythonASTVisitor extends BaseParser {
         }
         return parts.join(',');
       case 'Call':
-        console.log('=== [DEBUG] getValueString Call case ENTERED ===');
-        console.log('[DEBUG] Call node func name:', node.func?.id);
-        // ✅ 関数呼び出しノードは visitCall に委任して適切に処理
+        // Call case entered
+        // 関数呼び出しノードは visitCall に委任して適切に処理
         const callResult = this.visitCall(node, undefined);
-        console.log('[DEBUG] visitCall result:', callResult);
         return callResult.text;
       case 'Attribute':
         const objName = this.getValueString(node.value);
@@ -2035,11 +2016,7 @@ export class PythonASTVisitor extends BaseParser {
         
         return `${arrayName}[${index}]`;
       default:
-        console.log('=== [DEBUG] getValueString DEFAULT case ===');
-        console.log('[DEBUG] node.type:', node.type);
-        console.log('[DEBUG] node.value:', node.value);
-        console.log('[DEBUG] node.id:', node.id);
-        console.log('[DEBUG] node:', JSON.stringify(node, null, 2));
+        // Default case
         return node.value || node.id || 'unknown';
     }
   }
@@ -2164,19 +2141,11 @@ export class PythonASTVisitor extends BaseParser {
   }
 
   /**
-   * 関数名を適切に変換（snake_caseをPascalCaseに変換）
+   * 関数名を適切に変換（元の名前を保持）
    */
   private convertFunctionName(funcName: string): string {
-    // snake_caseをPascalCaseに変換
-    // 例: add_numbers -> Add, main -> Main
-    if (funcName.includes('_')) {
-      // アンダースコアで分割して最初の単語のみを使用し、先頭を大文字に
-      const firstWord = funcName.split('_')[0];
-      return firstWord.charAt(0).toUpperCase() + firstWord.slice(1).toLowerCase();
-    } else {
-      // 単一単語の場合は先頭を大文字に
-      return funcName.charAt(0).toUpperCase() + funcName.slice(1).toLowerCase();
-    }
+    // 元の関数名をそのまま保持
+    return funcName;
   }
 
   /**
@@ -2193,5 +2162,16 @@ export class PythonASTVisitor extends BaseParser {
     };
     
     return opMap[op] || 'Eq';
+  }
+
+  /**
+   * Elseノードの処理
+   */
+  private visitElse(node: ASTNode): IR {
+    this.increaseIndent();
+    const bodyChildren = node.body ? node.body.map((child: ASTNode) => this.visitNode(child)) : [];
+    this.decreaseIndent();
+    
+    return this.createIRNode('else', 'ELSE', bodyChildren);
   }
 }

@@ -354,10 +354,8 @@ export abstract class BaseEmitter {
   /**
    * デバッグ情報の出力
    */
-  protected debug(message: string): void {
-    if (this.options.includeDebugInfo) {
-      console.log(`[Emitter Debug] ${message}`);
-    }
+  protected debug(_message: string): void {
+    // Debug logging disabled
   }
 
   /**
