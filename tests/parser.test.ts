@@ -144,13 +144,15 @@ describe('Python to IGCSE Pseudocode Parser', () => {
     it('should convert array declaration', async () => {
       const pythonCode = 'numbers = [1, 2, 3, 4, 5]';
       const result = await converter.convert(pythonCode);
-      expect(result.code).toContain('numbers ← [1, 2, 3, 4, 5]');
+      expect(result.code).toContain('DECLARE numbers : ARRAY[1:5] OF INTEGER');
+      expect(result.code).toContain('numbers[1] ← 1');
+      expect(result.code).toContain('numbers[5] ← 5');
     });
 
     it('should convert array access', async () => {
       const pythonCode = 'first = numbers[0]';
       const result = await converter.convert(pythonCode);
-      expect(result.code).toContain('first ← numbers[0]');
+      expect(result.code).toContain('first ← numbers[1]');
     });
   });
 
@@ -186,7 +188,7 @@ describe('Python to IGCSE Pseudocode Parser', () => {
   });
 
   // 配列処理のテスト
-  describe.skip('Array Processing', () => {
+  describe('Array Processing', () => {
     it('should convert array declaration and initialization', async () => {
       const pythonCode = 'numbers = [1, 2, 3, 4, 5]';
       const result = await converter.convert(pythonCode);

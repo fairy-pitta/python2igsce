@@ -585,6 +585,27 @@ export class PythonASTVisitor extends BaseParser {
               index: isNaN(parseInt(index)) ? index : parseInt(index)
             };
           }
+          // 関数呼び出し（例: len(array), max(array)）
+          else if (rightTrimmed.includes('(') && rightTrimmed.includes(')')) {
+            const funcCallMatch = rightTrimmed.match(/(\w+)\(([^)]*)\)/);
+            if (funcCallMatch) {
+              const [, funcName, argsString] = funcCallMatch;
+              console.log(`[DEBUG] parseLineToAST: Function call detected: ${funcName}(${argsString})`);
+              
+              // 引数を解析
+              const args = argsString.trim() ? [{ type: 'Name', id: argsString.trim() }] : [];
+              
+              isVariable = true;
+              valueNode = {
+                type: 'Call',
+                func: { type: 'Name', id: funcName },
+                args: args
+              };
+              console.log(`[DEBUG] parseLineToAST: Created Call node:`, valueNode);
+            } else {
+              parsedValue = rightTrimmed;
+            }
+          }
           // メソッド呼び出し（例: text.upper(), text.lower()）
           else if (rightTrimmed.includes('.')) {
             const methodMatch = rightTrimmed.match(/(\w+)\.(\w+)\(\)/);
@@ -897,6 +918,9 @@ export class PythonASTVisitor extends BaseParser {
    * ASTノードをIRに変換
    */
   private visitNode(node: ASTNode): IR {
+    console.log('=== [DEBUG] visitNode CALLED ===');
+    console.log('[DEBUG] visitNode: node.type =', node.type);
+    console.log('[DEBUG] visitNode: node =', JSON.stringify(node, null, 2));
     this.debug(`Visiting node: ${node.type}`);
     
     switch (node.type) {
@@ -949,6 +973,12 @@ export class PythonASTVisitor extends BaseParser {
    * Moduleノードの処理
    */
   private visitModule(node: ASTNode): IR {
+    console.log('=== [DEBUG] visitModule CALLED ===');
+    console.log('[DEBUG] visitModule: node.body length =', node.body.length);
+    node.body.forEach((child: ASTNode, index: number) => {
+      console.log(`[DEBUG] visitModule: child[${index}].type =`, child.type);
+      console.log(`[DEBUG] visitModule: child[${index}] =`, JSON.stringify(child, null, 2));
+    });
     const children = node.body.map((child: ASTNode) => this.visitNode(child));
     return this.createIRNode('statement', '', children);
   }
@@ -957,8 +987,12 @@ export class PythonASTVisitor extends BaseParser {
    * 代入文の処理
    */
   private visitAssign(node: ASTNode): IR {
+    console.log('\n=== [DEBUG] visitAssign CALLED ===');
+    console.log('[DEBUG] visitAssign: node =', JSON.stringify(node, null, 2));
     const target = node.targets[0];
     const varName = target.id || target.name || 'unknown';
+    console.log('[DEBUG] visitAssign: varName =', varName);
+    console.log('[DEBUG] visitAssign: node.value.type =', node.value.type);
     
     // input関数の場合は特別な処理
     if (node.value.type === 'Call' && (node.value.func.id === 'input' || node.value.func.name === 'input')) {
@@ -1046,29 +1080,36 @@ export class PythonASTVisitor extends BaseParser {
         declareMeta.lineNumber = node.lineno;
       }
       
-      // 配列の初期化も含める場合は、宣言と初期化を分けて生成
-       const initElements = elements.map((elem: any) => elem.value).join(', ');
-       const initText = `${varName} ← [${initElements}]`;
+      // 配列の初期化は個別の要素代入として生成
+       const children: IR[] = [];
        
-       const initMeta: IRMeta = {
-         name: varName,
-         dataType: 'ARRAY'
-       };
-       if (node.lineno !== undefined) {
-         initMeta.lineNumber = node.lineno;
-       }
-       
-       // 宣言と初期化の両方を含むブロックを作成
+       // 宣言を追加
        const declareIR = this.createIRNode('array', declareText, [], declareMeta);
-       const initIR = this.createIRNode('assign', initText, [], initMeta);
+       children.push(declareIR);
        
-       return this.createIRNode('block', '', [declareIR, initIR], declareMeta);
+       // 各要素の代入を追加
+       elements.forEach((elem: any, index: number) => {
+         const assignText = `${varName}[${index + 1}] ← ${elem.value}`;
+         const assignMeta: IRMeta = {
+           name: varName,
+           index: index + 1
+         };
+         if (node.lineno !== undefined) {
+           assignMeta.lineNumber = node.lineno;
+         }
+         const assignIR = this.createIRNode('assign', assignText, [], assignMeta);
+         children.push(assignIR);
+       });
+       
+       return this.createIRNode('block', '', children, declareMeta);
     }
     
     // 値とデータ型を取得
     let value: string;
     let actualValue: any;
     let dataType: IGCSEDataType;
+    
+    console.log('[DEBUG] visitAssign: node.value.type =', node.value.type);
     
     if (node.value.type === 'Constant') {
       // Constantノードの場合は直接値を取得
@@ -1086,9 +1127,21 @@ export class PythonASTVisitor extends BaseParser {
       } else {
         value = String(actualValue);
       }
+    } else if (node.value.type === 'Call') {
+      // 関数呼び出しの場合は、visitCallを使用してIRを生成し、そのtextを取得
+      console.log('[DEBUG] visitAssign: Call node detected, calling visitCall');
+      console.log('[DEBUG] visitAssign: Call node func name =', node.value.func?.id || node.value.func?.name);
+      const callIR = this.visitCall(node.value, node.lineno);
+      console.log('[DEBUG] visitAssign: callIR =', JSON.stringify(callIR, null, 2));
+      console.log('[DEBUG] visitAssign: callIR.text =', callIR.text);
+      value = callIR.text;
+      dataType = 'STRING'; // デフォルトとして文字列型を設定
+      actualValue = value;
     } else {
       // その他の場合は従来通り
+      console.log('[DEBUG] visitAssign: Using getValueString for type:', node.value.type);
       value = this.getValueString(node.value);
+      console.log('[DEBUG] visitAssign: getValueString returned:', value);
       actualValue = value;
       dataType = inferDataType(actualValue);
     }
@@ -1117,13 +1170,19 @@ export class PythonASTVisitor extends BaseParser {
    * 式文の処理
    */
   private visitExpr(node: ASTNode): IR {
+    console.log('=== [DEBUG] visitExpr CALLED ===');
+    console.log('[DEBUG] visitExpr: node =', JSON.stringify(node, null, 2));
     const value = node.value;
+    console.log('[DEBUG] visitExpr: value.type =', value.type);
     
     if (value.type === 'Call') {
+      console.log('[DEBUG] visitExpr: Calling visitCall for Call node');
       return this.visitCall(value, node.lineno);
     }
     
+    console.log('[DEBUG] visitExpr: Using getValueString for non-Call node');
     const text = this.getValueString(value);
+    console.log('[DEBUG] visitExpr: getValueString returned:', text);
     return this.createIRNode('expression', text);
   }
 
@@ -1132,6 +1191,9 @@ export class PythonASTVisitor extends BaseParser {
    */
   private visitCall(node: ASTNode, lineNumber?: number): IR {
     const funcName = node.func.id || node.func.name;
+    console.log('\n=== [DEBUG] visitCall CALLED ===');
+    console.log('[DEBUG] visitCall: funcName =', funcName);
+    console.log('[DEBUG] visitCall: node =', JSON.stringify(node, null, 2));
     
     switch (funcName) {
       case 'print':
@@ -1184,12 +1246,16 @@ export class PythonASTVisitor extends BaseParser {
         
       case 'len':
         // len()関数をLENGTH()に変換
+        console.log('[DEBUG] visitCall: Processing len() function');
         const lenArgs = node.args.map((arg: ASTNode) => this.getValueString(arg)).join(', ');
+        console.log('[DEBUG] visitCall: lenArgs =', lenArgs);
         const lenMeta: IRMeta = { name: 'len' };
         if (lineNumber !== undefined) {
           lenMeta.lineNumber = lineNumber;
         }
-        return this.createIRNode('expression', `LENGTH(${lenArgs})`, [], lenMeta);
+        const lenResult = this.createIRNode('expression', `LENGTH(${lenArgs})`, [], lenMeta);
+        console.log('[DEBUG] visitCall: lenResult =', JSON.stringify(lenResult, null, 2));
+        return lenResult;
         
       default:
         const callArgs = node.args.map((arg: ASTNode) => this.getValueString(arg)).join(', ');
@@ -1306,15 +1372,24 @@ export class PythonASTVisitor extends BaseParser {
       const args = iter.args;
       if (args.length === 1) {
         // range(n) -> 0 to n-1
-        startValue = '0';
         const n = this.getNumericValue(args[0]);
-        endValue = (n - 1).toString();
+        
+        // len()関数の場合はLENGTH()として出力し、1-basedにする
+        if (args[0].type === 'Call' && args[0].func?.id === 'len') {
+          const arrayName = args[0].args[0]?.id || 'array';
+          startValue = '1';
+          endValue = `LENGTH(${arrayName})`;
+        } else {
+          startValue = '0';
+          endValue = (n - 1).toString();
+        }
+        
         console.log(`[DEBUG] Range(n): n=${n}, result: ${startValue} TO ${endValue}`);
         this.debug(`Range(n): n=${n}, result: ${startValue} TO ${endValue}`);
       } else if (args.length === 2) {
         // range(start, end) の処理
         const { start, end, isEndLen } = this.parseRangeArgumentsNodes(args[0], args[1]);
-        const [startIG, endIG] = this.transformRange(start, end, isEndLen);
+        const [startIG, endIG] = this.transformRange(start, end, isEndLen, args[1]);
         startValue = startIG;
         endValue = endIG;
         console.log(`[DEBUG] Range(start, end): start=${start}, end=${end}, isEndLen=${isEndLen}, result: ${startValue} TO ${endValue}`);
@@ -1380,12 +1455,19 @@ export class PythonASTVisitor extends BaseParser {
     return { start, end, isEndLen };
   }
 
-  private transformRange(start: number, end: number, isEndLen: boolean): [string, string] {
+  private transformRange(start: number, end: number, isEndLen: boolean, endNode?: ASTNode): [string, string] {
     const startIG = (start + 1).toString();
     
-    const endIG = isEndLen 
-      ? end.toString()               // len(array) → inclusive
-      : (end - 1).toString();        // Python rangeのendはexclusive → inclusive補正
+    let endIG: string;
+    if (isEndLen && endNode?.type === 'Call' && endNode.func?.id === 'len') {
+      // len()関数の場合はLENGTH()として出力
+      const arrayName = endNode.args[0]?.id || 'array';
+      endIG = `LENGTH(${arrayName})`;
+    } else if (isEndLen) {
+      endIG = end.toString();               // len(array) → inclusive
+    } else {
+      endIG = (end - 1).toString();        // Python rangeのendはexclusive → inclusive補正
+    }
     
     console.log(`[DEBUG] transformRange: start=${start}, end=${end}, isEndLen=${isEndLen} → startIG=${startIG}, endIG=${endIG}`);
     
@@ -1686,8 +1768,8 @@ export class PythonASTVisitor extends BaseParser {
     let index: string;
     
     if (typeof node.index === 'number') {
-      // 数値インデックスの場合、そのまま使用（0ベースを維持）
-      index = node.index.toString();
+      // 数値インデックスの場合、0-based to 1-based変換
+      index = (node.index + 1).toString();
     } else {
       // 変数インデックスの場合、そのまま使用
       index = node.index.toString();
@@ -1859,6 +1941,11 @@ export class PythonASTVisitor extends BaseParser {
    * 値を文字列として取得
    */
   private getValueString(node: ASTNode): string {
+    console.log('\n=== [DEBUG] getValueString CALLED ===');
+    console.log('[DEBUG] getValueString: node.type =', node.type);
+    if (node.type === 'Call') {
+      console.log('[DEBUG] getValueString: Call node detected, func =', node.func?.id || node.func?.name);
+    }
     if (!node) return '';
     
     switch (node.type) {
@@ -1907,16 +1994,12 @@ export class PythonASTVisitor extends BaseParser {
         }
         return parts.join(',');
       case 'Call':
-        const funcName = node.func.id || node.func.name;
-        if (funcName === 'input') {
-          const prompt = node.args.length > 0 ? this.getValueString(node.args[0]) : '';
-          return prompt ? `INPUT(${prompt})` : 'INPUT()';
-        } else if (funcName === 'len') {
-          const args = node.args.map((arg: ASTNode) => this.getValueString(arg)).join(',');
-          return `LENGTH(${args})`;
-        }
-        const args = node.args.map((arg: ASTNode) => this.getValueString(arg)).join(',');
-        return `${funcName}(${args})`;
+        console.log('=== [DEBUG] getValueString Call case ENTERED ===');
+        console.log('[DEBUG] Call node func name:', node.func?.id);
+        // ✅ 関数呼び出しノードは visitCall に委任して適切に処理
+        const callResult = this.visitCall(node, undefined);
+        console.log('[DEBUG] visitCall result:', callResult);
+        return callResult.text;
       case 'Attribute':
         const objName = this.getValueString(node.value);
         const methodName = node.attr;
@@ -1943,8 +2026,8 @@ export class PythonASTVisitor extends BaseParser {
         let index: string;
         
         if (typeof node.index === 'number') {
-          // 数値インデックスの場合、そのまま使用（0ベースを維持）
-          index = node.index.toString();
+          // 数値インデックスの場合、0-based to 1-based変換
+          index = (node.index + 1).toString();
         } else {
           // 変数インデックスの場合、そのまま使用
           index = node.index.toString();
@@ -1952,6 +2035,11 @@ export class PythonASTVisitor extends BaseParser {
         
         return `${arrayName}[${index}]`;
       default:
+        console.log('=== [DEBUG] getValueString DEFAULT case ===');
+        console.log('[DEBUG] node.type:', node.type);
+        console.log('[DEBUG] node.value:', node.value);
+        console.log('[DEBUG] node.id:', node.id);
+        console.log('[DEBUG] node:', JSON.stringify(node, null, 2));
         return node.value || node.id || 'unknown';
     }
   }
