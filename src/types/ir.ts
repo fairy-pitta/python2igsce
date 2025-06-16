@@ -110,6 +110,10 @@ export interface IRMeta {
   elementType?: string;
   /** 配列の要素 */
   elements?: any[];
+  /** input関数にプロンプトがあるかどうか */
+  hasPrompt?: boolean;
+  /** input関数のプロンプト文字列 */
+  prompt?: string;
 }
 
 /**

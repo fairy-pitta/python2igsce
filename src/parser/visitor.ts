@@ -605,6 +605,21 @@ export class PythonASTVisitor extends BaseParser {
               index: isNaN(parseInt(index)) ? index : parseInt(index)
             };
           }
+          // メソッド呼び出し（例: text.upper(), text.lower()）
+          else if (rightTrimmed.includes('.')) {
+            const methodMatch = rightTrimmed.match(/(\w+)\.(\w+)\(\)/);
+            if (methodMatch) {
+              const [, objName, methodName] = methodMatch;
+              isVariable = true;
+              valueNode = {
+                type: 'Attribute',
+                value: { type: 'Name', id: objName },
+                attr: methodName
+              };
+            } else {
+              parsedValue = rightTrimmed;
+            }
+          }
           // 関数呼び出し（例: len(array), max(array)）
           else if (rightTrimmed.includes('(') && rightTrimmed.includes(')')) {
             const funcCallMatch = rightTrimmed.match(/(\w+)\(([^)]*)\)/);
@@ -622,21 +637,6 @@ export class PythonASTVisitor extends BaseParser {
                 args: args
               };
               // Created Call node
-            } else {
-              parsedValue = rightTrimmed;
-            }
-          }
-          // メソッド呼び出し（例: text.upper(), text.lower()）
-          else if (rightTrimmed.includes('.')) {
-            const methodMatch = rightTrimmed.match(/(\w+)\.(\w+)\(\)/);
-            if (methodMatch) {
-              const [, objName, methodName] = methodMatch;
-              isVariable = true;
-              valueNode = {
-                type: 'Attribute',
-                value: { type: 'Name', id: objName },
-                attr: methodName
-              };
             } else {
               parsedValue = rightTrimmed;
             }
@@ -1012,33 +1012,19 @@ export class PythonASTVisitor extends BaseParser {
       const dataType = 'STRING'; // inputは通常文字列を返す
       this.registerVariable(varName, dataType, node.lineno);
       
-      // プロンプトがある場合は、OUTPUT文とINPUT文を分けて生成
-       if (prompt) {
-         const outputMeta: IRMeta = {};
-         if (node.lineno !== undefined) {
-           outputMeta.lineNumber = node.lineno;
-         }
-         
-         const inputMeta: IRMeta = {
-           name: varName,
-           dataType
-         };
-         if (node.lineno !== undefined) {
-           inputMeta.lineNumber = node.lineno;
-         }
-         
-         const outputNode = this.createIRNode('output', `OUTPUT ${prompt}`, [], outputMeta);
-         const inputNode = this.createIRNode('input', `INPUT ${varName}`, [], inputMeta);
-         
-         // 複数のIRノードを返すため、親ノードを作成
-         const blockMeta: IRMeta = {};
-         if (node.lineno !== undefined) {
-           blockMeta.lineNumber = node.lineno;
-         }
-         
-         return this.createIRNode('block', '', [outputNode, inputNode], blockMeta);
+      // プロンプトがある場合は「INPUT プロンプト, 変数名」の形式
+      if (prompt) {
+        const inputMeta: IRMeta = {
+          name: varName,
+          dataType
+        };
+        if (node.lineno !== undefined) {
+          inputMeta.lineNumber = node.lineno;
+        }
+        
+        return this.createIRNode('input', `INPUT ${prompt}, ${varName}`, [], inputMeta);
       } else {
-        // プロンプトがない場合は従来通り
+        // プロンプトがない場合は「INPUT 変数名」
         const inputMeta: IRMeta = {
           name: varName,
           dataType
@@ -1120,6 +1106,7 @@ export class PythonASTVisitor extends BaseParser {
     let dataType: IGCSEDataType;
     
     // visitAssign: node.value.type
+
     
     if (node.value.type === 'Constant') {
       // Constantノードの場合は直接値を取得
@@ -1140,7 +1127,37 @@ export class PythonASTVisitor extends BaseParser {
     } else if (node.value.type === 'Call') {
       // 関数呼び出しの場合は、visitCallを使用してIRを生成し、そのtextを取得
       // Call node detected, calling visitCall
-        const callIR = this.visitCall(node.value);
+      const callIR = this.visitCall(node.value);
+      
+      // input関数の場合は特別な処理
+      if (node.value.func && node.value.func.id === 'input') {
+        if (callIR.meta?.hasPrompt && callIR.meta?.prompt) {
+          // プロンプトがある場合: INPUT "プロンプト", 変数名
+          const text = `INPUT ${callIR.meta.prompt}, ${varName}`;
+          const meta: IRMeta = {
+            name: varName,
+            dataType: 'STRING'
+          };
+          if (node.lineno !== undefined) {
+            meta.lineNumber = node.lineno;
+          }
+          this.registerVariable(varName, 'STRING', node.lineno);
+          return this.createIRNode('input', text, [], meta);
+        } else {
+          // プロンプトがない場合: INPUT 変数名
+          const text = `INPUT ${varName}`;
+          const meta: IRMeta = {
+            name: varName,
+            dataType: 'STRING'
+          };
+          if (node.lineno !== undefined) {
+            meta.lineNumber = node.lineno;
+          }
+          this.registerVariable(varName, 'STRING', node.lineno);
+          return this.createIRNode('input', text, [], meta);
+        }
+      }
+      
       value = callIR.text;
       dataType = 'STRING'; // デフォルトとして文字列型を設定
       actualValue = value;
@@ -1193,6 +1210,11 @@ export class PythonASTVisitor extends BaseParser {
    * 関数呼び出しの処理
    */
   private visitCall(node: ASTNode, lineNumber?: number): IR {
+    // メソッド呼び出しの場合（例: text.upper()）
+    if (node.func.type === 'Attribute') {
+      return this.visitAttribute(node.func);
+    }
+    
     const funcName = node.func.id || node.func.name;
     // visitCall called
     
@@ -1213,37 +1235,18 @@ export class PythonASTVisitor extends BaseParser {
         return this.createIRNode('output', `OUTPUT ${formattedArgs}`, [], outputMeta);
         
       case 'input':
-        // プロンプトがある場合は、まずOUTPUTでプロンプトを表示
+        // input関数は代入文の文脈で処理されるため、ここでは基本的な情報のみ返す
+        const inputMeta: IRMeta = { 
+          name: 'input',
+          hasPrompt: node.args.length > 0
+        };
         if (node.args.length > 0) {
-          const prompt = this.getValueString(node.args[0]);
-          // プロンプトのOUTPUT文を作成
-          const outputMeta: IRMeta = {};
-          if (lineNumber !== undefined) {
-            outputMeta.lineNumber = lineNumber;
-          }
-          const outputIR = this.createIRNode('output', `OUTPUT ${prompt}`, [], outputMeta);
-          
-          // INPUT文を作成
-          const inputMeta: IRMeta = {};
-          if (lineNumber !== undefined) {
-            inputMeta.lineNumber = lineNumber;
-          }
-          const inputIR = this.createIRNode('input', 'INPUT', [], inputMeta);
-          
-          // 複合文として返す
-          const compoundMeta: IRMeta = {};
-          if (lineNumber !== undefined) {
-            compoundMeta.lineNumber = lineNumber;
-          }
-          return this.createIRNode('compound', '', [outputIR, inputIR], compoundMeta);
-        } else {
-          // プロンプトなしの場合
-          const inputMeta: IRMeta = {};
-          if (lineNumber !== undefined) {
-            inputMeta.lineNumber = lineNumber;
-          }
-          return this.createIRNode('input', 'INPUT', [], inputMeta);
+          inputMeta.prompt = this.getValueString(node.args[0]);
         }
+        if (lineNumber !== undefined) {
+          inputMeta.lineNumber = lineNumber;
+        }
+        return this.createIRNode('input', 'INPUT', [], inputMeta);
         
       case 'len':
         // len()関数をLENGTH()に変換
@@ -1677,20 +1680,19 @@ export class PythonASTVisitor extends BaseParser {
     const objName = this.getValueString(node.value);
     const methodName = node.attr;
     
-    let convertedMethod: string;
+    let text: string;
     switch (methodName) {
       case 'upper':
-        convertedMethod = 'UCASE';
+        text = `UCASE(${objName})`;
         break;
       case 'lower':
-        convertedMethod = 'LCASE';
+        text = `LCASE(${objName})`;
         break;
       default:
-        convertedMethod = methodName;
+        text = `${objName}.${methodName}`;
         break;
     }
     
-    const text = `${convertedMethod}(${objName})`;
     const meta: IRMeta = { name: methodName };
     if (node.lineno !== undefined) {
       meta.lineNumber = node.lineno;
