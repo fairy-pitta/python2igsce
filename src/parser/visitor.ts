@@ -1108,7 +1108,19 @@ export class PythonASTVisitor extends BaseParser {
     // visitAssign: node.value.type
 
     
-    if (node.value.type === 'Constant') {
+    // Check if the value is a logical or comparison expression that shouldn't be quoted
+    const valueType = node.value.type;
+    const isLogicalOrComparisonExpr = 
+        valueType === 'BoolOp' || 
+        valueType === 'Compare' || 
+        (valueType === 'UnaryOp' && node.value.op?.type === 'Not');
+
+    if (isLogicalOrComparisonExpr) {
+      value = this.getValueString(node.value);
+      actualValue = value; // Actual value is the expression string itself
+      dataType = 'BOOLEAN'; // Logical/comparison expressions result in a boolean
+    }
+    else if (node.value.type === 'Constant') {
       // Constantノードの場合は直接値を取得
       actualValue = node.value.value;
       dataType = inferDataType(actualValue);
@@ -1980,7 +1992,16 @@ export class PythonASTVisitor extends BaseParser {
         return parts.join(',');
       case 'Call':
         // Call case entered
-        // 関数呼び出しノードは visitCall に委任して適切に処理
+        if (node.func.id === 'input' && node.args && node.args.length > 0) {
+          const promptArg = node.args[0];
+          const promptStr = this.getValueString(promptArg);
+          // For input with prompt, it's handled in visitCall, this path might not be hit often for input.
+          // However, if it is, ensure it's formatted correctly or rely on visitCall.
+          // This direct return might be too simplistic for input() and should be reviewed.
+          // For now, let's assume visitCall handles input() primarily.
+          return `INPUT ${promptStr}`; // Simplified, actual handling in visitCall
+        }
+        // For other function calls, delegate to visitCall
         const callResult = this.visitCall(node, undefined);
         return callResult.text;
       case 'Attribute':
@@ -1995,15 +2016,96 @@ export class PythonASTVisitor extends BaseParser {
             return `${objName}.${methodName}`;
         }
       case 'BinOp':
-        const left = this.getValueString(node.left);
-        const right = this.getValueString(node.right);
-        const op = this.getOperatorString(node.op);
-        return `${left} ${op} ${right}`;
+        const leftNode = node.left;
+        const rightNode = node.right;
+        const opNodeBin = node.op;
+
+        const leftValStr = this.getValueString(leftNode);
+        const rightValStr = this.getValueString(rightNode);
+        const opStr = this.getOperatorString(opNodeBin);
+
+        // Determine if operands are numeric based on their AST node type or literal value
+        const isNumeric = (valNode: ASTNode, valStr: string): boolean => {
+          if (valNode.type === 'Constant' && typeof valNode.value === 'number') return true;
+          if (valNode.type === 'Num') return true;
+          // Check if the string representation is a plain number (not in quotes)
+          return !isNaN(parseFloat(valStr)) && isFinite(valNode.value) && !valStr.startsWith('"') && !valStr.endsWith('"');
+        };
+
+        const leftIsNumeric = isNumeric(leftNode, leftValStr);
+        const rightIsNumeric = isNumeric(rightNode, rightValStr);
+
+        if (opNodeBin.type === 'Add') {
+          // If either operand is explicitly a string literal, or if neither is clearly numeric, assume string concatenation.
+          const leftIsStringLiteral = (leftNode.type === 'Constant' && typeof leftNode.value === 'string') || (leftValStr.startsWith('"') && leftValStr.endsWith('"'));
+          const rightIsStringLiteral = (rightNode.type === 'Constant' && typeof rightNode.value === 'string') || (rightValStr.startsWith('"') && rightValStr.endsWith('"'));
+
+          if (leftIsStringLiteral || rightIsStringLiteral || (!leftIsNumeric && !rightIsNumeric) ) {
+            // String concatenation
+            let finalLeft = leftValStr;
+            // Ensure variables or non-quoted strings are not double-quoted for concatenation
+            if (leftNode.type === 'Name' || (leftNode.type === 'Constant' && typeof leftNode.value === 'string' && !(leftValStr.startsWith('"') && leftValStr.endsWith('"')))) {
+                // Use variable name directly or ensure string literal is quoted if not already
+                finalLeft = (leftNode.type === 'Name') ? leftNode.id : (leftIsStringLiteral ? leftValStr : `"${leftNode.value}"`);
+            } else if (leftIsStringLiteral && !(finalLeft.startsWith('"') && finalLeft.endsWith('"'))) {
+                 finalLeft = `"${leftNode.value}"`; // Ensure literal strings are quoted
+            }
+
+            let finalRight = rightValStr;
+            if (rightNode.type === 'Name' || (rightNode.type === 'Constant' && typeof rightNode.value === 'string' && !(rightValStr.startsWith('"') && rightValStr.endsWith('"')))) {
+                finalRight = (rightNode.type === 'Name') ? rightNode.id : (rightIsStringLiteral ? rightValStr : `"${rightNode.value}"`);
+            } else if (rightIsStringLiteral && !(finalRight.startsWith('"') && finalRight.endsWith('"'))) {
+                finalRight = `"${rightNode.value}"`;
+            }
+            return `${finalLeft} & ${finalRight}`;
+          } else {
+            // Arithmetic addition
+            return `${leftValStr} + ${rightValStr}`;
+          }
+        } else if (opNodeBin.type === 'FloorDiv') {
+            return `${leftValStr} DIV ${rightValStr}`;
+        } else {
+          // Other binary operations
+          return `${leftValStr} ${opStr} ${rightValStr}`;
+        }
+      case 'BoolOp':
+        const opBoolStr = this.getOperatorString(node.op);
+        // Ensure operands are not unnecessarily quoted
+        const valuesStr = node.values.map(val => {
+          const valStr = this.getValueString(val);
+          // Remove quotes if it's a variable or already a boolean TRUE/FALSE
+          if (val.type === 'Name' || valStr === 'TRUE' || valStr === 'FALSE') {
+            return val.id || valStr;
+          }
+          return valStr;
+        }).join(` ${opBoolStr} `);
+        return `(${valuesStr})`; // Enclose in parentheses for clarity if not already handled by precedence
+      case 'UnaryOp':
+        const opUnaryStr = this.getOperatorString(node.op);
+        let operandStr = this.getValueString(node.operand);
+        // For NOT operator, ensure operand is not quoted if it's a variable name
+        if (opUnaryStr === 'NOT' && node.operand.type === 'Name') {
+          operandStr = node.operand.id;
+        }
+        return `${opUnaryStr} ${operandStr}`.trim();
       case 'Compare':
-        const leftComp = this.getValueString(node.left);
-        const rightComp = this.getValueString(node.comparators[0]);
-        const opComp = this.getOperatorString(node.ops[0]);
-        return `${leftComp} ${opComp} ${rightComp}`;
+        let leftCompare = this.getValueString(node.left);
+        // If left operand is a Name, use its id directly to avoid quotes
+        if (node.left.type === 'Name') {
+            leftCompare = node.left.id;
+        }
+        let comparisons = [];
+        for (let i = 0; i < node.ops.length; i++) {
+          const opCompStr = this.getOperatorString(node.ops[i]);
+          let rightCompare = this.getValueString(node.comparators[i]);
+          // If right operand is a Name, use its id directly
+          if (node.comparators[i].type === 'Name') {
+            rightCompare = node.comparators[i].id;
+          }
+          comparisons.push(`${leftCompare} ${opCompStr} ${rightCompare}`);
+          leftCompare = rightCompare; 
+        }
+        return `(${comparisons.join(' AND ')})`; // IGCSE might need explicit AND for chained comparisons, or just the first one.
       case 'ArrayAccess':
         const arrayName = node.array.id;
         let index: string;
@@ -2108,20 +2210,20 @@ export class PythonASTVisitor extends BaseParser {
       'Sub': '-',
       'Mult': '*',
       'Div': '/',
-      'FloorDiv': 'DIV',
+      'FloorDiv': 'DIV', // Corrected mapping
       'Mod': 'MOD',
       'Pow': '^',
-      'Eq': '==',
-      'NotEq': '≠',
+      'Eq': '=',
+      'NotEq': '<>', // Corrected mapping for not equal
       'Lt': '<',
-      'LtE': '≤',
+      'LtE': '<=', // Using <= for LtE as ≤ might not be standard pseudocode
       'Gt': '>',
-      'GtE': '≥',
+      'GtE': '>=', // Using >= for GtE as ≥ might not be standard pseudocode
       'And': 'AND',
       'Or': 'OR',
       'Not': 'NOT'
     };
-    
+
     return opMap[op.type] || op.type;
   }
 
