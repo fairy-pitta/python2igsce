@@ -94,6 +94,10 @@ export interface IRMeta {
   stepValue?: string;
   /** 条件式 */
   condition?: string;
+  /** THEN側のステートメント（IF文用） */
+  consequent?: IR[];
+  /** ELSE側のステートメント（IF文用） */
+  alternate?: IR[];
   /** 戻り値の型 */
   returnType?: IGCSEDataType;
   /** 配列のサイズ */

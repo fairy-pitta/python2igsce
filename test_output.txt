@@ -1,0 +1,18 @@
+// Test comparison operators
+"result ← (a ≥ b)"
+"other ← (x ≤ y)"
+"check ← (p ≠ q)"
+"equal ← (m = n)"
+// Test in expressions
+IF a ≥ b THEN
+   OUTPUT "greater or equal"
+ENDIF
+WHILE x ≤ y
+   x ← x + 1
+ENDWHILE
+IF p ≠ q THEN
+   OUTPUT "not equal"
+ENDIF
+IF m ← n THEN
+   OUTPUT "equal"
+ENDIF

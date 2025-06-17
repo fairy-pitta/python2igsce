@@ -31,7 +31,7 @@ export class Converter {
     // エミッターの初期化
     const emitterOptions: EmitterOptions = {
       format: this.options.outputFormat ?? 'plain',
-      indentSize: this.options.indentSize ?? 3,
+      indentSize: this.options.indentSize ?? 2,
       indentChar: ' ',
       indentType: this.options.indentType ?? 'spaces',
       lineEnding: this.options.lineEnding ?? '\n',
@@ -52,7 +52,7 @@ export class Converter {
   /**
    * Python コードを IGCSE Pseudocode に変換
    */
-  async convert(pythonCode: string): Promise<ConversionResult> {
+  convert(pythonCode: string): ConversionResult {
     const startTime = Date.now();
     
     try {
@@ -183,7 +183,7 @@ export class Converter {
     // エミッターオプションの更新
     const emitterOptions: EmitterOptions = {
       format: this.options.outputFormat ?? 'plain',
-      indentSize: this.options.indentSize ?? 3,
+      indentSize: this.options.indentSize ?? 2,
       indentChar: ' ',
       indentType: this.options.indentType ?? 'spaces',
       lineEnding: this.options.lineEnding ?? '\n',
@@ -268,7 +268,7 @@ export class Converter {
   private mergeDefaultOptions(options: Partial<ConversionOptions>): ConversionOptions {
     const defaults: ConversionOptions = {
       outputFormat: 'plain',
-      indentSize: 3,
+      indentSize: 2,
       indentType: 'spaces',
       lineEnding: '\n',
       maxLineLength: 80,

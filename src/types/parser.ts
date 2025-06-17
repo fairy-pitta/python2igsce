@@ -139,6 +139,8 @@ export interface FunctionInfo {
   returnType?: IGCSEDataType | undefined;
   /** 関数かプロシージャか */
   isFunction: boolean;
+  /** 戻り値があるか */
+  hasReturn: boolean;
   /** 定義された行番号 */
   definedAt?: number | undefined;
 }

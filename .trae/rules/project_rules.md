@@ -1,5 +1,27 @@
 # Python → IGCSE Pseudocode 変換ライブラリ 実装TODO
 
+## 🐛 現在のバグ状況
+
+### 関数呼び出しでCALLキーワードが欠落する問題
+
+**問題**: プロシージャ呼び出し時に`CALL`キーワードが出力されない
+
+**原因**: 
+1. `visitFunctionDef`で関数を登録した後、`enterScope`で新しいスコープを作成している
+2. 関数呼び出し時に`findFunction`が呼ばれるが、関数は子スコープに登録されているため見つからない
+3. 結果として関数呼び出しが式として処理され、`CALL`キーワードが付かない
+
+**解決策**: 関数を親スコープに登録するか、スコープ管理を見直す必要がある
+
+**関連ファイル**:
+- `src/parser/visitor.ts` (visitFunctionDef, visitCall)
+- `src/parser/base-parser.ts` (registerFunction, findFunction, スコープ管理)
+
+---
+
+npm testとかそのままやるとウォッチモードに入ります。ウォッチモード禁止。
+できればテスト単体で（一つのテストごとに実行）
+
 ## 📋 実装フェーズ概要
 
 ### Phase 1: 基盤型定義とIR構造

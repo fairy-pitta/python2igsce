@@ -273,7 +273,7 @@ export function createIndentInfo(
 export function getDefaultEmitterOptions(): EmitterOptions {
   return {
     format: 'plain',
-    indentSize: 4,
+    indentSize: 2,
     indentChar: ' ',
     lineEnding: '\n',
     maxLineLength: 80,
@@ -290,7 +290,7 @@ export function getDefaultFormatterConfig(): FormatterConfig {
     spaceAroundOperators: true,
     spaceAfterComma: true,
     spaceInsideParentheses: false,
-    insertBlankLines: true,
+    insertBlankLines: false,
     wrapLongLines: true
   };
 }

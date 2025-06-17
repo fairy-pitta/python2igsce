@@ -149,12 +149,11 @@ export class TextEmitter extends BaseEmitter {
         break;
         
       default:
-        this.addWarning(
-          `Unsupported node kind: ${node.kind}`,
-          'complex_expression',
-          node
-        );
-        this.emitStatement(node);
+        // 未知のノードタイプの場合、テキストをそのまま出力
+        if (node.text) {
+          this.emitLine(this.formatText(node.text));
+        }
+        this.emitChildren(node);
         break;
     }
   }
@@ -213,36 +212,48 @@ export class TextEmitter extends BaseEmitter {
 
   /**
    * IF文の出力
+   * 構造化されたconsequent/alternateフィールドを使用
    */
   private emitIf(node: IR): void {
     const text = this.formatText(node.text);
     this.emitLine(text);
     
-    this.increaseIndent();
-    // 子ノードを処理するが、ENDIF、ELSE、ELSE IFは元のインデントレベルで出力
-    for (const child of node.children) {
-      if (child.kind === 'endif' || child.kind === 'else' || child.kind === 'elseif') {
-        this.decreaseIndent();
-        this.emitNode(child);
-        this.increaseIndent();
-      } else {
-        this.emitNode(child);
+    // THEN側（consequent）の出力
+    if (node.meta?.consequent) {
+      this.increaseIndent();
+      for (const stmt of node.meta.consequent) {
+        this.emitNode(stmt);
+      }
+      this.decreaseIndent();
+    }
+    
+    // ELSE側（alternate）の出力
+    if (node.meta?.alternate && node.meta.alternate.length > 0) {
+      for (const altStmt of node.meta.alternate) {
+        this.emitNode(altStmt);
       }
     }
-    this.decreaseIndent();
-    // emitChildren(node)は呼ばない（手動で処理済み）
+    
+    // ENDIFの出力
+    this.emitLine('ENDIF');
   }
 
   /**
    * ELSE文の出力
+   * 構造化されたconsequentフィールドを使用
    */
   private emitElse(node: IR): void {
     const text = this.formatText(node.text);
     this.emitLine(text);
     
-    this.increaseIndent();
-    this.emitChildren(node);
-    this.decreaseIndent();
+    // ELSE文の本体（consequent）の出力
+    if (node.meta?.consequent) {
+      this.increaseIndent();
+      for (const stmt of node.meta.consequent) {
+        this.emitNode(stmt);
+      }
+      this.decreaseIndent();
+    }
   }
 
   /**
@@ -263,7 +274,6 @@ export class TextEmitter extends BaseEmitter {
   private emitEndif(node: IR): void {
     const text = this.formatText(node.text);
     this.emitLine(text);
-    this.emitChildren(node);
   }
 
   /**

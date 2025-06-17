@@ -178,6 +178,7 @@ export abstract class BaseParser {
       parameters,
       returnType,
       isFunction: returnType !== undefined,
+      hasReturn: returnType !== undefined,
       definedAt: line
     };
     
