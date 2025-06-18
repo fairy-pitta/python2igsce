@@ -1211,14 +1211,13 @@ export class PythonASTVisitor extends BaseParser {
    * 式文の処理
    */
   private visitExpr(node: ASTNode): IR {
-    // visitExpr called
+    console.log("visitExpr called with node:", JSON.stringify(node, null, 2)); console.log("node.value.type:", node.value.type);
     const value = node.value;
     
     if (value.type === 'Call') {
       // Calling visitCall for Call node
-      const callIR = this.visitCall(value);
-      // プロシージャ呼び出しの場合は、既にstatementとして処理されている
-      return callIR;
+      // visitCallが正しいkindを返すのでそのまま使用
+      return this.visitCall(value);
     } else {
       // Using getValueString for non-Call node
       const text = this.getValueString(value);
@@ -1231,7 +1230,7 @@ export class PythonASTVisitor extends BaseParser {
    */
   private visitCall(node: ASTNode, lineNumber?: number): IR {
     const funcName = node.func.id || node.func.name;
-    // visitCall called
+    console.log("visitCall called with funcName:", funcName);
     
     switch (funcName) {
       case 'print':
@@ -1304,14 +1303,14 @@ export class PythonASTVisitor extends BaseParser {
         let callText: string;
         let irKind: IRKind;
         
-        if (functionInfo && !functionInfo.hasReturn) {
-          // プロシージャの場合はCALLを追加
-          callText = `CALL ${convertedFuncName}(${callArgs})`;
-          irKind = 'statement';
-        } else {
+        if (functionInfo && functionInfo.hasReturn) {
           // 関数の場合はそのまま
           callText = `${convertedFuncName}(${callArgs})`;
           irKind = 'expression';
+        } else {
+          // プロシージャの場合、または関数が見つからない場合はCALLを追加
+          callText = `CALL ${convertedFuncName}(${callArgs})`;
+          irKind = 'statement';
         }
         
         const exprMeta: IRMeta = { name: funcName };
@@ -1581,7 +1580,8 @@ export class PythonASTVisitor extends BaseParser {
     // パラメータ（型注釈なし）
     const paramText = params.join(', ');
     
-    // 最初に仮の関数情報を登録（後で更新）
+    // まず関数を現在のスコープ（親スコープ）に登録
+    // 仮の関数情報を登録（後で更新）
     this.registerFunction(funcName, parameterInfo, undefined, node.lineno);
     
     this.enterScope(funcName, 'function');
@@ -1596,7 +1596,7 @@ export class PythonASTVisitor extends BaseParser {
     const hasReturn = this.hasReturnStatement(bodyChildren);
     
     // 戻り値の型を推定（型注釈から）
-    let returnType: IGCSEDataType = 'STRING';
+    let returnType: IGCSEDataType = 'ANY';
     if (hasReturn && node.returns) {
       returnType = this.mapPythonTypeToIGCSE(node.returns);
     } else if (hasReturn) {
@@ -1608,9 +1608,7 @@ export class PythonASTVisitor extends BaseParser {
     if (functionInfo) {
       functionInfo.hasReturn = hasReturn;
       functionInfo.isFunction = hasReturn;
-      if (hasReturn) {
-        functionInfo.returnType = returnType;
-      }
+      functionInfo.returnType = hasReturn ? returnType : undefined;
     }
     
     let funcText: string;
@@ -2045,9 +2043,10 @@ export class PythonASTVisitor extends BaseParser {
         return parts.join(',');
       case 'Call':
         // Call case entered
-        // 関数呼び出しノードは visitCall に委任して適切に処理
+        console.log("getValueString Call case called");
         const callResult = this.visitCall(node, undefined);
-        return callResult.text;
+        // CALLキーワードを除去して関数呼び出し部分のみを返す
+        return callResult.text.replace(/^CALL /, '');
       case 'Attribute':
         const objName = this.getValueString(node.value);
         const methodName = node.attr;

@@ -10,7 +10,8 @@ export type IGCSEDataType =
   | 'BOOLEAN'   // 真偽値型
   | 'CHAR'      // 文字型
   | 'ARRAY'     // 配列型
-  | 'RECORD';   // レコード型
+  | 'RECORD'    // レコード型
+  | 'ANY';      // 任意の型（型推論できない場合）
 
 /**
  * IGCSE Pseudocodeの演算子

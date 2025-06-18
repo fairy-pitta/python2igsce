@@ -1,52 +1,32 @@
-const { Converter } = require('./dist/index.js');
+const { Converter } = require('./dist/converter');
 
-async function test() {
-  const converter = new Converter({
-    maxLineLength: 0
-  });
-  
-  console.log('Testing comparison operator conversion after fix:');
-  
-  const testCases = [
-    'a >= b',
-    'a <= b', 
-    'a != b',
-    'result = (a >= b)',
-    'is_equal = (a == b)',
-    'is_not_equal = (a != b)',
-    'is_greater_equal = (a >= b)',
-    'is_less_equal = (a <= b)'
-  ];
-  
-  for (const testCase of testCases) {
-    try {
-      console.log(`\nInput: ${testCase}`);
-      const result = await converter.convert(testCase);
-      console.log(`Output: "${result.code}"`);
-      
-      // 特殊文字の確認
-      const hasSpecialChars = /[≠≥≤]/.test(result.code);
-      console.log(`Contains special chars: ${hasSpecialChars}`);
-      
-      // 期待される変換の確認
-      if (testCase.includes('>=') && result.code.includes('≥')) {
-        console.log('✅ >= correctly converted to ≥');
-      } else if (testCase.includes('<=') && result.code.includes('≤')) {
-        console.log('✅ <= correctly converted to ≤');
-      } else if (testCase.includes('!=') && result.code.includes('≠')) {
-        console.log('✅ != correctly converted to ≠');
-      } else if (testCase.includes('==') && result.code.includes(' = ')) {
-        console.log('✅ == correctly converted to =');
-      } else if (testCase.includes('>=') || testCase.includes('<=') || testCase.includes('!=')) {
-        console.log('❌ Missing special characters!');
-      } else {
-        console.log('✅ Conversion looks correct');
-      }
-      
-    } catch (error) {
-      console.error(`Error with ${testCase}:`, error.message);
-    }
+// デバッグ用のConverterクラスを拡張
+class DebugConverter extends Converter {
+  constructor() {
+    super();
+    // デバッグモードを有効にする
+    this.options = { debug: true };
   }
 }
 
-test();
+const converter = new DebugConverter();
+
+const code = `def display_message(msg):
+    print(msg)
+
+display_message("Hello")`;
+
+console.log('=== 入力コード ===');
+console.log(code);
+console.log('\n=== 変換開始 ===');
+
+const result = converter.convert(code);
+
+console.log('\n=== 変換結果 ===');
+console.log('Code:');
+console.log(result.code);
+
+console.log('\n=== 詳細検証 ===');
+console.log('Contains CALL keyword:', result.code.includes('CALL'));
+console.log('Contains display_message:', result.code.includes('display_message'));
+console.log('Full result:', JSON.stringify(result, null, 2));
