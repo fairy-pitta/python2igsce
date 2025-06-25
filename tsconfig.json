@@ -26,6 +26,7 @@
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
+    "downlevelIteration": true,
     "moduleResolution": "node",
     "baseUrl": ".",
     "paths": {

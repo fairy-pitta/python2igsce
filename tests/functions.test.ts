@@ -134,7 +134,7 @@ x, y = swap(x, y) # Pythonic swap`;
       // Let's test a hypothetical direct translation if the converter could infer BYREF for a swap.
       // This is highly dependent on converter logic for BYREF.
       // For now, we'll test a direct IGCSE-style procedure if the converter could map to it.
-      const converterWithByRefSupport = new Converter({ /* options to enable byref interpretation */ });
+      const converterWithByRefSupport = new Converter();
       const igcseEquivalentCode = 
 `# Hypothetical Python that maps to BYREF
 # def swap_byref(a: BYREF_INT, b: BYREF_INT):
@@ -179,7 +179,7 @@ modify_list_element(my_list) # my_list[0] becomes 20`;
 #   temp ← a
 #   a ← b
 #   b ← temp
-# ENDPROCEDURE`
+# ENDPROCEDURE`;
       // This test is more illustrative of the target than a direct Python translation feature without conventions.
       // For now, we'll skip a direct BYREF translation test until the convention is solid.
       expect(true).toBe(true); // Placeholder
