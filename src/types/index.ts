@@ -65,6 +65,8 @@ export interface ConversionResult {
   stats: ConversionStats;
   /** パースされたAST（デバッグ用） */
   ast?: any;
+  /** 中間表現（IR）ツリー */
+  ir?: import('./ir').IR;
 }
 
 export interface ConversionStats {

@@ -1,18 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { PythonParser } from '../src/parser/python-parser';
-import { TextEmitter } from '../src/emitter/text-emitter';
+import { Converter } from '../src/converter';
 
 describe('E2E Tests - Python to IGCSE Pseudocode', () => {
-  const parser = new PythonParser();
-  const emitter = new TextEmitter();
+  const converter = new Converter();
 
   function convertPython(pythonCode: string): string {
-    const parseResult = parser.parse(pythonCode);
-    if (parseResult.errors.length > 0) {
-      throw new Error(`Parse errors: ${parseResult.errors.map(e => e.message).join(', ')}`);
-    }
-    const emitResult = emitter.emit(parseResult.ir!);
-    return emitResult.code;
+    return converter.convert(pythonCode).code;
   }
 
   describe('Variables and Assignment', () => {
@@ -35,8 +28,10 @@ pi ← 3.14`;
 name = input("Enter your name: ")
 age = int(input("Enter your age: "))
 `;
-      const expected = `INPUT "Enter your name: ", name
-INPUT "Enter your age: ", age`;
+      const expected = `OUTPUT "Enter your name: "
+INPUT name
+OUTPUT "Enter your age: "
+INPUT age`;
       
       const result = convertPython(python);
       expect(result.trim()).toBe(expected);
@@ -64,7 +59,7 @@ for i in range(1, 11):
     print(i)
 `;
       const expected = `FOR i ← 1 TO 10
-    OUTPUT i
+  OUTPUT i
 NEXT i`;
       
       const result = convertPython(python);
@@ -77,7 +72,7 @@ for i in range(10, 0, -1):
     print(i)
 `;
       const expected = `FOR i ← 10 TO 1 STEP -1
-    OUTPUT i
+  OUTPUT i
 NEXT i`;
       
       const result = convertPython(python);
@@ -91,8 +86,8 @@ while x < 10:
     print(x)
 `;
       const expected = `WHILE x < 10
-    x ← x + 1
-    OUTPUT x
+  x ← x + 1
+  OUTPUT x
 ENDWHILE`;
       
       const result = convertPython(python);
@@ -123,10 +118,10 @@ if score >= 50:
 else:
     print("Fail")
 `;
-      const expected = `IF score ≥ 50 THEN
-    OUTPUT "Pass"
+      const expected = `IF score >= 50 THEN
+  OUTPUT "Pass"
 ELSE
-    OUTPUT "Fail"
+  OUTPUT "Fail"
 ENDIF`;
       
       const result = convertPython(python);

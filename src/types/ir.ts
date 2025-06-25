@@ -122,6 +122,8 @@ export interface IRMeta {
   prompt?: string;
   /** 終了テキスト（ENDPROCEDURE、ENDFUNCTION等） */
   endText?: string;
+  /** 変数名（FOR文のループ変数など） */
+  variable?: string;
 }
 
 /**
