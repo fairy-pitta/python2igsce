@@ -1586,7 +1586,7 @@ export class PythonASTVisitor extends BaseParser {
   }
 
   private transformRange(start: number, end: number, isEndLen: boolean, endNode?: ASTNode): [string, string] {
-    const startIG = (start + 1).toString();
+    const startIG = start.toString();
     
     let endIG: string;
     if (isEndLen && endNode?.type === 'Call' && endNode.func?.id === 'len') {
@@ -2442,7 +2442,7 @@ export class PythonASTVisitor extends BaseParser {
       'FloorDiv': 'DIV',
       'Mod': 'MOD',
       'Pow': '^',
-      'Eq': '=',
+      'Eq': '==',
       'NotEq': '≠',
       'Lt': '<',
       'LtE': '≤',
