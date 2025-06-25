@@ -132,21 +132,17 @@ ENDWHILE`;
       const result = await converter.convert(pythonCode);
       // This is a simplified translation. A more robust solution might use a flag.
       // Or, if the language supports EXIT WHILE (not standard IGCSE but common extension)
-      const expected = 
-`i ← 0
-WHILE TRUE
-  OUTPUT i
-  i ← i + 1
-  IF i = 3 THEN
-    // Simulating break; in full IGCSE this might need a flag or be unrepresentable directly
-    // For now, we assume the loop terminates here or a comment indicates the break.
-    // Depending on strictness, this could be an error or a specific translation pattern.
-    // Let's assume for now it implies the loop structure ends after the IF if the condition is met.
-    // A more accurate translation might involve restructuring the loop or using a boolean flag.
-    // For this test, we'll check for the components.
-    // A more complete test would verify the exact control flow if `break` is fully supported.
-  ENDIF
-ENDWHILE`; // This ENDWHILE might be problematic if break is meant to exit immediately.
+      // This is a simplified translation. A more robust solution might use a flag.
+      // Or, if the language supports EXIT WHILE (not standard IGCSE but common extension)
+      // const expected = 
+      // `i ← 0
+      // WHILE TRUE
+      //   OUTPUT i
+      //   i ← i + 1
+      //   IF i = 3 THEN
+      //     // break simulation
+      //   ENDIF
+      // ENDWHILE`;
       // Let's simplify the expectation for now, focusing on the components.
       expect(result.code).toContain('i ← 0');
       expect(result.code).toContain('WHILE TRUE');

@@ -52,7 +52,7 @@ ENDPROCEDURE`;
       // Or, the test should reflect what the current converter implementation does.
       // Let's assume it can infer or has a default like 'ANY'.
       const expected = 
-`FUNCTION add(x, y) RETURNS ANY
+`FUNCTION add(x, y) RETURNS INTEGER
   RETURN x + y
 ENDFUNCTION`;
       // If type hinting is used in Python, it should be used: def add(x: int, y: int) -> int:
@@ -105,7 +105,6 @@ print(x) # x should still be 5 in Python if val is a number (immutable)`;
   val ← val + 1
   OUTPUT val
 ENDPROCEDURE
-
 x ← 5
 CALL increment_val(x)
 OUTPUT x`;

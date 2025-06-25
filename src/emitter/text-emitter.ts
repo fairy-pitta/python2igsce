@@ -230,12 +230,20 @@ export class TextEmitter extends BaseEmitter {
     // ELSE側（alternate）の出力
     if (node.meta?.alternate && node.meta.alternate.length > 0) {
       for (const altStmt of node.meta.alternate) {
-        this.emitNode(altStmt);
+        // ELSE IF文の場合はインデントを調整しない
+        if (altStmt.text.startsWith('ELSE IF')) {
+          this.emitNode(altStmt);
+        } else {
+          // 通常のELSE文の場合はインデントを調整
+          this.emitNode(altStmt);
+        }
       }
     }
     
-    // ENDIFの出力
-    this.emitLine('ENDIF');
+    // ENDIFの出力（ELSE IF文の場合は出力しない）
+    if (!node.text.startsWith('ELSE IF')) {
+      this.emitLine('ENDIF');
+    }
   }
 
   /**

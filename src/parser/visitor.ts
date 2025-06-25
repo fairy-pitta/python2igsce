@@ -727,7 +727,12 @@ export class PythonASTVisitor extends BaseParser {
     
     // print文
     if (trimmed.startsWith('print(')) {
-      const content = trimmed.slice(6, -1); // print( と ) を除去
+      // コメントがある場合は、最初の閉じ括弧を見つける
+      let endParen = trimmed.indexOf(')', 6);
+      if (endParen === -1) {
+        endParen = trimmed.length;
+      }
+      const content = trimmed.slice(6, endParen); // print( と ) を除去
       
       // カンマ区切りの引数を解析
       const args = [];
@@ -961,12 +966,100 @@ export class PythonASTVisitor extends BaseParser {
       }
     }
     
+    // 関数呼び出し（単独の文として）
+    if (trimmed.includes('(') && trimmed.includes(')') && !trimmed.includes('=')) {
+      const funcCallMatch = trimmed.match(/(\w+)\(([^)]*)\)/);
+      if (funcCallMatch) {
+        const [, funcName, argsString] = funcCallMatch;
+        
+        // 引数を解析
+        const args = [];
+        if (argsString.trim()) {
+          const argParts = argsString.split(',').map(arg => arg.trim());
+          for (const arg of argParts) {
+            // 文字列リテラル
+            if ((arg.startsWith('"') && arg.endsWith('"')) ||
+                (arg.startsWith("'") && arg.endsWith("'"))) {
+              args.push({ type: 'Constant', value: arg.slice(1, -1) });
+            }
+            // 数値
+            else if (/^-?\d+(\.\d+)?$/.test(arg)) {
+              args.push({ type: 'Constant', value: Number(arg) });
+            }
+            // 変数名
+            else {
+              args.push({ type: 'Name', id: arg });
+            }
+          }
+        }
+        
+        return {
+          type: 'Expr',
+          value: {
+            type: 'Call',
+            func: { type: 'Name', id: funcName },
+            args: args
+          },
+          lineno: lineNumber
+        };
+      }
+    }
+    
     // デフォルト（式として扱う）
+    // 比較演算子を含む式かどうかをチェック
+    const compareMatch = trimmed.match(/(.*?)\s*(<=|>=|==|!=|<|>)\s*(.*)/); 
+    if (compareMatch) {
+      const [, left, op, right] = compareMatch;
+      const leftValue = left.trim();
+      const rightValue = right.trim();
+      
+      // 左辺の解析
+      let leftNode: ASTNode;
+      if (/^-?\d+(\.\d+)?$/.test(leftValue)) {
+        leftNode = { type: 'Constant', value: Number(leftValue) };
+      } else {
+        // BinOp（例: x % 2）の解析
+        const binOpMatch = leftValue.match(/(\w+)\s*(\+|-|\*|\/|%|\*\*|\/\/)\s*(\w+)/);
+        if (binOpMatch) {
+          const [, leftOp, operator, rightOp] = binOpMatch;
+          leftNode = {
+            type: 'BinOp',
+            left: { type: 'Name', id: leftOp },
+            op: { type: this.mapBinOp(operator) },
+            right: /^-?\d+(\.\d+)?$/.test(rightOp) ? 
+              { type: 'Constant', value: Number(rightOp) } : 
+              { type: 'Name', id: rightOp }
+          };
+        } else {
+          leftNode = { type: 'Name', id: leftValue };
+        }
+      }
+      
+      // 右辺の解析
+      let rightNode: ASTNode;
+      if (/^-?\d+(\.\d+)?$/.test(rightValue)) {
+        rightNode = { type: 'Constant', value: Number(rightValue) };
+      } else {
+        rightNode = { type: 'Name', id: rightValue };
+      }
+      
+      return {
+        type: 'Expr',
+        value: {
+          type: 'Compare',
+          left: leftNode,
+          ops: [{ type: this.mapCompareOp(op) }],
+          comparators: [rightNode]
+        },
+        lineno: lineNumber
+      };
+    }
+    
     return {
-      type: 'Expr',
-      value: { type: 'Constant', value: trimmed },
-      lineno: lineNumber
-    };
+       type: 'Expr',
+       value: { type: 'Constant', value: trimmed },
+       lineno: lineNumber
+     };
   }
 
   /**
@@ -1327,7 +1420,7 @@ export class PythonASTVisitor extends BaseParser {
    */
   private visitIf(node: ASTNode): IR {
     const condition = this.getValueString(node.test);
-    const ifText = `IF ${condition} THEN`;
+    const ifText = node.is_elif ? `ELSE IF ${condition} THEN` : `IF ${condition} THEN`;
     
     // THEN側のステートメント（consequent）
     this.increaseIndent();
@@ -1354,7 +1447,9 @@ export class PythonASTVisitor extends BaseParser {
     }
     
     // ENDIFはツリー上のノードとして残さず、emitter側で制御
-    return this.createIRNode('if', ifText, [], meta);
+    // hasReturnStatementのために子要素も設定
+    const children = [...consequent, ...alternate];
+    return this.createIRNode('if', ifText, children, meta);
   }
   
   /**
@@ -1580,8 +1675,8 @@ export class PythonASTVisitor extends BaseParser {
     // パラメータ（型注釈なし）
     const paramText = params.join(', ');
     
-    // まず関数を現在のスコープ（親スコープ）に登録
-    // 仮の関数情報を登録（後で更新）
+    // 関数を親スコープに登録してからスコープを作成
+    // これにより関数呼び出し時にfindFunctionで見つけられる
     this.registerFunction(funcName, parameterInfo, undefined, node.lineno);
     
     this.enterScope(funcName, 'function');
@@ -1604,11 +1699,20 @@ export class PythonASTVisitor extends BaseParser {
     }
     
     // 関数情報を更新（戻り値の有無を正しく設定）
-    const functionInfo = this.findFunction(funcName);
+    // 親スコープから関数を検索（現在のスコープは関数内部）
+    const parentScope = this.context.currentScope.parent;
+    const functionInfo = parentScope?.functions.get(funcName);
     if (functionInfo) {
       functionInfo.hasReturn = hasReturn;
       functionInfo.isFunction = hasReturn;
       functionInfo.returnType = hasReturn ? returnType : undefined;
+    }
+    
+    // currentFunctionも更新（visitReturnとの整合性のため）
+    if (this.context.currentFunction && this.context.currentFunction.name === funcName) {
+      this.context.currentFunction.hasReturn = hasReturn;
+      this.context.currentFunction.isFunction = hasReturn;
+      this.context.currentFunction.returnType = hasReturn ? returnType : undefined;
     }
     
     let funcText: string;
@@ -2130,7 +2234,7 @@ export class PythonASTVisitor extends BaseParser {
   }
 
   /**
-   * print文の引数を分割する（文字列内のカンマは無視）
+   * print文の引数を分割する（文字列内のカンマは無視、コメントで終了）
    */
   private splitPrintArgs(content: string): string[] {
     const args: string[] = [];
@@ -2140,6 +2244,11 @@ export class PythonASTVisitor extends BaseParser {
     
     for (let i = 0; i < content.length; i++) {
       const char = content[i];
+      
+      // コメントが始まったら処理を終了（文字列内でない場合のみ）
+      if (char === '#' && !inString) {
+        break;
+      }
       
       if (!inString && (char === '"' || char === "'")) {
         inString = true;
@@ -2356,7 +2465,7 @@ export class PythonASTVisitor extends BaseParser {
       if (child.kind === 'expression' && child.text.includes('return')) {
         return true;
       }
-      // 子要素も再帰的にチェック
+      // 子要素も再帰的にチェック（IF文、ELSE文、その他の構造も含む）
       if (child.children && child.children.length > 0) {
         return this.hasReturnStatement(child.children);
       }
@@ -2438,6 +2547,23 @@ export class PythonASTVisitor extends BaseParser {
     };
     
     return opMap[op] || 'Eq';
+  }
+
+  /**
+   * 二項演算子をASTタイプにマッピング
+   */
+  private mapBinOp(op: string): string {
+    const opMap: Record<string, string> = {
+      '+': 'Add',
+      '-': 'Sub',
+      '*': 'Mult',
+      '/': 'Div',
+      '//': 'FloorDiv',
+      '%': 'Mod',
+      '**': 'Pow'
+    };
+    
+    return opMap[op] || 'Add';
   }
 
   /**
