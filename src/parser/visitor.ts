@@ -1141,18 +1141,31 @@ export class PythonASTVisitor extends BaseParser {
 
     // 関数定義
     if (trimmed.startsWith('def ')) {
-      const match = trimmed.match(/def\s+(\w+)\(([^)]*)\):?/);
+      // 戻り値の型注釈を含む関数定義をパース (例: def func(a: int, b: int) -> int:)
+      const match = trimmed.match(/def\s+(\w+)\(([^)]*)\)(?:\s*->\s*([^:]+))?:?/);
       if (match) {
-        const params = match[2] ? match[2].split(',').map(p => p.trim()) : [];
-        return {
+        const [, funcName, paramsStr, returnType] = match;
+        const params = paramsStr ? paramsStr.split(',').map(p => p.trim()) : [];
+        
+        const functionNode: ASTNode = {
           type: 'FunctionDef',
-          name: match[1],
+          name: funcName,
           args: {
             args: params.map(p => ({ type: 'arg', arg: p }))
           },
           body: [],
           lineno: lineNumber
         };
+        
+        // 戻り値の型注釈がある場合は追加
+        if (returnType) {
+          functionNode.returns = {
+            type: 'Name',
+            id: returnType.trim()
+          };
+        }
+        
+        return functionNode;
       }
     }
     

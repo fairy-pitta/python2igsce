@@ -120,6 +120,8 @@ export interface IRMeta {
   hasPrompt?: boolean;
   /** input関数のプロンプト文字列 */
   prompt?: string;
+  /** 終了テキスト（ENDPROCEDURE、ENDFUNCTION等） */
+  endText?: string;
 }
 
 /**

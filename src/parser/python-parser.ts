@@ -342,7 +342,7 @@ export class PythonParser extends BaseParser {
     
     // 全スコープの変数を収集
     for (const scope of this.context.scopeStack) {
-      for (const [name, variable] of scope.variables) {
+      for (const [name, variable] of Array.from(scope.variables.entries())) {
         usage.set(name, {
           defined: true,
           used: false, // 実際の使用状況は別途分析が必要
@@ -368,7 +368,7 @@ export class PythonParser extends BaseParser {
     
     // 全スコープの関数を収集
     for (const scope of this.context.scopeStack) {
-      for (const [name, func] of scope.functions) {
+      for (const [name, func] of Array.from(scope.functions.entries())) {
         usage.set(name, {
           defined: true,
           called: false, // 実際の呼び出し状況は別途分析が必要

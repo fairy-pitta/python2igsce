@@ -1,118 +1,119 @@
 // Python → IGCSE Pseudocode 統合テスト
+import { describe, it, expect, beforeEach } from 'vitest';
+import { Converter } from '../src/converter';
+
 describe('Python to IGCSE Pseudocode Integration Tests', () => {
+  let converter: Converter;
+
+  beforeEach(() => {
+    converter = new Converter();
+  });
+
   // 基本的なプログラムの変換テスト
   describe('Basic Programs', () => {
     it('should convert simple calculator program', () => {
-      // TODO: Implement actual conversion test when converter is ready
-      expect(true).toBe(true); // Placeholder test
-    });
+      const pythonCode = `num1 = 5
+num2 = 3
+result = num1 + num2
+print(result)`;
 
-    it('should convert number guessing game', () => {
-      // TODO: Implement actual conversion test when converter is ready
-      expect(true).toBe(true); // Placeholder test
-    });
-
-    it('should convert grade calculator', () => {
-      // TODO: Implement actual conversion test when converter is ready
-      expect(true).toBe(true); // Placeholder test
-    });
-
-    it('should convert temperature converter', () => {
-      // TODO: Implement actual conversion test when converter is ready
-      expect(true).toBe(true); // Placeholder test
-    });
-
-    it('should convert factorial calculator', () => {
-      // TODO: Implement actual conversion test when converter is ready
-      expect(true).toBe(true); // Placeholder test
-    });
-
-    it('should convert fibonacci sequence', () => {
-      // TODO: Implement actual conversion test when converter is ready
-      expect(true).toBe(true); // Placeholder test
-    });
-
-    it('should convert prime number checker', () => {
-      // TODO: Implement actual conversion test when converter is ready
-      expect(true).toBe(true); // Placeholder test
-    });
-
-    it('should convert array operations', () => {
-      // TODO: Implement actual conversion test when converter is ready
-      expect(true).toBe(true); // Placeholder test
-    });
-
-    it('should convert string manipulation', () => {
-      // TODO: Implement actual conversion test when converter is ready
-      expect(true).toBe(true); // Placeholder test
-    });
-  });
-
-  // ファイル処理のテスト
-  describe.skip('File Handling', () => {
-    it('should convert file reading operations', () => {
-      const python = `
-with open("data.txt", "r") as file:
-    content = file.read()
-    lines = file.readlines()
-`;
-      const expected = `OPENFILE "data.txt" FOR READ
-content ← READFILE "data.txt"
-lines ← READFILE "data.txt"
-CLOSEFILE "data.txt"`;
+      const result = converter.convert(pythonCode);
       
-      // TODO: Implement actual conversion when file handling is ready
-      expect(true).toBe(true); // Placeholder test
+      expect(result.code).toBeDefined();
+      expect(result.code).toContain('←');
+      expect(result.code.length).toBeGreaterThan(0);
     });
 
-    it('should convert file writing operations', () => {
-      const python = `
-with open("output.txt", "w") as file:
-    file.write("Hello World")
-    file.writelines(["Line 1\\n", "Line 2\\n"])
-`;
-      const expected = `OPENFILE "output.txt" FOR WRITE
-WRITEFILE "output.txt", "Hello World"
-WRITEFILE "output.txt", "Line 1"
-WRITEFILE "output.txt", "Line 2"
-CLOSEFILE "output.txt"`;
+    it('should convert simple assignment', () => {
+      const pythonCode = `x = 10
+y = 20
+z = x + y`;
+
+      const result = converter.convert(pythonCode);
       
-      // TODO: Implement actual conversion when file handling is ready
-      expect(true).toBe(true); // Placeholder test
+      expect(result.code).toBeDefined();
+      expect(result.code).toContain('←');
+      expect(result.code.length).toBeGreaterThan(0);
     });
 
-    it('should convert file appending operations', () => {
-      const python = `
-with open("log.txt", "a") as file:
-    file.write("New log entry")
-`;
-      const expected = `OPENFILE "log.txt" FOR APPEND
-WRITEFILE "log.txt", "New log entry"
-CLOSEFILE "log.txt"`;
+    it('should convert simple if statement', () => {
+      const pythonCode = `x = 5
+if x > 0:
+    print("positive")`;
+
+      const result = converter.convert(pythonCode);
       
-      // TODO: Implement actual conversion when file handling is ready
-      expect(true).toBe(true); // Placeholder test
+      expect(result.code).toBeDefined();
+      expect(result.code).toContain('←');
+      expect(result.code.length).toBeGreaterThan(0);
+    });
+
+    it('should convert simple arithmetic', () => {
+      const pythonCode = `a = 10
+b = 5
+c = a * b`;
+
+      const result = converter.convert(pythonCode);
+      
+      expect(result.code).toBeDefined();
+      expect(result.code).toContain('←');
+      expect(result.code.length).toBeGreaterThan(0);
+    });
+
+    it('should convert simple function', () => {
+      const pythonCode = `def add(a, b):
+    return a + b
+
+result = add(3, 4)`;
+
+      const result = converter.convert(pythonCode);
+      
+      expect(result.code).toBeDefined();
+      expect(result.code.length).toBeGreaterThan(0);
+    });
+
+    it('should convert simple loop', () => {
+      const pythonCode = `for i in range(5):
+    print(i)`;
+
+      const result = converter.convert(pythonCode);
+      
+      expect(result.code).toBeDefined();
+      expect(result.code.length).toBeGreaterThan(0);
+    });
+
+    it('should convert simple while loop', () => {
+      const pythonCode = `i = 0
+while i < 5:
+    print(i)
+    i = i + 1`;
+
+      const result = converter.convert(pythonCode);
+      
+      expect(result.code).toBeDefined();
+      expect(result.code.length).toBeGreaterThan(0);
+    });
+
+    it('should convert simple list', () => {
+      const pythonCode = `numbers = [1, 2, 3]
+first = numbers[0]`;
+
+      const result = converter.convert(pythonCode);
+      
+      expect(result.code).toBeDefined();
+      expect(result.code.length).toBeGreaterThan(0);
+    });
+
+    it('should convert string operations', () => {
+      const pythonCode = `name = "Alice"
+greeting = "Hello " + name`;
+
+      const result = converter.convert(pythonCode);
+      
+      expect(result.code).toBeDefined();
+      expect(result.code.length).toBeGreaterThan(0);
     });
   });
 
-  // エラーハンドリングのテスト
-  describe('Error Handling', () => {
-    it('should handle syntax errors gracefully', () => {
-      // TODO: Implement error handling tests
-      expect(true).toBe(true); // Placeholder test
-    });
 
-    it('should handle unsupported features', () => {
-      // TODO: Implement unsupported feature tests
-      expect(true).toBe(true); // Placeholder test
-    });
-  });
-
-  // パフォーマンステスト
-  describe('Performance Tests', () => {
-    it('should handle large files efficiently', () => {
-      // TODO: Implement performance tests
-      expect(true).toBe(true); // Placeholder test
-    });
-  });
 });
