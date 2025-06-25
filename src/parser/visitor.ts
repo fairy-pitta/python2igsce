@@ -154,6 +154,83 @@ export class PythonASTVisitor extends BaseParser {
           node.body = bodyNodes;
           i--; // 次のループで正しい行を処理するため
         }
+        // クラス定義の場合、次の行からインデントされた行を本体として追加
+        else if (node.type === 'ClassDef') {
+          i++;
+          const bodyNodes: ASTNode[] = [];
+          
+          // クラス定義のインデントレベルを取得
+          const classLine = lines[i - 1];
+          const classIndentLevel = classLine.length - classLine.trimStart().length;
+          const expectedBodyIndent = classIndentLevel + 4; // クラスの本体は4スペース深い
+          
+          // インデントされた行をクラスの本体として収集
+          while (i < lines.length) {
+            const line = lines[i];
+            const lineIndentLevel = line.length - line.trimStart().length;
+            
+            // 空行はスキップ
+            if (!line.trim()) {
+              i++;
+              continue;
+            }
+            
+            // クラスの本体より浅いインデントの場合は終了
+            if (lineIndentLevel <= classIndentLevel) {
+              break;
+            }
+            
+            // クラスの本体として処理
+            if (lineIndentLevel >= expectedBodyIndent || line.trim()) {
+              const bodyNode = this.parseLineToAST(line, i + 1);
+              
+              // メソッド定義の場合、メソッドの本体も処理
+              if (bodyNode.type === 'FunctionDef') {
+                i++;
+                const methodBodyNodes: ASTNode[] = [];
+                
+                // メソッド定義のインデントレベルを取得
+                const methodLine = lines[i - 1];
+                const methodIndentLevel = methodLine.length - methodLine.trimStart().length;
+                const expectedMethodBodyIndent = methodIndentLevel + 4;
+                
+                // メソッドの本体を収集
+                while (i < lines.length) {
+                  const methodBodyLine = lines[i];
+                  const methodBodyIndentLevel = methodBodyLine.length - methodBodyLine.trimStart().length;
+                  
+                  // 空行はスキップ
+                  if (!methodBodyLine.trim()) {
+                    i++;
+                    continue;
+                  }
+                  
+                  // メソッドの本体より浅いインデントの場合は終了
+                  if (methodBodyIndentLevel <= methodIndentLevel) {
+                    break;
+                  }
+                  
+                  // メソッドの本体として処理
+                  if (methodBodyIndentLevel >= expectedMethodBodyIndent) {
+                    const methodBodyNode = this.parseLineToAST(methodBodyLine, i + 1);
+                    methodBodyNodes.push(methodBodyNode);
+                  }
+                  
+                  i++;
+                }
+                
+                bodyNode.body = methodBodyNodes;
+                i--; // 次のループで正しい行を処理するため
+              }
+              
+              bodyNodes.push(bodyNode);
+            }
+            i++;
+          }
+          
+          node.body = bodyNodes;
+          i--; // 次のループで正しい行を処理するため
+        }
         // IF文の場合、elif/else文を探して構造化
         else if (node.type === 'If') {
           i++;
@@ -515,6 +592,38 @@ export class PythonASTVisitor extends BaseParser {
       }
     }
     
+    // 型注釈付きの代入文（例: items: list[str] = []）
+    if (trimmed.includes(':') && trimmed.includes('=') && trimmed.includes('list[')) {
+      const colonIndex = trimmed.indexOf(':');
+      const equalIndex = trimmed.indexOf('=');
+      
+      if (colonIndex < equalIndex) {
+        const varName = trimmed.substring(0, colonIndex).trim();
+        const typeAnnotation = trimmed.substring(colonIndex + 1, equalIndex).trim();
+        const value = trimmed.substring(equalIndex + 1).trim();
+        
+        // list[type] から型を抽出
+        const typeMatch = typeAnnotation.match(/list\[([^\]]+)\]/);
+        if (typeMatch) {
+          const elementType = typeMatch[1];
+          
+          // 空配列の場合
+          if (value === '[]') {
+            return {
+              type: 'Assign',
+              targets: [{ type: 'Name', id: varName }],
+              value: {
+                type: 'ArrayLiteral',
+                elements: [],
+                elementType: elementType
+              },
+              lineno: lineNumber
+            };
+          }
+        }
+      }
+    }
+    
     // 配列要素への代入（例: numbers[0] = 10, numbers[i] = 10）
     if (trimmed.includes('=') && trimmed.includes('[') && trimmed.includes(']') && !trimmed.includes('==')) {
       const match = trimmed.match(/(\w+)\[([\w\d]+)\]\s*=\s*(.+)/);
@@ -640,7 +749,7 @@ export class PythonASTVisitor extends BaseParser {
               index: isNaN(parseInt(index)) ? index : parseInt(index)
             };
           }
-          // 関数呼び出し（例: len(array), max(array)）
+          // 関数呼び出し（例: len(array), max(array), Calculator()）
           else if (rightTrimmed.includes('(') && rightTrimmed.includes(')')) {
             const funcCallMatch = rightTrimmed.match(/(\w+)\(([^)]*)\)/);
             if (funcCallMatch) {
@@ -648,7 +757,17 @@ export class PythonASTVisitor extends BaseParser {
               // Function call detected
               
               // 引数を解析
-              const args = argsString.trim() ? [{ type: 'Name', id: argsString.trim() }] : [];
+              const args = [];
+              if (argsString.trim()) {
+                const argList = argsString.split(',').map(arg => arg.trim());
+                for (const arg of argList) {
+                  if (/^-?\d+(\.\d+)?$/.test(arg)) {
+                    args.push({ type: 'Constant', value: Number(arg) });
+                  } else {
+                    args.push({ type: 'Name', id: arg });
+                  }
+                }
+              }
               
               isVariable = true;
               valueNode = {
@@ -661,23 +780,41 @@ export class PythonASTVisitor extends BaseParser {
               parsedValue = rightTrimmed;
             }
           }
-          // メソッド呼び出し（例: text.upper(), text.lower()）
+          // メソッド呼び出し（例: text.upper(), text.lower(), calc.add(5, 7)）
           else if (rightTrimmed.includes('.')) {
-            const methodMatch = rightTrimmed.match(/(\w+)\.(\w+)\(\)/);
+            const methodMatch = rightTrimmed.match(/(\w+)\.(\w+)\(([^)]*)\)/);
             if (methodMatch) {
-              const [, objName, methodName] = methodMatch;
+              const [, objName, methodName, argsString] = methodMatch;
+              
+              // 引数を解析
+              const args = [];
+              if (argsString.trim()) {
+                const argList = argsString.split(',').map(arg => arg.trim());
+                for (const arg of argList) {
+                  if (/^-?\d+(\.\d+)?$/.test(arg)) {
+                    args.push({ type: 'Constant', value: Number(arg) });
+                  } else {
+                    args.push({ type: 'Name', id: arg });
+                  }
+                }
+              }
+              
               isVariable = true;
               valueNode = {
-                type: 'Attribute',
-                value: { type: 'Name', id: objName },
-                attr: methodName
+                type: 'Call',
+                func: {
+                  type: 'Attribute',
+                  value: { type: 'Name', id: objName },
+                  attr: methodName
+                },
+                args: args
               };
             } else {
               parsedValue = rightTrimmed;
             }
           }
-          // 変数名
-          else if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(rightTrimmed)) {
+          // 変数名（関数呼び出しでない場合のみ）
+          else if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(rightTrimmed) && !rightTrimmed.includes('(')) {
             isVariable = true;
             valueNode = { type: 'Name', id: rightTrimmed };
           }
@@ -695,7 +832,7 @@ export class PythonASTVisitor extends BaseParser {
       
       // valueNodeが設定されていない場合のフォールバック
       if (!valueNode) {
-        valueNode = { type: 'Constant', value: rightTrimmed };
+        valueNode = { type: 'Name', id: rightTrimmed };
       }
       
       const assignNode = {
@@ -790,8 +927,45 @@ export class PythonASTVisitor extends BaseParser {
           // 文字列リテラル
           args.push({ type: 'Constant', value: trimmedArg.slice(1, -1) });
         } else {
-          // 変数名
-          args.push({ type: 'Name', id: trimmedArg });
+          // 文字列連結や変数名の処理
+          const binOpMatch = trimmedArg.match(/(.+?)\s*\+\s*(.+)/);
+          if (binOpMatch) {
+            const [, left, right] = binOpMatch;
+            const leftTrimmed = left.trim();
+            const rightTrimmed = right.trim();
+            
+            // 左辺の解析
+            let leftNode: ASTNode;
+            if (leftTrimmed.startsWith('self.')) {
+              leftNode = {
+                type: 'Attribute',
+                value: { type: 'Name', id: 'self' },
+                attr: leftTrimmed.slice(5)
+              };
+            } else if (leftTrimmed.startsWith('"') && leftTrimmed.endsWith('"')) {
+              leftNode = { type: 'Constant', value: leftTrimmed.slice(1, -1) };
+            } else {
+              leftNode = { type: 'Name', id: leftTrimmed };
+            }
+            
+            // 右辺の解析
+            let rightNode: ASTNode;
+            if (rightTrimmed.startsWith('"') && rightTrimmed.endsWith('"')) {
+              rightNode = { type: 'Constant', value: rightTrimmed.slice(1, -1) };
+            } else {
+              rightNode = { type: 'Name', id: rightTrimmed };
+            }
+            
+            args.push({
+              type: 'BinOp',
+              left: leftNode,
+              op: { type: 'Add' },
+              right: rightNode
+            });
+          } else {
+            // 単純な変数名
+            args.push({ type: 'Name', id: trimmedArg });
+          }
         }
       }
       
@@ -949,6 +1123,22 @@ export class PythonASTVisitor extends BaseParser {
       }
     }
 
+    // クラス定義
+    if (trimmed.startsWith('class ')) {
+      const match = trimmed.match(/class\s+(\w+)(?:\(([^)]*)\))?:?/);
+      if (match) {
+        const className = match[1];
+        const bases = match[2] ? [{ type: 'Name', id: match[2].trim() }] : [];
+        return {
+          type: 'ClassDef',
+          name: className,
+          bases: bases,
+          body: [],
+          lineno: lineNumber
+        };
+      }
+    }
+
     // 関数定義
     if (trimmed.startsWith('def ')) {
       const match = trimmed.match(/def\s+(\w+)\(([^)]*)\):?/);
@@ -966,8 +1156,50 @@ export class PythonASTVisitor extends BaseParser {
       }
     }
     
-    // 関数呼び出し（単独の文として）
+    // メソッド呼び出し（単独の文として）
     if (trimmed.includes('(') && trimmed.includes(')') && !trimmed.includes('=')) {
+      // メソッド呼び出し（例: my_greeter.greet()）
+      const methodCallMatch = trimmed.match(/(\w+)\.(\w+)\(([^)]*)\)/);
+      if (methodCallMatch) {
+        const [, objName, methodName, argsString] = methodCallMatch;
+        
+        // 引数を解析
+        const args = [];
+        if (argsString.trim()) {
+          const argParts = argsString.split(',').map(arg => arg.trim());
+          for (const arg of argParts) {
+            // 文字列リテラル
+            if ((arg.startsWith('"') && arg.endsWith('"')) ||
+                (arg.startsWith("'") && arg.endsWith("'"))) {
+              args.push({ type: 'Constant', value: arg.slice(1, -1) });
+            }
+            // 数値
+            else if (/^-?\d+(\.\d+)?$/.test(arg)) {
+              args.push({ type: 'Constant', value: Number(arg) });
+            }
+            // 変数名
+            else {
+              args.push({ type: 'Name', id: arg });
+            }
+          }
+        }
+        
+        return {
+          type: 'Expr',
+          value: {
+            type: 'Call',
+            func: {
+              type: 'Attribute',
+              value: { type: 'Name', id: objName },
+              attr: methodName
+            },
+            args: args
+          },
+          lineno: lineNumber
+        };
+      }
+      
+      // 通常の関数呼び出し（例: print(), len()）
       const funcCallMatch = trimmed.match(/(\w+)\(([^)]*)\)/);
       if (funcCallMatch) {
         const [, funcName, argsString] = funcCallMatch;
@@ -1066,6 +1298,7 @@ export class PythonASTVisitor extends BaseParser {
    * ASTノードをIRに変換
    */
   private visitNode(node: ASTNode): IR {
+    console.log(`visitNode: ${node.type}`);
     this.debug(`Visiting node: ${node.type}`);
     
     switch (node.type) {
@@ -1087,6 +1320,9 @@ export class PythonASTVisitor extends BaseParser {
       case 'FunctionDef':
         // Processing FunctionDef node
         return this.visitFunctionDef(node);
+      case 'ClassDef':
+        // Processing ClassDef node
+        return this.visitClassDef(node);
       case 'Return':
         return this.visitReturn(node);
       case 'Comment':
@@ -1129,8 +1365,17 @@ export class PythonASTVisitor extends BaseParser {
    * 代入文の処理
    */
   private visitAssign(node: ASTNode): IR {
+
     const target = node.targets[0];
-    const varName = target.id || target.name || 'unknown';
+    let varName = target.id || target.name || 'unknown';
+    
+    // self.nameの場合はnameに変換
+    if (target.type === 'Attribute' && target.value && target.value.id === 'self') {
+      varName = target.attr;
+    } else if (target.type === 'Name' && target.id && target.id.startsWith('self.')) {
+      // self.nameが単一のNameノードとして解析された場合
+      varName = target.id.substring(5); // 'self.'を除去
+    }
     
     // input関数の場合は特別な処理
     if (node.value.type === 'Call' && (node.value.func.id === 'input' || node.value.func.name === 'input')) {
@@ -1186,7 +1431,22 @@ export class PythonASTVisitor extends BaseParser {
       const elements = node.value.elements || [];
       let elementType = 'INTEGER';
       
-      if (elements.length > 0) {
+      // 型注釈から型を取得（空配列の場合）
+      if (elements.length === 0 && node.value.elementType) {
+        switch (node.value.elementType) {
+          case 'str':
+            elementType = 'STRING';
+            break;
+          case 'int':
+            elementType = 'INTEGER';
+            break;
+          case 'float':
+            elementType = 'REAL';
+            break;
+          default:
+            elementType = 'STRING';
+        }
+      } else if (elements.length > 0) {
         const firstElement = elements[0];
         if (firstElement.type === 'Constant') {
           if (typeof firstElement.value === 'number') {
@@ -1202,7 +1462,13 @@ export class PythonASTVisitor extends BaseParser {
       
       // 配列宣言のIRを生成
        const size = elements.length;
-       const declareText = `DECLARE ${varName} : ARRAY[1:${size}] OF ${elementType}`;
+       let declareText;
+       if (size === 0) {
+         // 空配列の場合はサイズ0として宣言
+         declareText = `DECLARE ${varName} : ARRAY[1:0] OF ${elementType}`;
+       } else {
+         declareText = `DECLARE ${varName} : ARRAY[1:${size}] OF ${elementType}`;
+       }
        
        // 配列のサイズ情報を保存（後でforループで使用）
        this.context.arrayInfo = this.context.arrayInfo || {};
@@ -1266,12 +1532,55 @@ export class PythonASTVisitor extends BaseParser {
         value = String(actualValue);
       }
     } else if (node.value.type === 'Call') {
-      // 関数呼び出しの場合は、visitCallを使用してIRを生成し、そのtextを取得
-      // Call node detected, calling visitCall
+      // 関数呼び出しの場合
+      const funcName = node.value.func.id || node.value.func.name;
+      console.log(`visitAssign: funcName=${funcName}, isClassConstructor=${this.isClassConstructor(funcName)}`);
+      
+      // クラスのコンストラクタ呼び出しかどうかを判定
+      if (this.isClassConstructor(funcName)) {
+        // オブジェクトのインスタンス化
+        const args = node.value.args.map((arg: ASTNode) => this.getValueString(arg)).join(', ');
+        
+        // DECLARE文とNEW文を生成
+        const declareText = `DECLARE ${varName} : ${funcName}`;
+        const newText = `${varName} ← NEW ${funcName}(${args})`;
+        
+        dataType = funcName as IGCSEDataType; // クラス名をデータ型として使用
+        this.registerVariable(varName, dataType, node.lineno);
+        
+        // 複数のIRノードを返すため、親ノードを作成
+        const declareMeta: IRMeta = {
+          name: varName,
+          dataType
+        };
+        if (node.lineno !== undefined) {
+          declareMeta.lineNumber = node.lineno;
+        }
+        
+        const assignMeta: IRMeta = {
+          name: varName,
+          dataType
+        };
+        if (node.lineno !== undefined) {
+          assignMeta.lineNumber = node.lineno;
+        }
+        
+        const declareIR = this.createIRNode('statement', declareText, [], declareMeta);
+        const assignIR = this.createIRNode('assign', newText, [], assignMeta);
+        
+        const blockMeta: IRMeta = {};
+        if (node.lineno !== undefined) {
+          blockMeta.lineNumber = node.lineno;
+        }
+        
+        return this.createIRNode('block', '', [declareIR, assignIR], blockMeta);
+      } else {
+        // 通常の関数呼び出し
         const callIR = this.visitCall(node.value);
-      value = callIR.text;
-      dataType = 'STRING'; // デフォルトとして文字列型を設定
-      actualValue = value;
+        value = callIR.text;
+        dataType = 'STRING'; // デフォルトとして文字列型を設定
+        actualValue = value;
+      }
     } else {
       // その他の場合は従来通り
       // Using getValueString
@@ -1322,8 +1631,23 @@ export class PythonASTVisitor extends BaseParser {
    * 関数呼び出しの処理
    */
   private visitCall(node: ASTNode, lineNumber?: number): IR {
-    const funcName = node.func.id || node.func.name;
-    console.log("visitCall called with funcName:", funcName);
+    let funcName: string;
+    let isMethodCall = false;
+    let objectName = '';
+    
+    // メソッド呼び出しかどうかを判定
+    if (node.func.type === 'Attribute') {
+      // object.method() の形式
+      objectName = this.getValueString(node.func.value);
+      funcName = node.func.attr;
+      isMethodCall = true;
+    } else {
+      // 通常の関数呼び出し
+      funcName = node.func.id || node.func.name;
+    }
+    
+    console.log("visitCall called with funcName:", funcName, "isMethodCall:", isMethodCall, "objectName:", objectName);
+    console.log("node.func:", JSON.stringify(node.func, null, 2));
     
     switch (funcName) {
       case 'print':
@@ -1386,32 +1710,114 @@ export class PythonASTVisitor extends BaseParser {
         // lenResult created
         return lenResult;
         
+      case 'super':
+        // super().__init__の処理
+        const superMeta: IRMeta = { name: 'super' };
+        if (lineNumber !== undefined) {
+          superMeta.lineNumber = lineNumber;
+        }
+        
+        // super()の引数を処理
+        const superArgs = node.args.map((arg: ASTNode) => this.getValueString(arg)).join(', ');
+        return this.createIRNode('statement', `CALL SUPER.NEW(${superArgs})`, [], superMeta);
+        
       default:
         const callArgs = node.args.map((arg: ASTNode) => this.getValueString(arg)).join(', ');
-        // 関数名を変換しない（そのまま使用）
-        const convertedFuncName = this.convertFunctionName(funcName);
         
-        // 関数かプロシージャかを判定
-        const functionInfo = this.findFunction(funcName);
-        let callText: string;
-        let irKind: IRKind;
-        
-        if (functionInfo && functionInfo.hasReturn) {
-          // 関数の場合はそのまま
-          callText = `${convertedFuncName}(${callArgs})`;
-          irKind = 'expression';
+        if (isMethodCall) {
+          // メソッド呼び出しの場合
+          let callText: string;
+          let irKind: IRKind;
+          
+          // メソッド名に基づいて戻り値があるかを判定
+          const hasReturn = this.methodHasReturn(funcName);
+          
+          if (hasReturn) {
+            // 戻り値がある場合（関数）
+            callText = `${objectName}.${funcName}(${callArgs})`;
+            irKind = 'expression';
+          } else {
+            // 戻り値がない場合（プロシージャ）
+            // objectNameが空の場合はfuncNameのみ使用
+            if (objectName) {
+              callText = `CALL ${objectName}.${funcName}(${callArgs})`;
+            } else {
+              callText = `CALL ${funcName}(${callArgs})`;
+            }
+            irKind = 'statement';
+          }
+          
+          const exprMeta: IRMeta = { name: funcName };
+          if (lineNumber !== undefined) {
+            exprMeta.lineNumber = lineNumber;
+          }
+          return this.createIRNode(irKind, callText, [], exprMeta);
         } else {
-          // プロシージャの場合、または関数が見つからない場合はCALLを追加
-          callText = `CALL ${convertedFuncName}(${callArgs})`;
-          irKind = 'statement';
+          // 通常の関数呼び出し
+          const convertedFuncName = this.convertFunctionName(funcName);
+          
+          // 関数かプロシージャかを判定
+          const functionInfo = this.findFunction(funcName);
+          let callText: string;
+          let irKind: IRKind;
+          
+          if (functionInfo && functionInfo.hasReturn) {
+            // 関数の場合はそのまま
+            callText = `${convertedFuncName}(${callArgs})`;
+            irKind = 'expression';
+          } else {
+            // プロシージャの場合、または関数が見つからない場合はCALLを追加
+            callText = `CALL ${convertedFuncName}(${callArgs})`;
+            irKind = 'statement';
+          }
+          
+          const exprMeta: IRMeta = { name: funcName };
+          if (lineNumber !== undefined) {
+            exprMeta.lineNumber = lineNumber;
+          }
+          return this.createIRNode(irKind, callText, [], exprMeta);
         }
-        
-        const exprMeta: IRMeta = { name: funcName };
-        if (lineNumber !== undefined) {
-          exprMeta.lineNumber = lineNumber;
-        }
-        return this.createIRNode(irKind, callText, [], exprMeta);
     }
+  }
+
+  /**
+   * クラスのコンストラクタ呼び出しかどうかを判定
+   */
+  private isClassConstructor(funcName: string): boolean {
+    // 一般的なクラス名のパターン（大文字で始まる）
+    return /^[A-Z][a-zA-Z0-9]*$/.test(funcName);
+  }
+
+  /**
+   * メソッドが戻り値を持つかどうかを判定
+   */
+  private methodHasReturn(methodName: string): boolean {
+    // 一般的に戻り値を持つメソッド
+    const returningMethods = [
+      'add', 'subtract', 'multiply', 'divide',
+      'get', 'calculate', 'compute', 'find',
+      'length', 'size', 'count', 'sum',
+      'upper', 'lower', 'substring', 'charAt'
+    ];
+    
+    // 一般的に戻り値を持たないメソッド（プロシージャ）
+    const nonReturningMethods = [
+      'print', 'display', 'show', 'output',
+      'set', 'update', 'insert', 'delete',
+      'clear', 'reset', 'initialize',
+      'greet', 'speak', 'move', 'run'
+    ];
+    
+    if (returningMethods.includes(methodName)) {
+      return true;
+    }
+    
+    if (nonReturningMethods.includes(methodName)) {
+      return false;
+    }
+    
+    // デフォルトはプロシージャとして扱う
+    return false;
   }
 
   /**
@@ -1744,6 +2150,194 @@ export class PythonASTVisitor extends BaseParser {
   }
 
   /**
+   * クラス定義の処理
+   */
+  private visitClassDef(node: ASTNode): IR {
+    const className = node.name;
+    const baseClass = node.bases && node.bases.length > 0 ? node.bases[0].id : null;
+    
+    // クラスを登録
+    this.registerClass(className, node.lineno);
+    
+    this.enterScope(className, 'class');
+    this.increaseIndent();
+    
+    // クラス内のメンバーを処理
+    const members: IR[] = [];
+    const attributes: string[] = [];
+    
+    // まずコンストラクタから属性を抽出
+    const constructor = node.body.find((item: ASTNode) => item.type === 'FunctionDef' && item.name === '__init__');
+    if (constructor) {
+      // コンストラクタ内のself.attribute代入を探す
+      for (const stmt of constructor.body) {
+        if (stmt.type === 'Assign' || stmt.type === 'AssignWithComment') {
+          // AssignWithCommentの場合はassignプロパティから取得
+          const assignNode = stmt.type === 'AssignWithComment' ? stmt.assign : stmt;
+          const target = assignNode.targets[0];
+          if (target.type === 'Attribute' && target.value && target.value.id === 'self') {
+            // self.attributeの形式
+            const attrName = target.attr;
+            const attrType = 'STRING'; // デフォルト型
+            attributes.push(`PRIVATE ${attrName} : ${attrType}`);
+          } else if (target.type === 'Name' && target.id && target.id.startsWith('self.')) {
+            // self.attributeが単一のNameノードとして解析された場合
+            const attrName = target.id.substring(5); // 'self.'を除去
+            const attrType = 'STRING'; // デフォルト型
+            attributes.push(`PRIVATE ${attrName} : ${attrType}`);
+          }
+        }
+      }
+    }
+    
+    for (const item of node.body) {
+      if (item.type === 'FunctionDef') {
+        // メソッドの処理
+        if (item.name === '__init__') {
+          // コンストラクタをNEWプロシージャに変換
+          const constructorIR = this.visitConstructor(item);
+          members.push(constructorIR);
+        } else {
+          // 通常のメソッド
+          const methodIR = this.visitMethod(item);
+          members.push(methodIR);
+        }
+      } else if (item.type === 'Assign') {
+        // クラス属性の処理
+        const attrName = item.targets[0].id;
+        let attrType: IGCSEDataType;
+        let attrValue: string;
+        
+        // 値の型を推定
+        if (item.value.type === 'Constant') {
+          if (typeof item.value.value === 'number') {
+            attrType = this.inferNumericType(item.value.value);
+            attrValue = item.value.value.toString();
+          } else if (typeof item.value.value === 'string') {
+            attrType = 'STRING';
+            attrValue = `"${item.value.value}"`;
+          } else if (typeof item.value.value === 'boolean') {
+            attrType = 'BOOLEAN';
+            attrValue = item.value.value ? 'TRUE' : 'FALSE';
+          } else {
+            attrType = 'STRING';
+            attrValue = `"${item.value.value}"`;
+          }
+        } else {
+          attrType = inferDataType(item.value);
+          const valueIR = this.visitNode(item.value);
+          attrValue = valueIR.text;
+        }
+        
+        // 型宣言と初期値代入の両方を追加
+        attributes.push(`PRIVATE ${attrName} : ${attrType}`);
+        attributes.push(`${attrName} ← ${attrValue}`);
+      }
+    }
+    
+    this.decreaseIndent();
+    this.exitScope();
+    
+    // クラス定義のテキストを構築
+    let classText: string;
+    if (baseClass) {
+      classText = `CLASS ${className} INHERITS ${baseClass}`;
+    } else {
+      classText = `CLASS ${className}`;
+    }
+    
+    // 属性をメンバーの最初に追加
+    const attributeIRs = attributes.map(attr => this.createIRNode('statement', attr));
+    const allMembers = [...attributeIRs, ...members];
+    
+    const endClassIR = this.createIRNode('statement', 'ENDCLASS');
+    const children = [...allMembers, endClassIR];
+    
+    const meta: IRMeta = {
+      name: className,
+      baseClass
+    };
+    if (node.lineno !== undefined) {
+      meta.lineNumber = node.lineno;
+    }
+    
+    return this.createIRNode('class', classText, children, meta);
+  }
+  
+  /**
+   * コンストラクタの処理
+   */
+  private visitConstructor(node: ASTNode): IR {
+    const params = node.args.args.slice(1).map((arg: ASTNode) => {
+      // selfを除外し、型注釈を除去
+      const paramName = arg.arg;
+      return paramName.includes(':') ? paramName.split(':')[0].trim() : paramName;
+    });
+    
+    const paramText = params.map((param: string) => `initial${param.charAt(0).toUpperCase() + param.slice(1)} : STRING`).join(', ');
+    
+    // パラメータマッピングを設定（self.name = name → name ← initialName）
+    this.context.parameterMapping = {};
+    params.forEach((param: string) => {
+      this.context.parameterMapping[param] = `initial${param.charAt(0).toUpperCase() + param.slice(1)}`;
+    });
+    
+    this.increaseIndent();
+    const bodyChildren = node.body.map((child: ASTNode) => this.visitNode(child));
+    this.decreaseIndent();
+    
+    const constructorText = `PUBLIC PROCEDURE NEW(${paramText})`;
+    const endProcedureIR = this.createIRNode('statement', 'ENDPROCEDURE');
+    const children = [...bodyChildren, endProcedureIR];
+    
+    // パラメータマッピングをクリア
+    this.context.parameterMapping = {};
+    
+    return this.createIRNode('procedure', constructorText, children);
+  }
+  
+  /**
+   * メソッドの処理
+   */
+  private visitMethod(node: ASTNode): IR {
+    const methodName = node.name;
+    const params = node.args.args.slice(1).map((arg: ASTNode) => {
+      // selfを除外し、型注釈を除去
+      const paramName = arg.arg;
+      return paramName.includes(':') ? paramName.split(':')[0].trim() : paramName;
+    });
+    
+    const paramText = params.join(', ');
+    
+    this.increaseIndent();
+    const bodyChildren = node.body.map((child: ASTNode) => this.visitNode(child));
+    this.decreaseIndent();
+    
+    // return文があるかチェック
+    const hasReturn = this.hasReturnStatement(bodyChildren);
+    
+    let methodText: string;
+    let endText: string;
+    let irType: IRKind;
+    
+    if (hasReturn) {
+      const returnType = this.inferReturnType(bodyChildren);
+      methodText = `PUBLIC FUNCTION ${methodName}(${paramText}) RETURNS ${returnType}`;
+      endText = 'ENDFUNCTION';
+      irType = 'function';
+    } else {
+      methodText = `PUBLIC PROCEDURE ${methodName}(${paramText})`;
+      endText = 'ENDPROCEDURE';
+      irType = 'procedure';
+    }
+    
+    const endIR = this.createIRNode('statement', endText);
+    const children = [...bodyChildren, endIR];
+    
+    return this.createIRNode(irType, methodText, children);
+  }
+
+  /**
    * RETURN文の処理
    */
   private visitReturn(node: ASTNode): IR {
@@ -1844,10 +2438,20 @@ export class PythonASTVisitor extends BaseParser {
    */
   private visitAttribute(node: ASTNode): IR {
     const objName = this.getValueString(node.value);
-    const methodName = node.attr;
+    const attrName = node.attr;
     
+    // self.attributeの場合は属性名のみを返す
+    if (objName === 'self') {
+      const meta: IRMeta = { name: attrName };
+      if (node.lineno !== undefined) {
+        meta.lineNumber = node.lineno;
+      }
+      return this.createIRNode('expression', attrName, [], meta);
+    }
+    
+    // メソッド呼び出しの場合
     let convertedMethod: string;
-    switch (methodName) {
+    switch (attrName) {
       case 'upper':
         convertedMethod = 'UCASE';
         break;
@@ -1855,12 +2459,12 @@ export class PythonASTVisitor extends BaseParser {
         convertedMethod = 'LCASE';
         break;
       default:
-        convertedMethod = methodName;
+        convertedMethod = attrName;
         break;
     }
     
     const text = `${convertedMethod}(${objName})`;
-    const meta: IRMeta = { name: methodName };
+    const meta: IRMeta = { name: attrName };
     if (node.lineno !== undefined) {
       meta.lineNumber = node.lineno;
     }
@@ -2128,6 +2732,12 @@ export class PythonASTVisitor extends BaseParser {
         } else if (node.id === 'False') {
           return 'FALSE';
         }
+        
+        // パラメータマッピングがある場合は変換
+        if (this.context.parameterMapping && this.context.parameterMapping[node.id]) {
+          return this.context.parameterMapping[node.id];
+        }
+        
         return node.id;
       case 'Str':
         return `"${node.s}"`;
@@ -2153,14 +2763,22 @@ export class PythonASTVisitor extends BaseParser {
         return callResult.text.replace(/^CALL /, '');
       case 'Attribute':
         const objName = this.getValueString(node.value);
-        const methodName = node.attr;
-        switch (methodName) {
+        const attrName = node.attr;
+        
+        // selfの属性アクセスの場合は特別処理
+        if (objName === 'self') {
+          // コンストラクタ内でのself.nameはnameに変換
+          return attrName;
+        }
+        
+        // メソッド呼び出しの場合
+        switch (attrName) {
           case 'upper':
             return `UCASE(${objName})`;
           case 'lower':
             return `LCASE(${objName})`;
           default:
-            return `${objName}.${methodName}`;
+            return `${objName}.${attrName}`;
         }
       case 'BinOp':
         const left = this.getValueString(node.left);
@@ -2391,6 +3009,37 @@ export class PythonASTVisitor extends BaseParser {
       };
     }
     
+    // 配列リテラル
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      const elements = trimmed.slice(1, -1).split(',').map((elem: string) => {
+        const trimmedElem = elem.trim();
+        if (/^-?\d+(\.\d+)?$/.test(trimmedElem)) {
+          return { type: 'Constant', value: Number(trimmedElem) };
+        } else if ((trimmedElem.startsWith('"') && trimmedElem.endsWith('"')) ||
+                   (trimmedElem.startsWith("'") && trimmedElem.endsWith("'"))) {
+          return { type: 'Constant', value: trimmedElem.slice(1, -1) };
+        } else {
+          return { type: 'Name', id: trimmedElem };
+        }
+      });
+      
+      return {
+        type: 'ArrayLiteral',
+        elements: elements
+      };
+    }
+    
+    // 配列アクセス
+    const arrayAccessMatch = trimmed.match(/^(\w+)\[([\w\d]+)\]$/);
+    if (arrayAccessMatch) {
+      const [, arrayName, index] = arrayAccessMatch;
+      return {
+        type: 'ArrayAccess',
+        array: { type: 'Name', id: arrayName },
+        index: isNaN(parseInt(index)) ? index : parseInt(index)
+      };
+    }
+    
     // 変数名
     return {
       type: 'Name',
@@ -2489,8 +3138,12 @@ export class PythonASTVisitor extends BaseParser {
     for (const child of bodyChildren) {
       if (child.kind === 'return' || child.text.includes('RETURN')) {
         const returnValue = child.text.replace('RETURN ', '').trim();
-        // 数値かどうかチェック
-        if (/^\d+$/.test(returnValue) || returnValue.includes('+') || returnValue.includes('-') || returnValue.includes('*') || returnValue.includes('/')) {
+        // 数値演算（乗算、除算、小数点を含む）かどうかチェック
+        if (returnValue.includes('*') || returnValue.includes('/') || returnValue.includes('.')) {
+          return 'REAL';
+        }
+        // 整数のみの場合
+        if (/^\d+$/.test(returnValue) || (returnValue.includes('+') || returnValue.includes('-')) && !returnValue.includes('*') && !returnValue.includes('/')) {
           return 'INTEGER';
         }
         // 文字列かどうかチェック
@@ -2531,6 +3184,16 @@ export class PythonASTVisitor extends BaseParser {
     }
     
     return 'STRING';
+  }
+
+  /**
+   * 数値リテラルの型を推定
+   */
+  private inferNumericType(value: any): IGCSEDataType {
+    if (typeof value === 'number') {
+      return Number.isInteger(value) ? 'INTEGER' : 'REAL';
+    }
+    return 'REAL';
   }
 
   /**

@@ -98,6 +98,8 @@ export interface IRMeta {
   consequent?: IR[];
   /** ELSE側のステートメント（IF文用） */
   alternate?: IR[];
+  /** 基底クラス名（クラス継承用） */
+  baseClass?: string;
   /** 戻り値の型 */
   returnType?: IGCSEDataType;
   /** 配列のサイズ */

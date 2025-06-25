@@ -62,6 +62,7 @@ export abstract class BaseParser {
       errors: [],
       warnings: [],
       arrayInfo: {},
+      parameterMapping: {},
       startTime: Date.now()
     };
   }
@@ -220,6 +221,17 @@ export abstract class BaseParser {
     }
     
     return undefined;
+  }
+
+  /**
+   * クラスの登録
+   */
+  protected registerClass(name: string, line?: number): void {
+    // クラス情報を現在のスコープに登録
+    // 実装は簡略化し、デバッグ出力のみ
+    if (this.options.debug) {
+      console.log(`Registering class: ${name} at line ${line}`);
+    }
   }
 
   /**
