@@ -225,19 +225,24 @@ export class TextEmitter extends BaseEmitter {
         this.emitNode(stmt);
       }
       this.decreaseIndent();
-    }
-    
-    // ELSE側（alternate）の出力
-    if (node.meta?.alternate && node.meta.alternate.length > 0) {
-      for (const altStmt of node.meta.alternate) {
-        // ELSE IF文の場合はインデントを調整しない
-        if (altStmt.text.startsWith('ELSE IF')) {
-          this.emitNode(altStmt);
-        } else {
-          // 通常のELSE文の場合はインデントを調整
-          this.emitNode(altStmt);
+      
+      // ELSE側（alternate）の出力
+      if (node.meta?.alternate && node.meta.alternate.length > 0) {
+        for (const altStmt of node.meta.alternate) {
+          // ELSE IF文の場合はインデントを調整しない
+          if (altStmt.text.startsWith('ELSE IF')) {
+            this.emitNode(altStmt);
+          } else {
+            // 通常のELSE文の場合はインデントを調整
+            this.emitNode(altStmt);
+          }
         }
       }
+    } else {
+      // 従来の子ノード処理（後方互換性）
+      this.increaseIndent();
+      this.emitChildren(node);
+      this.decreaseIndent();
     }
     
     // ENDIFの出力（ELSE IF文の場合は出力しない）
@@ -260,6 +265,11 @@ export class TextEmitter extends BaseEmitter {
       for (const stmt of node.meta.consequent) {
         this.emitNode(stmt);
       }
+      this.decreaseIndent();
+    } else {
+      // 従来の子ノード処理（後方互換性）
+      this.increaseIndent();
+      this.emitChildren(node);
       this.decreaseIndent();
     }
   }

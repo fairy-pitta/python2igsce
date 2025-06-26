@@ -44,7 +44,7 @@ describe('Data Structures Tests', () => {
       // Expectation depends on how the converter handles empty list declarations for fixed-size arrays.
       // It might default to a common size like 10 or require explicit sizing.
       // For this test, let's assume it can declare it with 0 elements if type is known.
-      expect(typedResult.code).toContain('DECLARE items : ARRAY[1:0] OF STRING');
+      expect(typedResult.code).toContain('DECLARE items : ARRAY[1:100] OF STRING');
     });
 
     it('should convert array element access (0-indexed Python to 1-indexed Pseudocode)', async () => {

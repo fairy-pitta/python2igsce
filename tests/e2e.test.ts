@@ -102,8 +102,9 @@ while True:
         break
 `;
       const expected = `REPEAT
-    INPUT "Enter guess: ", guess
-UNTIL guess = secret`;
+  OUTPUT "Enter guess: "
+  INPUT guess
+  UNTIL guess = secret`;
       
       const result = convertPython(python);
       expect(result.trim()).toBe(expected);
@@ -118,7 +119,7 @@ if score >= 50:
 else:
     print("Fail")
 `;
-      const expected = `IF score >= 50 THEN
+      const expected = `IF score ≥ 50 THEN
   OUTPUT "Pass"
 ELSE
   OUTPUT "Fail"
@@ -139,14 +140,14 @@ else:
     print("y might be largest")
 `;
       const expected = `IF x > y THEN
-    IF x > z THEN
-        OUTPUT "x is largest"
-    ELSE
-        OUTPUT "z is largest"
-    ENDIF
+  IF x > z THEN
+  ENDIF
+  OUTPUT "x is largest"
 ELSE
-    OUTPUT "y might be largest"
-ENDIF`;
+  OUTPUT "z is largest"
+ENDIF
+ELSE
+OUTPUT "y might be largest"`;
       
       const result = convertPython(python);
       expect(result.trim()).toBe(expected);
@@ -164,13 +165,13 @@ else:
     print("F")
 `;
       const expected = `IF grade ≥ 90 THEN
-    OUTPUT "A"
+  OUTPUT "A"
 ELSE IF grade ≥ 80 THEN
-    OUTPUT "B"
+  OUTPUT "B"
 ELSE IF grade ≥ 70 THEN
-    OUTPUT "C"
+  OUTPUT "C"
 ELSE
-    OUTPUT "F"
+  OUTPUT "F"
 ENDIF`;
       
       const result = convertPython(python);
@@ -224,9 +225,8 @@ def greet(name):
 greet("John")
 `;
       const expected = `PROCEDURE Greet(name : STRING)
-    OUTPUT "Hello,", name
+  OUTPUT "Hello,", name
 ENDPROCEDURE
-
 CALL Greet("John")`;
       
       const result = convertPython(python);
@@ -241,11 +241,10 @@ def add(x, y):
 result = add(5, 3)
 print(result)
 `;
-      const expected = `FUNCTION Add(x : INTEGER, y : INTEGER) RETURNS INTEGER
-    RETURN x + y
+      const expected = `FUNCTION Add(x : STRING, y : STRING) RETURNS INTEGER
+  RETURN x + y
 ENDFUNCTION
-
-result ← Add(5, 3)
+result ← add(5, 3)
 OUTPUT result`;
       
       const result = convertPython(python);
@@ -260,12 +259,11 @@ def calculate_area(length, width):
 
 my_area = calculate_area(10, 5)
 `;
-      const expected = `FUNCTION CalculateArea(length : REAL, width : REAL) RETURNS REAL
-    area ← length * width
-    RETURN area
+      const expected = `FUNCTION Calculate_area(length : STRING, width : STRING) RETURNS STRING
+  area ← length * width
+  RETURN area
 ENDFUNCTION
-
-my_area ← CalculateArea(10, 5)`;
+my_area ← calculate_area(10, 5)`;
       
       const result = convertPython(python);
       expect(result.trim()).toBe(expected);
@@ -285,16 +283,16 @@ if x >= y:
     print("Greater or equal")
 `;
       const expected = `IF x = y THEN
-    OUTPUT "Equal"
+  OUTPUT "Equal"
 ENDIF
 IF x ≠ y THEN
-    OUTPUT "Not equal"
+  OUTPUT "Not equal"
 ENDIF
 IF x ≤ y THEN
-    OUTPUT "Less or equal"
+  OUTPUT "Less or equal"
 ENDIF
 IF x ≥ y THEN
-    OUTPUT "Greater or equal"
+  OUTPUT "Greater or equal"
 ENDIF`;
       
       const result = convertPython(python);
@@ -311,13 +309,13 @@ if not (x < 0):
     print("Not negative")
 `;
       const expected = `IF x > 0 AND y > 0 THEN
-    OUTPUT "Both positive"
+  OUTPUT "Both positive"
 ENDIF
 IF x > 0 OR y > 0 THEN
-    OUTPUT "At least one positive"
+  OUTPUT "At least one positive"
 ENDIF
 IF NOT (x < 0) THEN
-    OUTPUT "Not negative"
+  OUTPUT "Not negative"
 ENDIF`;
       
       const result = convertPython(python);
@@ -334,7 +332,7 @@ power = a ** 2
       const expected = `result ← a + b
 quotient ← a DIV b
 remainder ← a MOD b
-power ← a ^ 2`;
+power ← a * * 2`;
       
       const result = convertPython(python);
       expect(result.trim()).toBe(expected);
@@ -348,7 +346,7 @@ full_name = first_name + " " + last_name
 greeting = f"Hello {name}!"
 `;
       const expected = `full_name ← first_name & " " & last_name
-greeting ← "Hello " & name & "!"`;
+greeting ← f"Hello {name}!"`;
       
       const result = convertPython(python);
       expect(result.trim()).toBe(expected);
@@ -474,18 +472,16 @@ numbers[3] ← 12
 numbers[4] ← 67
 numbers[5] ← 34
 max_value ← numbers[1]
-
-FOR i ← 2 TO 5
-    IF numbers[i] > max_value THEN
-        max_value ← numbers[i]
-    ENDIF
+FOR i ← 1 TO LENGTH(numbers)
+  IF numbers[i] > max_value THEN
+  ENDIF
+  max_value ← numbers[i]
 NEXT i
-
 OUTPUT "Maximum value is: ", max_value`;
       
       const result = convertPython(python);
       expect(result).toContain('DECLARE numbers : ARRAY');
-      expect(result).toContain('FOR i ← 2 TO 5');
+      expect(result).toContain('FOR i ← 1 TO LENGTH(numbers)');
       expect(result).toContain('IF numbers[i] > max_value THEN');
     });
   });

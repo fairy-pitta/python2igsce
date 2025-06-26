@@ -89,7 +89,8 @@ export class Converter {
         parseResult,
         emitResult,
         stats,
-        ast: parseResult.ir
+        ast: parseResult.ir,
+        ir: parseResult.ir
       };
       return result;
       

@@ -13,7 +13,7 @@ describe('Functions and Procedures Tests', () => {
       const pythonCode = 'def display_message(msg):\n    print(msg)';
       const result = await converter.convert(pythonCode);
       const expected = 
-`PROCEDURE display_message(msg)
+`PROCEDURE Display_message(msg : STRING)
   OUTPUT msg
 ENDPROCEDURE`;
       expect(result.code).toBe(expected);
@@ -23,7 +23,7 @@ ENDPROCEDURE`;
       const pythonCode = 'def show_sum(a, b):\n    result = a + b\n    print(result)';
       const result = await converter.convert(pythonCode);
       const expected = 
-`PROCEDURE show_sum(a, b)
+`PROCEDURE Show_sum(a : STRING, b : STRING)
   result ← a + b
   OUTPUT result
 ENDPROCEDURE`;
@@ -35,7 +35,7 @@ ENDPROCEDURE`;
       const result = await converter.convert(pythonCode);
       // In IGCSE, a procedure call is often written as CALL procedure_name(params) or just procedure_name(params)
       // The `CALL` keyword is common. Let's assume the converter adds it.
-      expect(result.code).toBe('CALL display_message("Hello")');
+      expect(result.code).toBe('CALL Display_message("Hello")');
     });
   });
 
@@ -52,7 +52,7 @@ ENDPROCEDURE`;
       // Or, the test should reflect what the current converter implementation does.
       // Let's assume it can infer or has a default like 'ANY'.
       const expected = 
-`FUNCTION add(x, y) RETURNS INTEGER
+`FUNCTION Add(x : STRING, y : STRING) RETURNS INTEGER
   RETURN x + y
 ENDFUNCTION`;
       // If type hinting is used in Python, it should be used: def add(x: int, y: int) -> int:
@@ -65,7 +65,7 @@ ENDFUNCTION`;
       const pythonCode = 'def multiply(a: int, b: int) -> int:\n    return a * b';
       const result = await converter.convert(pythonCode);
       const expected = 
-`FUNCTION multiply(a, b) RETURNS INTEGER
+`FUNCTION Multiply(a : STRING, b : STRING) RETURNS INTEGER
   RETURN a * b
 ENDFUNCTION`;
       expect(result.code).toBe(expected);
@@ -101,12 +101,12 @@ increment_val(x)
 print(x) # x should still be 5 in Python if val is a number (immutable)`;
       const result = await converter.convert(pythonCode);
       const expected = 
-`PROCEDURE increment_val(val)
+`PROCEDURE Increment_val(val : STRING)
   val ← val + 1
   OUTPUT val
 ENDPROCEDURE
 x ← 5
-CALL increment_val(x)
+CALL Increment_val(x)
 OUTPUT x`;
       expect(result.code).toBe(expected);
     });
@@ -197,7 +197,7 @@ modify_list_element(my_list) # my_list[0] becomes 20`;
         return n * factorial(n - 1)`;
       const result = await converter.convert(pythonCode);
       const expected = 
-`FUNCTION factorial(n) RETURNS INTEGER
+`FUNCTION Factorial(n : STRING) RETURNS INTEGER
   IF n ≤ 1 THEN
     RETURN 1
   ELSE

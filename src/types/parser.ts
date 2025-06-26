@@ -235,7 +235,7 @@ export interface ParserContext {
   /** 警告リスト */
   warnings: ParseWarning[];
   /** 配列情報 */
-  arrayInfo: { [key: string]: { size: number; elementType: string } };
+  arrayInfo: { [key: string]: { size: number; elementType: string; currentIndex: number } };
   /** パラメータマッピング（コンストラクタ用） */
   parameterMapping: { [key: string]: string };
   /** パース開始時刻 */
