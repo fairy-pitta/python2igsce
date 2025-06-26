@@ -33,7 +33,7 @@ export interface ParserOptions {
  */
 export interface ParseResult {
   /** 生成されたIR */
-  ir: IR;
+  ir: IR[];
   /** エラーメッセージ */
   errors: ParseError[];
   /** 警告メッセージ */

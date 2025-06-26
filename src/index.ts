@@ -220,7 +220,11 @@ export const utils = {
           }
         };
         
-        analyzeNode(result.parseResult.ir);
+        if (Array.isArray(result.parseResult.ir)) {
+          result.parseResult.ir.forEach(node => analyzeNode(node));
+        } else {
+          analyzeNode(result.parseResult.ir);
+        }
         
         // Determine complexity level
         let complexity: 'low' | 'medium' | 'high' = 'low';

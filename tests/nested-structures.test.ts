@@ -53,8 +53,8 @@ describe('Nested Structures Comprehensive Tests', () => {
       const pythonCode = 'if x > 0:\n    for i in range(2):\n        print(i)';
       
       const result = converter.convert(pythonCode);
-      if (result.ir) {
-        const depth = getIRDepth(result.ir);
+      if (result.ir && result.ir.length > 0) {
+        const depth = getIRDepth(result.ir[0]);
         expect(depth).toBeGreaterThan(1);
       }
     });
@@ -63,9 +63,9 @@ describe('Nested Structures Comprehensive Tests', () => {
       const pythonCode = 'if a > 0:\n    print("positive")\nelse:\n    print("not positive")';
       
       const result = converter.convert(pythonCode);
-      if (result.ir) {
-        const nodeCount = countIRNodes(result.ir);
-        expect(nodeCount).toBeGreaterThan(3);
+      if (result.ir && result.ir.length > 0) {
+        const totalNodeCount = result.ir.reduce((sum, node) => sum + countIRNodes(node), 0);
+        expect(totalNodeCount).toBeGreaterThan(3);
       }
     });
   });

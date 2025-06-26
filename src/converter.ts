@@ -73,7 +73,7 @@ export class Converter {
         ? this.markdownEmitter 
         : this.textEmitter;
       
-      const emitResult = emitter.emit(parseResult.ir);
+      const emitResult = emitter.emit(parseResult.ir[0] || { kind: 'statement', text: '', children: [] });
       
       // 結果の作成
       const endTime = Date.now();
@@ -90,7 +90,7 @@ export class Converter {
         emitResult,
         stats,
         ast: parseResult.ir,
-        ir: parseResult.ir
+        ir: Array.isArray(parseResult.ir) ? parseResult.ir : [parseResult.ir]
       };
       return result;
       
@@ -122,7 +122,7 @@ export class Converter {
         const errorResult: ConversionResult = {
           code: '',
           parseResult: {
-            ir: { kind: 'comment', text: '', children: [] },
+            ir: [{ kind: 'comment', text: '', children: [] }],
             errors: [{
               message: error instanceof Error ? error.message : 'Unknown error',
               type: 'syntax_error',
@@ -302,7 +302,7 @@ export class Converter {
     return {
       code: '',
       parseResult: {
-         ir: { kind: 'comment', text: '', children: [] },
+         ir: [{ kind: 'comment', text: '', children: [] }],
         errors: [
           {
             type: 'conversion',
