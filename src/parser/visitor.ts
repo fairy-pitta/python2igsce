@@ -1659,21 +1659,11 @@ export class PythonASTVisitor extends BaseParser {
         // オブジェクトのインスタンス化
         const args = node.value.args.map((arg: ASTNode) => this.getValueString(arg)).join(', ');
         
-        // DECLARE文とNEW文を生成
-        const declareText = `DECLARE ${varName} : ${funcName}`;
-        const newText = `${varName} ← NEW ${funcName}(${args})`;
+        // シンプルな代入形式を生成（テストに合わせて）
+        const assignText = args ? `${varName} ← ${funcName}(${args})` : `${varName} ← ${funcName}()`;
         
         dataType = funcName as IGCSEDataType; // クラス名をデータ型として使用
         this.registerVariable(varName, dataType, node.lineno);
-        
-        // 複数のIRノードを返すため、親ノードを作成
-        const declareMeta: IRMeta = {
-          name: varName,
-          dataType
-        };
-        if (node.lineno !== undefined) {
-          declareMeta.lineNumber = node.lineno;
-        }
         
         const assignMeta: IRMeta = {
           name: varName,
@@ -1683,15 +1673,7 @@ export class PythonASTVisitor extends BaseParser {
           assignMeta.lineNumber = node.lineno;
         }
         
-        const declareIR = this.createIRNode('statement', declareText, [], declareMeta);
-        const assignIR = this.createIRNode('assign', newText, [], assignMeta);
-        
-        const blockMeta: IRMeta = {};
-        if (node.lineno !== undefined) {
-          blockMeta.lineNumber = node.lineno;
-        }
-        
-        return this.createIRNode('block', '', [declareIR, assignIR], blockMeta);
+        return this.createIRNode('assign', assignText, [], assignMeta);
       } else {
         // 通常の関数呼び出し
         const callIR = this.visitCall(node.value, node.lineno, true);
