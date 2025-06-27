@@ -98,20 +98,51 @@ export class StatementVisitor extends BaseParser {
     
     // ELSE節の処理
     if (node.orelse && node.orelse.length > 0) {
-      const elseIR = this.createIRNode('else', 'ELSE');
-      this.enterScope('else', 'block');
-      this.increaseIndent();
-      const elseChildren = node.orelse.map((child: ASTNode) => 
-      this.visitNode ? this.visitNode(child) : this.createIRNode('comment', '// Unprocessed node')
-    );
-      this.decreaseIndent();
-      this.exitScope();
+      const firstElse = node.orelse[0];
       
-      children = [...bodyChildren, elseIR, ...elseChildren];
+      // 最初の要素がIF文の場合、ELSE IFとして処理
+      if (firstElse.type === 'If') {
+        const condition = this.expressionVisitor.visitExpression(firstElse.test);
+        const elseIfText = `ELSE IF ${condition} THEN`;
+        const elseIfIR = this.createIRNode('elseif', elseIfText);
+        
+        this.enterScope('elseif', 'block');
+        this.increaseIndent();
+        const elseIfBodyChildren = firstElse.body.map((child: ASTNode) => 
+          this.visitNode ? this.visitNode(child) : this.createIRNode('comment', '// Unprocessed node')
+        );
+        this.decreaseIndent();
+        this.exitScope();
+        
+        children = [...bodyChildren, elseIfIR, ...elseIfBodyChildren];
+        
+        // 再帰的にELSE IF文のorelse節を処理
+        if (firstElse.orelse && firstElse.orelse.length > 0) {
+          const nestedElseResult = this.visitIf({
+            ...firstElse,
+            body: [], // bodyは空にして、orelseのみ処理
+            test: null // testも不要
+          } as ASTNode);
+          
+          // ネストしたELSE/ELSE IF文の子要素を追加
+          if (nestedElseResult.children) {
+            children = [...children, ...nestedElseResult.children];
+          }
+        }
+      } else {
+        // 通常のELSE節
+        const elseIR = this.createIRNode('else', 'ELSE');
+        this.enterScope('else', 'block');
+        this.increaseIndent();
+        const elseChildren = node.orelse.map((child: ASTNode) => 
+          this.visitNode ? this.visitNode(child) : this.createIRNode('comment', '// Unprocessed node')
+        );
+        this.decreaseIndent();
+        this.exitScope();
+        
+        children = [...bodyChildren, elseIR, ...elseChildren];
+      }
     }
-    
-    const endifIR = this.createIRNode('endif', 'ENDIF');
-    children.push(endifIR);
     
     return this.createIRNode('if', ifText, children);
   }

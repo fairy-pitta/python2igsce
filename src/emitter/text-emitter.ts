@@ -256,21 +256,20 @@ export class TextEmitter extends BaseEmitter {
    * 構造化されたconsequentフィールドを使用
    */
   private emitElse(node: IR): void {
+    // ELSEはIF文と同じレベルなので、現在のインデントを一時的に減らす
+    this.decreaseIndent();
     const text = this.formatText(node.text);
     this.emitLine(text);
+    this.increaseIndent();
     
     // ELSE文の本体（consequent）の出力
     if (node.meta?.consequent) {
-      this.increaseIndent();
       for (const stmt of node.meta.consequent) {
         this.emitNode(stmt);
       }
-      this.decreaseIndent();
     } else {
       // 従来の子ノード処理（後方互換性）
-      this.increaseIndent();
       this.emitChildren(node);
-      this.decreaseIndent();
     }
   }
 
@@ -278,12 +277,13 @@ export class TextEmitter extends BaseEmitter {
    * ELSE IF文の出力
    */
   private emitElseIf(node: IR): void {
+    // ELSE IFはIF文と同じレベルなので、現在のインデントを一時的に減らす
+    this.decreaseIndent();
     const text = this.formatText(node.text);
     this.emitLine(text);
-    
     this.increaseIndent();
+    
     this.emitChildren(node);
-    this.decreaseIndent();
   }
 
   /**

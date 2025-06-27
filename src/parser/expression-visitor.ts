@@ -21,6 +21,11 @@ export class ExpressionVisitor {
   visitExpression(node: ASTNode): string {
     if (!node) return '';
 
+    // If the node has a raw property, use it for simplified parsing
+    if (node.raw) {
+      return this.parseRawExpression(node.raw);
+    }
+
     switch (node.type) {
       case 'Name':
         return node.id;
@@ -58,6 +63,24 @@ export class ExpressionVisitor {
       default:
         return `/* ${node.type} */`;
     }
+  }
+
+  /**
+   * 簡易的な式の解析
+   */
+  private parseRawExpression(raw: string): string {
+    // 比較演算子の変換（単語境界を使用）
+    let result = raw
+      .replace(/==/g, ' = ')
+      .replace(/!=/g, ' ≠ ')
+      .replace(/>=/g, ' ≥ ')
+      .replace(/<=/g, ' ≤ ')
+      .replace(/\band\b/g, ' AND ')
+      .replace(/\bor\b/g, ' OR ')
+      .replace(/\bnot\b/g, ' NOT ')
+      .replace(/%/g, ' MOD ');
+    
+    return result.trim();
   }
 
   private formatConstant(value: any): string {
