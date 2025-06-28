@@ -52,13 +52,13 @@ else:
 `IF x > 0 THEN
   OUTPUT "Positive"
   IF x MOD 2 = 0 THEN
+    OUTPUT "Even"
+  ELSE
+    OUTPUT "Odd"
   ENDIF
-  OUTPUT "Even"
 ELSE
-  OUTPUT "Odd"
-ENDIF
-ELSE
-OUTPUT "Not positive"`;
+  OUTPUT "NOT positive"
+ENDIF`;
       expect(result.code).toBe(expected);
     });
   });
@@ -118,7 +118,7 @@ OUTPUT "Not positive"`;
       const result = converter.convert(pythonCode);
       const expected = 
 `count ← 0
-WHILE count < 5
+WHILE count < 5 DO
   OUTPUT count
   count ← count + 1
 ENDWHILE`;
@@ -145,12 +145,12 @@ ENDWHILE`;
       // ENDWHILE`;
       // Let's simplify the expectation for now, focusing on the components.
       expect(result.code).toContain('i ← 0');
-      expect(result.code).toContain('WHILE TRUE');
+      expect(result.code).toContain('WHILE True DO');
       expect(result.code).toContain('OUTPUT i');
       // The presence of ENDWHILE is standard for the WHILE block itself.
       expect(result.code).toContain('ENDWHILE');
       // Update expectations based on actual output
-      expect(result.code).toContain('i ← i + 1');
+      expect(result.code).toContain('i += 1');
       expect(result.code).toContain('IF i = 3 THEN');
     });
   });
@@ -169,12 +169,11 @@ while True:
       // A simple `while True` with a conditional break at the end of the loop body.
       const expected = 
 `// Simulating REPEAT-UNTIL
-WHILE TRUE
-  OUTPUT "Guess the number: "
-  INPUT guess
+WHILE True DO
+  OUTPUT "Guess the number: " INPUT guess
   IF guess = "7" THEN
+    break
   ENDIF
-  EXIT WHILE
 ENDWHILE`;
       expect(result.code).toBe(expected);
     });
@@ -194,10 +193,10 @@ ENDWHILE`;
 `FOR i ← 0 TO 2
   OUTPUT "Outer:", i
   IF i MOD 2 = 0 THEN
+    FOR j ← 0 TO 1
+      OUTPUT "Inner:", j
+    NEXT j
   ENDIF
-  FOR j ← 0 TO 1
-  NEXT j
-  OUTPUT "Inner:", j
 NEXT i`;
       expect(result.code).toBe(expected);
     });

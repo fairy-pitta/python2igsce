@@ -70,7 +70,16 @@ export class PythonASTVisitor extends BaseParser {
       const line = lines[i];
       const trimmed = line.trim();
       
-      if (trimmed && !trimmed.startsWith('#')) {
+      if (trimmed.startsWith('#')) {
+        // コメント行を処理
+        const commentNode: ASTNode = {
+          type: 'Comment',
+          value: trimmed.substring(1).trim(),
+          lineno: i + 1
+        };
+        nodes.push(commentNode);
+        i++;
+      } else if (trimmed) {
         const result = this.parseStatement(lines, i);
         if (result.node) {
           nodes.push(result.node);
@@ -178,7 +187,7 @@ export class PythonASTVisitor extends BaseParser {
       }
       
       // ノードに子ブロックを設定
-      if (node.type === 'If' || node.type === 'For' || node.type === 'While') {
+      if (node.type === 'If' || node.type === 'For' || node.type === 'While' || node.type === 'FunctionDef') {
         node.body = bodyNodes;
       }
       
@@ -226,6 +235,34 @@ export class PythonASTVisitor extends BaseParser {
       return this.parsePrintStatement(trimmed, lineNumber);
     }
     
+    // 関数定義の検出
+    if (trimmed.startsWith('def ')) {
+      return this.parseFunctionDef(trimmed, lineNumber);
+    }
+    
+    // return文の検出
+    if (trimmed.startsWith('return')) {
+      return this.parseReturnStatement(trimmed, lineNumber);
+    }
+    
+    // 関数呼び出しの検出
+    const callMatch = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\((.*)\)$/);
+    if (callMatch) {
+      const funcName = callMatch[1];
+      const argsStr = callMatch[2];
+      const args = this.parseArguments(argsStr);
+      
+      return {
+        type: 'Expr',
+        lineno: lineNumber,
+        value: {
+          type: 'Call',
+          func: { type: 'Name', id: funcName },
+          args: args
+        }
+      };
+    }
+    
     // その他の式文として処理
     return {
       type: 'Expr',
@@ -265,6 +302,20 @@ export class PythonASTVisitor extends BaseParser {
     const target = match ? match[1] : 'i';
     const iter = match ? match[2] : 'range(1)';
     
+    // range関数の引数を解析
+    let args: any[] = [];
+    if (iter.startsWith('range(') && iter.endsWith(')')) {
+      const argsStr = iter.slice(6, -1); // "range(" と ")" を除去
+      if (argsStr.trim()) {
+        const argParts = argsStr.split(',').map(arg => arg.trim());
+        args = argParts.map(arg => ({
+          type: 'Num',
+          n: isNaN(Number(arg)) ? arg : Number(arg),
+          raw: arg
+        }));
+      }
+    }
+    
     return {
       type: 'For',
       lineno: lineNumber,
@@ -272,7 +323,7 @@ export class PythonASTVisitor extends BaseParser {
       iter: {
         type: 'Call',
         func: { type: 'Name', id: 'range' },
-        args: [],
+        args: args,
         raw: iter
       },
       body: [],
@@ -408,6 +459,122 @@ export class PythonASTVisitor extends BaseParser {
   private visitModule(node: ASTNode): IR {
     const children = node.body.map((child: ASTNode) => this.visitNode(child));
     return this.createIRNode('statement', '', children);
+  }
+
+  /**
+   * 関数定義の解析
+   */
+  private parseFunctionDef(line: string, lineNumber: number): ASTNode {
+    // "def function_name(params):" の形式を解析
+    const match = line.match(/^def\s+(\w+)\s*\(([^)]*)\)\s*(?:->\s*([^:]+))?:\s*$/);
+    
+    if (!match) {
+      // マッチしない場合は基本的な関数定義として処理
+      return {
+        type: 'FunctionDef',
+        name: 'unknown_function',
+        args: { args: [] },
+        returns: null,
+        body: [],
+        lineno: lineNumber
+      };
+    }
+    
+    const [, funcName, paramsStr, returnType] = match;
+    
+    // パラメータの解析
+    const params = this.parseParameters(paramsStr);
+    
+    return {
+      type: 'FunctionDef',
+      name: funcName,
+      args: { args: params },
+      returns: returnType ? { type: 'Name', id: returnType.trim() } : null,
+      body: [],
+      lineno: lineNumber
+    };
+  }
+
+  /**
+   * 引数リストの解析
+   */
+  private parseArguments(argsStr: string): any[] {
+    if (!argsStr.trim()) {
+      return [];
+    }
+    
+    return argsStr.split(',').map(arg => {
+      const trimmed = arg.trim();
+      
+      // 文字列リテラルの場合
+      if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+        return {
+          type: 'Str',
+          s: trimmed.slice(1, -1)
+        };
+      }
+      
+      // 数値の場合
+      if (/^\d+$/.test(trimmed)) {
+        return {
+          type: 'Num',
+          n: parseInt(trimmed)
+        };
+      }
+      
+      // 変数名の場合
+      return {
+        type: 'Name',
+        id: trimmed
+      };
+    });
+  }
+
+  /**
+   * パラメータリストの解析
+   */
+  private parseParameters(paramsStr: string): any[] {
+    if (!paramsStr.trim()) {
+      return [];
+    }
+    
+    return paramsStr.split(',').map(param => {
+      const trimmed = param.trim();
+      
+      // 型注釈がある場合: "param: type"
+      const typeMatch = trimmed.match(/^(\w+)\s*:\s*(.+)$/);
+      if (typeMatch) {
+        const [, paramName, paramType] = typeMatch;
+        return {
+          arg: paramName,
+          annotation: { type: 'Name', id: paramType.trim() }
+        };
+      }
+      
+      // 型注釈がない場合
+      return {
+        arg: trimmed,
+        annotation: null
+      };
+    });
+  }
+
+  /**
+   * return文の解析
+   */
+  private parseReturnStatement(line: string, lineNumber: number): ASTNode {
+    const match = line.match(/^return\s*(.*)$/);
+    const value = match ? match[1].trim() : '';
+    
+    return {
+      type: 'Return',
+      value: value ? {
+        type: 'Name',
+        id: value,
+        raw: value
+      } : null,
+      lineno: lineNumber
+    };
   }
 
   /**

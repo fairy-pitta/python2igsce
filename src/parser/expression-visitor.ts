@@ -77,7 +77,7 @@ export class ExpressionVisitor {
       .replace(/<=/g, ' ≤ ')
       .replace(/\band\b/g, ' AND ')
       .replace(/\bor\b/g, ' OR ')
-      .replace(/\bnot\b/g, ' NOT ')
+      .replace(/\bnot\b/g, 'NOT ')
       .replace(/%/g, ' MOD ');
     
     return result.trim();
@@ -189,7 +189,9 @@ export class ExpressionVisitor {
       case 'print':
         return `OUTPUT ${args.join(', ')}`;
       case 'input':
-        return args.length > 0 ? `INPUT(${args[0]})` : 'INPUT';
+        // input()は代入文の右辺では特別な処理が必要
+        // ここでは一旦そのまま返し、後でエミッターで処理
+        return args.length > 0 ? `input(${args[0]})` : 'input()';
       case 'len':
         return `LENGTH(${args[0]})`;
       case 'str':
@@ -242,7 +244,7 @@ export class ExpressionVisitor {
     switch (op.type) {
       case 'UAdd': return '+';
       case 'USub': return '-';
-      case 'Not': return 'NOT ';
+      case 'Not': return 'NOT';
       default: return '';
     }
   }

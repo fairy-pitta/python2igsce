@@ -378,12 +378,12 @@ export class TextEmitter extends BaseEmitter {
     this.emitLine(text);
     
     this.increaseIndent();
-    // 子ノードを処理するが、ENDPROCEDUREは元のインデントレベルで出力
+    // 子ノードを処理するが、ENDPROCEDURE/ENDFUNCTIONは元のインデントレベルで出力
     for (const child of node.children) {
-      if (child.kind === 'statement' && child.text.trim() === 'ENDPROCEDURE') {
+      if (child.kind === 'statement' && (child.text.trim() === 'ENDPROCEDURE' || child.text.trim() === 'ENDFUNCTION')) {
         this.decreaseIndent();
         this.emitNode(child);
-        this.increaseIndent();
+        return; // ENDPROCEDUREを出力したら終了
       } else {
         this.emitNode(child);
       }
@@ -407,12 +407,12 @@ export class TextEmitter extends BaseEmitter {
     this.emitLine(text);
     
     this.increaseIndent();
-    // 子ノードを処理するが、ENDFUNCTIONは元のインデントレベルで出力
+    // 子ノードを処理するが、ENDPROCEDURE/ENDFUNCTIONは元のインデントレベルで出力
     for (const child of node.children) {
-      if (child.kind === 'statement' && child.text.trim() === 'ENDFUNCTION') {
+      if (child.kind === 'statement' && (child.text.trim() === 'ENDPROCEDURE' || child.text.trim() === 'ENDFUNCTION')) {
         this.decreaseIndent();
         this.emitNode(child);
-        this.increaseIndent();
+        return; // ENDFUNCTIONを出力したら終了
       } else {
         this.emitNode(child);
       }

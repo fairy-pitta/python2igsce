@@ -216,8 +216,9 @@ export class StatementVisitor extends BaseParser {
       return this.createIRNode('input', text);
     }
     
-    // 通常の関数呼び出し
-    const text = `${func}(${args.join(', ')})`;
+    // 通常の関数呼び出し（CALLキーワードを追加）
+    const capitalizedFunc = this.capitalizeFirstLetter(func);
+    const text = `CALL ${capitalizedFunc}(${args.join(', ')})`;
     return this.createIRNode('statement', text);
   }
 
@@ -236,6 +237,11 @@ export class StatementVisitor extends BaseParser {
    * 式文の処理
    */
   visitExpr(node: ASTNode): IR {
+    // 関数呼び出しの場合は特別に処理
+    if (node.value && node.value.type === 'Call') {
+      return this.visitCall(node.value);
+    }
+    
     const expr = this.expressionVisitor.visitExpression(node.value);
     return this.createIRNode('statement', expr);
   }
@@ -341,11 +347,37 @@ export class StatementVisitor extends BaseParser {
     }
     
     // 数値定数の場合は最適化
-    if (this.expressionVisitor.isNumericConstant(args[args.length - 1])) {
-      const endNum = this.expressionVisitor.getNumericValue(args[args.length - 1]);
-      endValue = (endNum - 1).toString();
+    // ステップが1の場合のみ終了値から1を引く
+    if (stepValue === '1') {
+      if (this.expressionVisitor.isNumericConstant(args[args.length - 1])) {
+        const endNum = this.expressionVisitor.getNumericValue(args[args.length - 1]);
+        endValue = (endNum - 1).toString();
+      } else {
+        endValue = `${endValue} - 1`;
+      }
     } else {
-      endValue = `${endValue} - 1`;
+      // ステップが1以外の場合は、最後に到達する値を計算
+      if (args.length === 3 && 
+          this.expressionVisitor.isNumericConstant(args[0]) && 
+          this.expressionVisitor.isNumericConstant(args[1]) && 
+          this.expressionVisitor.isNumericConstant(args[2])) {
+        const start = this.expressionVisitor.getNumericValue(args[0]);
+        const end = this.expressionVisitor.getNumericValue(args[1]);
+        const step = this.expressionVisitor.getNumericValue(args[2]);
+        
+        // 最後に到達する値を計算
+        let lastValue = start;
+        if (step > 0) {
+          while (lastValue + step < end) {
+            lastValue += step;
+          }
+        } else {
+          while (lastValue + step > end) {
+            lastValue += step;
+          }
+        }
+        endValue = lastValue.toString();
+      }
     }
     
     const forText = stepValue === '1' 
@@ -424,6 +456,14 @@ export class StatementVisitor extends BaseParser {
 
   protected override createIRNode(kind: IRKind, text: string, children: IR[] = [], meta?: IRMeta): IR {
     return createIR(kind, text, children, meta);
+  }
+
+  /**
+   * 文字列の最初の文字を大文字にする
+   */
+  private capitalizeFirstLetter(str: string): string {
+    if (!str) return str;
+    return str.charAt(0).toUpperCase() + str.slice(1);
   }
 
   // visitNodeはプロパティとして定義済み

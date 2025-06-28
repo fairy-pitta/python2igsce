@@ -43,7 +43,7 @@ export class DefinitionVisitor extends BaseParser {
    * 関数定義の処理
    */
   visitFunctionDef(node: ASTNode): IR {
-    const funcName = node.name;
+    const funcName = this.capitalizeFirstLetter(node.name);
     const params = this.extractParameters(node.args);
     const paramText = params.map(p => `${p.name} : ${p.type}`).join(', ');
     
@@ -59,7 +59,7 @@ export class DefinitionVisitor extends BaseParser {
     }
     
     // 関数スコープに入る
-    this.enterScope('function', funcName);
+    this.enterScope(funcName, 'function');
     this.increaseIndent();
     
     // パラメータを変数として登録
@@ -266,6 +266,14 @@ export class DefinitionVisitor extends BaseParser {
 
   protected override createIRNode(kind: IRKind, text: string, children: IR[] = [], meta?: IRMeta): IR {
     return createIR(kind, text, children, meta);
+  }
+
+  /**
+   * 文字列の最初の文字を大文字にする
+   */
+  private capitalizeFirstLetter(str: string): string {
+    if (!str) return str;
+    return str.charAt(0).toUpperCase() + str.slice(1);
   }
 
   // visitNodeはプロパティとして定義済み
