@@ -255,13 +255,38 @@ export class DefinitionVisitor extends BaseParser {
    * 戻り値の型を推論
    */
   private inferReturnType(node: ASTNode): IGCSEDataType {
-    // 簡易的な戻り値型推論
-    for (const stmt of node.body) {
-      if (stmt.type === 'Return' && stmt.value) {
-        return this.expressionVisitor.inferTypeFromValue(stmt.value);
+    // Python型ヒントがある場合は優先
+    if (node.returns && node.returns.id) {
+      switch (node.returns.id) {
+        case 'int': return 'INTEGER';
+        case 'str': return 'STRING';
+        case 'bool': return 'BOOLEAN';
+        case 'float': return 'REAL';
+        default: return 'STRING';
       }
     }
-    return 'STRING';
+    
+    // 簡易的な戻り値型推論（再帰的にReturn文を検索）
+    const findReturnType = (statements: ASTNode[]): IGCSEDataType | null => {
+      for (const stmt of statements) {
+        if (stmt.type === 'Return' && stmt.value) {
+          return this.expressionVisitor.inferTypeFromValue(stmt.value);
+        }
+        // ネストした構造（if文、for文など）も検索
+        if (stmt.body && Array.isArray(stmt.body)) {
+          const nestedType = findReturnType(stmt.body);
+          if (nestedType) return nestedType;
+        }
+        if (stmt.orelse && Array.isArray(stmt.orelse)) {
+          const elseType = findReturnType(stmt.orelse);
+          if (elseType) return elseType;
+        }
+      }
+      return null;
+    };
+    
+    const returnType = findReturnType(node.body);
+    return returnType || 'STRING';
   }
 
   protected override createIRNode(kind: IRKind, text: string, children: IR[] = [], meta?: IRMeta): IR {

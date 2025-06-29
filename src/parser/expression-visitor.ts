@@ -289,6 +289,48 @@ export class ExpressionVisitor {
       case 'List':
       case 'Tuple':
         return 'ARRAY';
+      case 'Name':
+        // 名前（変数や数値リテラル）の型推論
+        if (node.id && /^\d+$/.test(node.id)) {
+          // 整数リテラル
+          return 'INTEGER';
+        }
+        if (node.id && /^\d+\.\d+$/.test(node.id)) {
+          // 浮動小数点リテラル
+          return 'REAL';
+        }
+        if (node.id === 'True' || node.id === 'False') {
+          return 'BOOLEAN';
+        }
+        // その他の変数名はSTRING（型情報がない場合）
+        return 'STRING';
+      case 'BinOp':
+        // 二項演算の型推論
+        const leftType = this.inferTypeFromValue(node.left);
+        const rightType = this.inferTypeFromValue(node.right);
+        
+        // 算術演算子の場合
+        if (['Add', 'Sub', 'Mult', 'Div', 'Mod', 'Pow'].includes(node.op.type)) {
+          // 両方が数値型の場合
+          if ((leftType === 'INTEGER' || leftType === 'REAL') && 
+              (rightType === 'INTEGER' || rightType === 'REAL')) {
+            // どちらかがREALならREAL、両方INTEGERならINTEGER
+            return (leftType === 'REAL' || rightType === 'REAL') ? 'REAL' : 'INTEGER';
+          }
+        }
+        
+        // 比較演算子の場合
+        if (['Eq', 'NotEq', 'Lt', 'LtE', 'Gt', 'GtE'].includes(node.op.type)) {
+          return 'BOOLEAN';
+        }
+        
+        // 論理演算子の場合
+        if (['And', 'Or'].includes(node.op.type)) {
+          return 'BOOLEAN';
+        }
+        
+        // デフォルトはSTRING
+        return 'STRING';
     }
     
     return 'STRING';
