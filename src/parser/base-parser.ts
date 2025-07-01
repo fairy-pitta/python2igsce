@@ -272,7 +272,7 @@ export abstract class BaseParser {
   /**
    * パース結果の作成
    */
-  protected createParseResult(ir: IR): ParseResult {
+  protected createParseResult(ir: IR[]): ParseResult {
     const endTime = Date.now();
     const parseTime = endTime - this.startTime;
     
@@ -282,7 +282,7 @@ export abstract class BaseParser {
       warnings: [...this.context.warnings],
       stats: {
         linesProcessed: 0, // 実装時に設定
-        nodesGenerated: this.countNodes(ir),
+        nodesGenerated: ir.reduce((sum, node) => sum + this.countNodes(node), 0),
         parseTime,
         functionsFound: this.countFunctions(),
         classesFound: 0, // 実装時に設定
@@ -339,5 +339,19 @@ export abstract class BaseParser {
    */
   protected resetContext(): void {
     this.context = this.createInitialContext();
+  }
+
+  /**
+   * エラーの取得
+   */
+  protected getErrors(): import('../types/parser').ParseError[] {
+    return this.context.errors;
+  }
+
+  /**
+   * 警告の取得
+   */
+  protected getWarnings(): import('../types/parser').ParseWarning[] {
+    return this.context.warnings;
   }
 }

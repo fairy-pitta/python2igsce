@@ -215,41 +215,56 @@ export abstract class BaseEmitter {
   private convertOperators(text: string): string {
     let result = text;
     
-    // コメント部分を保護（//で始まるコメントを一時的に置き換え）
+    // コメント部分を保護（Pythonの#コメントを一時的に置き換え）
     const commentMatches: string[] = [];
-    result = result.replace(/\/\/.*$/gm, (match) => {
+    result = result.replace(/#.*$/gm, (match) => {
       const index = commentMatches.length;
       commentMatches.push(match);
       return `__COMMENT_${index}__`;
     });
     
-    // 比較演算子を一時的なプレースホルダーに置き換え
-    result = result.replace(/!=/g, '__NE__');
-    result = result.replace(/<=/g, '__LE__');
-    result = result.replace(/>=/g, '__GE__');
-    result = result.replace(/==/g, '__EQ__');
+    // 比較演算子の変換（代入演算子より先に処理）
+    result = result.replace(/!=/g, '≠');
+    result = result.replace(/<=/g, '≤');
+    result = result.replace(/>=/g, '≥');
+    result = result.replace(/==/g, '=');
     
-    // 代入演算子の変換
-    result = result.replace(/\s*=\s*/g, ' ← ');
-    
-    // プレースホルダーを正しい比較演算子に戻す
-    result = result.replace(/__NE__/g, '≠');
-    result = result.replace(/__LE__/g, '≤');
-    result = result.replace(/__GE__/g, '≥');
-    result = result.replace(/__EQ__/g, '=');
+    // 代入演算子の変換（比較演算子以外の=のみ）
+    // 比較演算子の周りにスペースがある場合は除外
+    result = result.replace(/(?<!\s)=(?!\s)/g, ' ← ');
+    result = result.replace(/^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*/gm, '$1 ← ');
     
     // 論理演算子の変換
     result = result.replace(/\band\b/gi, 'AND');
     result = result.replace(/\bor\b/gi, 'OR');
     result = result.replace(/\bnot\b/gi, 'NOT');
     
+    // 文字列連結の変換（文字列リテラルが含まれる行の+を&に変換）
+    const lines = result.split('\n');
+    result = lines.map(line => {
+      // 文字列リテラル（"または'で囲まれた部分）が含まれる行かチェック
+      if (/["']/.test(line)) {
+        // 文字列連結の+を&に変換
+        return line.replace(/\s*\+\s*/g, ' & ');
+      }
+      return line;
+    }).join('\n');
+    
     // 算術演算子の変換（コメント以外の//のみ）
     result = result.replace(/\s*%\s*/g, ' MOD ');
     result = result.replace(/\s*\/\/\s*/g, ' DIV ');
     
-    // コメントを復元
+    // input()関数の変換（代入文の場合は特別処理）
+    result = result.replace(/(\w+)\s*←\s*input\(\)/g, 'INPUT $1');
+    result = result.replace(/(\w+)\s*←\s*input\(([^)]+)\)/g, 'OUTPUT $2\nINPUT $1');
+    // 通常のinput()関数の変換
+    result = result.replace(/\binput\(\)/g, 'INPUT');
+    result = result.replace(/\binput\(([^)]+)\)/g, 'INPUT($1)');
+    
+    // コメントを復元（#を//に変換）
     commentMatches.forEach((comment, index) => {
-      result = result.replace(`__COMMENT_${index}__`, comment);
+      const convertedComment = comment.replace(/^#/, '//');
+      result = result.replace(`__COMMENT_${index}__`, convertedComment);
     });
     
     return result;

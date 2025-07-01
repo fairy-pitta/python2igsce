@@ -1,7 +1,7 @@
 // メインのPythonパーサークラス
 import { BaseParser } from './base-parser';
 import { ParserOptions, ParseResult } from '../types/parser';
-import { IR } from '../types/ir';
+import { IR, countIRNodes } from '../types/ir';
 import { PythonASTVisitor } from './visitor';
 
 /**
@@ -38,7 +38,7 @@ export class PythonParser extends BaseParser {
     const processedSource = this.preprocessSource(source);
     
     // PythonASTVisitorを使用してASTからIRへ変換
-    const visitor = new PythonASTVisitor(this.options);
+    const visitor = new PythonASTVisitor();
     const visitorResult = visitor.parse(processedSource);
     
     const parseTime = Date.now() - this.context.startTime;
@@ -50,10 +50,10 @@ export class PythonParser extends BaseParser {
        stats: {
          parseTime,
          linesProcessed: processedSource.split('\n').length,
-         nodesGenerated: this.countNodes(visitorResult.ir),
-         functionsFound: this.countFunctionsFromIR(visitorResult.ir),
-         classesFound: this.countClassesFromIR(visitorResult.ir),
-         variablesFound: this.countVariablesFromIR(visitorResult.ir)
+         nodesGenerated: Array.isArray(visitorResult.ir) ? visitorResult.ir.reduce((sum, node) => sum + countIRNodes(node), 0) : countIRNodes(visitorResult.ir),
+         functionsFound: Array.isArray(visitorResult.ir) ? visitorResult.ir.reduce((sum, node) => sum + this.countFunctionsFromIR(node), 0) : this.countFunctionsFromIR(visitorResult.ir),
+         classesFound: Array.isArray(visitorResult.ir) ? visitorResult.ir.reduce((sum, node) => sum + this.countClassesFromIR(node), 0) : this.countClassesFromIR(visitorResult.ir),
+         variablesFound: Array.isArray(visitorResult.ir) ? visitorResult.ir.reduce((sum, node) => sum + this.countVariablesFromIR(node), 0) : this.countVariablesFromIR(visitorResult.ir)
        }
      };
     

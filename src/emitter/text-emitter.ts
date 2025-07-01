@@ -225,19 +225,24 @@ export class TextEmitter extends BaseEmitter {
         this.emitNode(stmt);
       }
       this.decreaseIndent();
-    }
-    
-    // ELSE側（alternate）の出力
-    if (node.meta?.alternate && node.meta.alternate.length > 0) {
-      for (const altStmt of node.meta.alternate) {
-        // ELSE IF文の場合はインデントを調整しない
-        if (altStmt.text.startsWith('ELSE IF')) {
-          this.emitNode(altStmt);
-        } else {
-          // 通常のELSE文の場合はインデントを調整
-          this.emitNode(altStmt);
+      
+      // ELSE側（alternate）の出力
+      if (node.meta?.alternate && node.meta.alternate.length > 0) {
+        for (const altStmt of node.meta.alternate) {
+          // ELSE IF文の場合はインデントを調整しない
+          if (altStmt.text.startsWith('ELSE IF')) {
+            this.emitNode(altStmt);
+          } else {
+            // 通常のELSE文の場合はインデントを調整
+            this.emitNode(altStmt);
+          }
         }
       }
+    } else {
+      // 従来の子ノード処理（後方互換性）
+      this.increaseIndent();
+      this.emitChildren(node);
+      this.decreaseIndent();
     }
     
     // ENDIFの出力（ELSE IF文の場合は出力しない）
@@ -251,16 +256,20 @@ export class TextEmitter extends BaseEmitter {
    * 構造化されたconsequentフィールドを使用
    */
   private emitElse(node: IR): void {
+    // ELSEはIF文と同じレベルなので、現在のインデントを一時的に減らす
+    this.decreaseIndent();
     const text = this.formatText(node.text);
     this.emitLine(text);
+    this.increaseIndent();
     
     // ELSE文の本体（consequent）の出力
     if (node.meta?.consequent) {
-      this.increaseIndent();
       for (const stmt of node.meta.consequent) {
         this.emitNode(stmt);
       }
-      this.decreaseIndent();
+    } else {
+      // 従来の子ノード処理（後方互換性）
+      this.emitChildren(node);
     }
   }
 
@@ -268,12 +277,13 @@ export class TextEmitter extends BaseEmitter {
    * ELSE IF文の出力
    */
   private emitElseIf(node: IR): void {
+    // ELSE IFはIF文と同じレベルなので、現在のインデントを一時的に減らす
+    this.decreaseIndent();
     const text = this.formatText(node.text);
     this.emitLine(text);
-    
     this.increaseIndent();
+    
     this.emitChildren(node);
-    this.decreaseIndent();
   }
 
   /**
@@ -368,12 +378,12 @@ export class TextEmitter extends BaseEmitter {
     this.emitLine(text);
     
     this.increaseIndent();
-    // 子ノードを処理するが、ENDPROCEDUREは元のインデントレベルで出力
+    // 子ノードを処理するが、ENDPROCEDURE/ENDFUNCTIONは元のインデントレベルで出力
     for (const child of node.children) {
-      if (child.kind === 'statement' && child.text.trim() === 'ENDPROCEDURE') {
+      if (child.kind === 'statement' && (child.text.trim() === 'ENDPROCEDURE' || child.text.trim() === 'ENDFUNCTION')) {
         this.decreaseIndent();
         this.emitNode(child);
-        this.increaseIndent();
+        return; // ENDPROCEDUREを出力したら終了
       } else {
         this.emitNode(child);
       }
@@ -397,12 +407,12 @@ export class TextEmitter extends BaseEmitter {
     this.emitLine(text);
     
     this.increaseIndent();
-    // 子ノードを処理するが、ENDFUNCTIONは元のインデントレベルで出力
+    // 子ノードを処理するが、ENDPROCEDURE/ENDFUNCTIONは元のインデントレベルで出力
     for (const child of node.children) {
-      if (child.kind === 'statement' && child.text.trim() === 'ENDFUNCTION') {
+      if (child.kind === 'statement' && (child.text.trim() === 'ENDPROCEDURE' || child.text.trim() === 'ENDFUNCTION')) {
         this.decreaseIndent();
         this.emitNode(child);
-        this.increaseIndent();
+        return; // ENDFUNCTIONを出力したら終了
       } else {
         this.emitNode(child);
       }
@@ -524,9 +534,10 @@ export class TextEmitter extends BaseEmitter {
         const text = this.formatText(node.text);
         this.emitLine(text);
       }
+    } else {
+      // テキストが空の場合のみ子ノードを処理
+      this.emitChildren(node);
     }
-    
-    this.emitChildren(node);
   }
 
   /**
