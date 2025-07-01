@@ -26,6 +26,8 @@ export interface ParserOptions {
   maxErrors?: number;
   /** タイムアウト（ミリ秒） */
   timeout?: number;
+  /** Pyodideパーサーを使用するかどうか */
+  usePyodide?: boolean;
 }
 
 /**

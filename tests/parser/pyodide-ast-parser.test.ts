@@ -3,8 +3,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { getPyodideParser, parsePythonWithPyodide, PyodideASTParser } from '../../src/parser/pyodide-ast-parser';
-import { ASTNode } from '../../src/types/ast';
+import { getPyodideParser, parsePythonWithPyodide, PyodideASTParser, ASTNode } from '../../src/parser/pyodide-ast-parser';
 
 describe('PyodideASTParser', () => {
   let parser: PyodideASTParser;

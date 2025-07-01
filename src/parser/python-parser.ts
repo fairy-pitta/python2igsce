@@ -1,7 +1,7 @@
 // メインのPythonパーサークラス
 import { BaseParser } from './base-parser';
 import { ParserOptions, ParseResult } from '../types/parser';
-import { IR, createIR } from '../types/ir';
+import { IR, createIR, countIRNodes } from '../types/ir';
 import { PythonASTVisitor } from './visitor';
 
 /**
@@ -15,7 +15,7 @@ export class PythonParser extends BaseParser {
   /**
    * Pythonソースコードをパースしてイルに変換
    */
-  async parse(source: string): Promise<ParseResult> {
+  override async parse(source: string): Promise<ParseResult> {
     console.log('DEBUG: PythonParser.parse called');
     this.reset();
     
@@ -169,6 +169,14 @@ export class PythonParser extends BaseParser {
     return optimized;
   }
   */
+
+  private countIRNodes(node: IR): number {
+    let count = 1;
+    if (node.children) {
+      count += node.children.reduce((sum, child) => sum + this.countIRNodes(child), 0);
+    }
+    return count;
+  }
 
   /**
    * IRの最適化

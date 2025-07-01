@@ -64,10 +64,10 @@ print(f"Area: {result}")
     const converter = new Converter({
       parser: {
         usePyodide: true,  // Pyodideの使用を明示的に指定
-        strict: true
+        strictMode: true
       },
       emitter: {
-        format: 'text',
+        format: 'markdown',
         indentSize: 2
       }
     });
@@ -78,14 +78,14 @@ print(f"Area: {result}")
     console.log('IGCSE Pseudocode:');
     console.log(result.code);
     
-    if (result.errors.length > 0) {
+    if (result.parseResult.errors.length > 0) {
       console.log('Errors:');
-      result.errors.forEach(error => console.log(`- ${error.message}`));
+      result.parseResult.errors.forEach((error: any) => console.log(`- ${error.message}`));
     }
     
-    if (result.warnings.length > 0) {
+    if (result.parseResult.warnings.length > 0) {
       console.log('Warnings:');
-      result.warnings.forEach(warning => console.log(`- ${warning.message}`));
+      result.parseResult.warnings.forEach((warning: any) => console.log(`- ${warning.message}`));
     }
     
     return result;
@@ -184,15 +184,15 @@ def invalid_function(
     return ast;
   } catch (error) {
     console.log('Expected error caught:');
-    console.log(`Error type: ${error.constructor.name}`);
-    console.log(`Error message: ${error.message}`);
+    console.log(`Error type: ${(error as any).constructor.name}`);
+    console.log(`Error message: ${(error as any).message}`);
     
     // エラー情報の詳細表示
-    if (error.line !== undefined) {
-      console.log(`Line: ${error.line}`);
+    if ((error as any).line !== undefined) {
+      console.log(`Line: ${(error as any).line}`);
     }
-    if (error.column !== undefined) {
-      console.log(`Column: ${error.column}`);
+    if ((error as any).column !== undefined) {
+      console.log(`Column: ${(error as any).column}`);
     }
     
     return null;

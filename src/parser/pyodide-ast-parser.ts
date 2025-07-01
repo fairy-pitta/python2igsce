@@ -1,6 +1,32 @@
 import { loadPyodide, PyodideInterface } from 'pyodide';
-import { ASTNode } from '../types/parser';
-import { ParseError } from '../types/parser';
+import { IR } from '../types/ir';
+import { ParseError as ParseErrorType } from '../types/parser';
+
+// ASTNode型の定義（Pyodide用）
+export interface ASTNode {
+  type: string;
+  body?: ASTNode[];
+  lineno?: number;
+  col_offset?: number;
+  [key: string]: any;
+}
+
+// ParseErrorクラスの実装
+export class ParseError extends Error {
+  public line?: number;
+  public column?: number;
+  public lineno?: number;
+  public msg?: string;
+
+  constructor(message: string, line?: number, column?: number) {
+    super(message);
+    this.name = 'ParseError';
+    this.line = line;
+    this.column = column;
+    this.lineno = line;
+    this.msg = message;
+  }
+}
 
 /**
  * PyodideベースのPython ASTパーサー

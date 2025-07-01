@@ -34,7 +34,7 @@ export class PythonASTVisitor extends BaseParser {
   /**
    * メインのパース関数
    */
-  async parse(source: string): Promise<import('../types/parser').ParseResult> {
+  override async parse(source: string): Promise<import('../types/parser').ParseResult> {
     console.log('DEBUG: parse called');
     this.startParsing();
     this.resetContext();
@@ -62,13 +62,13 @@ export class PythonASTVisitor extends BaseParser {
   /**
    * ASTパーサー（Pyodideまたは簡易実装を使用）
    */
-  private async parseToAST(source: string): Promise<ASTNode> {
+  private async parseToAST(source: string): Promise<import('./pyodide-ast-parser').ASTNode> {
     // Pyodideが利用可能な場合は使用
     try {
       const pyodideParser = getPyodideParser();
       return await pyodideParser.parseToAST(source);
-    } catch (error) {
-      console.warn('Pyodide parsing failed, falling back to simple parser:', error);
+    } catch (error: any) {
+      console.warn('Pyodide parsing failed, falling back to simple parser:', error?.message || error);
       return this.parseToASTSimple(source);
     }
   }
@@ -76,7 +76,7 @@ export class PythonASTVisitor extends BaseParser {
   /**
    * 簡易的なASTパーサー（フォールバック用）
    */
-  private parseToASTSimple(source: string): ASTNode {
+  private parseToASTSimple(source: string): import('./pyodide-ast-parser').ASTNode {
     console.log('DEBUG: parseToAST called');
     // 実際の実装では、python-astやpyodideなどを使用
     // ここでは簡易的な実装

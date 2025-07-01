@@ -65,7 +65,7 @@ export class Converter {
   /**
    * Python コードを IGCSE Pseudocode に変換
    */
-  convert(pythonCode: string): ConversionResult {
+  async convert(pythonCode: string): Promise<ConversionResult> {
     const startTime = Date.now();
     
     try {
