@@ -211,7 +211,7 @@ export class StatementVisitor extends BaseParser {
    */
   visitWhile(node: ASTNode): IR {
     const condition = this.expressionVisitor.visitExpression(node.test);
-    const whileText = `WHILE ${condition} DO`;
+    const whileText = `WHILE ${condition}`;
     
     this.enterScope('while', 'block');
     this.increaseIndent();
