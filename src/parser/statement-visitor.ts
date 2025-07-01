@@ -20,8 +20,8 @@ export class StatementVisitor extends BaseParser {
   /**
    * パースの実行（StatementVisitorでは使用しない）
    */
-  parse(_source: string): ParseResult {
-    throw new Error('StatementVisitor.parse() should not be called directly');
+  override async parse(_source: string): Promise<ParseResult> {
+    throw new Error('StatementVisitor.parse should not be called directly');
   }
   private expressionVisitor: ExpressionVisitor;
   public visitNode: ((node: ASTNode) => IR) | undefined;
@@ -430,6 +430,34 @@ export class StatementVisitor extends BaseParser {
 
   private handleArrayInitialization(node: ASTNode): IR {
     const target = this.expressionVisitor.visitExpression(node.targets[0]);
+    
+    // [0] * 5 のような配列初期化パターンの処理
+    if (node.value.type === 'BinOp' && node.value.op.type === 'Mult') {
+      let size: number;
+      let elementType: string;
+      
+      if (node.value.left.type === 'List' && node.value.right.type === 'Constant') {
+        // [0] * 5 パターン
+        size = node.value.right.value;
+        const firstElement = node.value.left.elts[0];
+        elementType = this.expressionVisitor.inferTypeFromValue(firstElement);
+      } else if (node.value.right.type === 'List' && node.value.left.type === 'Constant') {
+        // 5 * [0] パターン
+        size = node.value.left.value;
+        const firstElement = node.value.right.elts[0];
+        elementType = this.expressionVisitor.inferTypeFromValue(firstElement);
+      } else {
+        // フォールバック
+        size = 10;
+        elementType = 'INTEGER';
+      }
+      
+      // 配列宣言のみを生成（初期化は行わない）
+      const declText = `DECLARE ${target} : ARRAY[1:${size}] OF ${elementType}`;
+      return this.createIRNode('array', declText);
+    }
+    
+    // 通常のリスト初期化の処理
     const elements = node.value.elts;
     const size = elements.length;
     

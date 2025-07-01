@@ -2,6 +2,7 @@
  * Pyodide ASTパーサーの使用例
  */
 
+// @ts-ignore
 import { getPyodideParser, parsePythonWithPyodide } from '../parser/pyodide-ast-parser';
 import { Converter } from '../converter';
 
@@ -68,7 +69,13 @@ print(f"Area: {result}")
       },
       emitter: {
         format: 'markdown',
-        indentSize: 2
+        indentSize: 2,
+        indentChar: ' ' as const,
+        lineEnding: '\n' as const,
+        includeComments: true,
+        includeLineNumbers: false,
+        includeDebugInfo: false,
+        beautify: true
       }
     });
 

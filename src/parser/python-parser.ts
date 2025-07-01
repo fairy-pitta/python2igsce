@@ -1,7 +1,7 @@
 // メインのPythonパーサークラス
 import { BaseParser } from './base-parser';
 import { ParserOptions, ParseResult } from '../types/parser';
-import { IR, createIR, countIRNodes } from '../types/ir';
+import { IR } from '../types/ir';
 import { PythonASTVisitor } from './visitor';
 
 /**
@@ -24,7 +24,7 @@ export class PythonParser extends BaseParser {
       const preprocessed = this.preprocessSource(source);
       
       // ASTビジターを使用してパース
-      const visitor = new PythonASTVisitor(this.context);
+      const visitor = new PythonASTVisitor();
       const result = await visitor.parse(preprocessed);
       
       // 統計を更新
@@ -42,37 +42,7 @@ export class PythonParser extends BaseParser {
     }
   }
 
-  /**
-   * IRへのパース処理
-   */
-  private parseToIR(source: string): ParseResult {
-    this.context.startTime = Date.now();
-    
-    // ソースコードの前処理
-    const processedSource = this.preprocessSource(source);
-    
-    // PythonASTVisitorを使用してASTからIRへ変換
-    const visitor = new PythonASTVisitor();
-    const visitorResult = visitor.parse(processedSource);
-    
-    const parseTime = Date.now() - this.context.startTime;
-    
-    const result: ParseResult = {
-       ir: visitorResult.ir,
-       errors: [...this.context.errors, ...visitorResult.errors],
-       warnings: [...this.context.warnings, ...visitorResult.warnings],
-       stats: {
-         parseTime,
-         linesProcessed: processedSource.split('\n').length,
-         nodesGenerated: Array.isArray(visitorResult.ir) ? visitorResult.ir.reduce((sum, node) => sum + countIRNodes(node), 0) : countIRNodes(visitorResult.ir),
-         functionsFound: Array.isArray(visitorResult.ir) ? visitorResult.ir.reduce((sum, node) => sum + this.countFunctionsFromIR(node), 0) : this.countFunctionsFromIR(visitorResult.ir),
-         classesFound: Array.isArray(visitorResult.ir) ? visitorResult.ir.reduce((sum, node) => sum + this.countClassesFromIR(node), 0) : this.countClassesFromIR(visitorResult.ir),
-         variablesFound: Array.isArray(visitorResult.ir) ? visitorResult.ir.reduce((sum, node) => sum + this.countVariablesFromIR(node), 0) : this.countVariablesFromIR(visitorResult.ir)
-       }
-     };
-    
-    return result;
-  }
+
 
   /**
    * ソースコードの前処理
@@ -81,53 +51,7 @@ export class PythonParser extends BaseParser {
     return this.preprocess(source);
   }
 
-  /**
-   * IRから関数数をカウント
-   */
-  private countFunctionsFromIR(ir: IR): number {
-    let count = 0;
-    if (ir.kind === 'function' || ir.kind === 'procedure') {
-      count = 1;
-    }
-    if (ir.children) {
-      for (const child of ir.children) {
-        count += this.countFunctionsFromIR(child);
-      }
-    }
-    return count;
-  }
 
-  /**
-   * IRからクラス数をカウント
-   */
-  private countClassesFromIR(ir: IR): number {
-    let count = 0;
-    if (ir.kind === 'class') {
-      count = 1;
-    }
-    if (ir.children) {
-      for (const child of ir.children) {
-        count += this.countClassesFromIR(child);
-      }
-    }
-    return count;
-  }
-
-  /**
-   * IRから変数数をカウント
-   */
-  private countVariablesFromIR(ir: IR): number {
-    let count = 0;
-    if (ir.kind === 'assign' && ir.meta?.name) {
-      count = 1;
-    }
-    if (ir.children) {
-      for (const child of ir.children) {
-        count += this.countVariablesFromIR(child);
-      }
-    }
-    return count;
-  }
 
   /**
    * ソースコードの前処理（内部実装）
@@ -414,14 +338,46 @@ export class PythonParser extends BaseParser {
   /**
    * 統計情報を更新
    */
-  private updateStatistics(result: ParseResult): void {
+  private updateStatistics(_result: ParseResult): void {
     // 統計情報の更新処理
+  }
+
+  /**
+   * IRから関数数をカウント
+   */
+  private countFunctionsFromIR(ir: IR): number {
+    let count = 0;
+    if (ir.kind === 'function' || ir.kind === 'procedure') {
+      count = 1;
+    }
+    if (ir.children) {
+      for (const child of ir.children) {
+        count += this.countFunctionsFromIR(child);
+      }
+    }
+    return count;
+  }
+
+  /**
+   * IRから変数数をカウント
+   */
+  private countVariablesFromIR(ir: IR): number {
+    let count = 0;
+    if (ir.kind === 'assign' && ir.meta?.name) {
+      count = 1;
+    }
+    if (ir.children) {
+      for (const child of ir.children) {
+        count += this.countVariablesFromIR(child);
+      }
+    }
+    return count;
   }
 
   /**
    * パース結果を作成
    */
-  private createParseResult(ir: IR[]): ParseResult {
+  protected override createParseResult(ir: IR[]): ParseResult {
     return {
       ir,
       errors: this.context.errors,

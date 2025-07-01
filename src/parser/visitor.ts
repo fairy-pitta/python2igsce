@@ -2,7 +2,7 @@ import { IR, IRKind, createIR, IRMeta, countIRNodes } from '../types/ir';
 import { BaseParser } from './base-parser';
 import { StatementVisitor } from './statement-visitor';
 import { DefinitionVisitor } from './definition-visitor';
-import { PyodideASTParser, getPyodideParser } from './pyodide-ast-parser';
+import { getPyodideParser } from './pyodide-ast-parser';
 
 /**
  * Python ASTノードの基本インターフェース
@@ -262,8 +262,8 @@ export class PythonASTVisitor extends BaseParser {
       const beforeEqual = trimmed.substring(0, equalIndex).trim();
       const afterEqual = trimmed.substring(equalIndex + 3).trim();
       
-      // 左辺が単純な変数名で、右辺が存在する場合は代入文
-      if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(beforeEqual) && afterEqual.length > 0) {
+      // 左辺が変数名または配列アクセスで、右辺が存在する場合は代入文
+      if ((/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(beforeEqual) || /^[a-zA-Z_][a-zA-Z0-9_]*\[.+\]$/.test(beforeEqual)) && afterEqual.length > 0) {
         return this.parseAssignStatement(trimmed, lineNumber);
       }
     }
@@ -399,20 +399,49 @@ export class PythonASTVisitor extends BaseParser {
     const match = line.match(/^if\s+(.+):\s*$/);
     const condition = match ? match[1] : line.substring(3, line.length - 1);
     
+    // 条件式を解析
+    const testNode = this.parseCondition(condition);
+    
     return {
       type: 'If',
       lineno: lineNumber,
-      test: {
-        type: 'Compare',
-        left: { type: 'Name', id: 'condition' },
-        ops: ['>'],
-        comparators: [{ type: 'Num', n: 0 }],
-        raw: condition
-      },
+      test: testNode,
       body: [],
       orelse: []
     };
   }
+
+  private parseCondition(condition: string): ASTNode {
+    // 比較演算子を検出
+    const comparisonOps = ['>=', '<=', '==', '!=', '>', '<'];
+    
+    for (const op of comparisonOps) {
+      if (condition.includes(op)) {
+        const parts = condition.split(op);
+        if (parts.length === 2) {
+          const left = parts[0].trim();
+          const right = parts[1].trim();
+          
+          return {
+            type: 'Compare',
+            left: this.parseExpression(left),
+            ops: [op],
+            comparators: [this.parseExpression(right)],
+            raw: condition
+          };
+        }
+      }
+    }
+    
+    // 単純な式として処理
+    return {
+      type: 'Name',
+      id: condition,
+      raw: condition
+    };
+  }
+
+
 
   private parseForStatement(line: string, lineNumber: number): ASTNode {
     // "for var in iterable:" の形式を解析
@@ -487,6 +516,22 @@ export class PythonASTVisitor extends BaseParser {
     const target = parts[0].trim();
     const value = parts.slice(1).join(' = ').trim();
     
+    // 左辺が配列アクセスの場合（例: numbers[0] = 10）
+    const arrayAssignMatch = target.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\[(\d+)\]$/);
+    if (arrayAssignMatch) {
+      const [, arrayName, indexStr] = arrayAssignMatch;
+      return {
+        type: 'Assign',
+        lineno: lineNumber,
+        targets: [{
+          type: 'Subscript',
+          value: { type: 'Name', id: arrayName },
+          slice: { type: 'Constant', value: parseInt(indexStr) }
+        }],
+        value: this.parseExpression(value)
+      };
+    }
+    
     // 配列リテラルの検出
     if (value.startsWith('[') && value.endsWith(']')) {
       const elementsStr = value.slice(1, -1).trim();
@@ -559,6 +604,21 @@ export class PythonASTVisitor extends BaseParser {
    */
   private parseExpression(expr: string): ASTNode {
     const trimmed = expr.trim();
+    
+    // 配列初期化パターンの検出（例: [0] * 5）
+    const arrayInitMatch = trimmed.match(/^\[(.+?)\]\s*\*\s*(\d+)$/);
+    if (arrayInitMatch) {
+      const [, element, count] = arrayInitMatch;
+      return {
+        type: 'BinOp',
+        left: {
+          type: 'List',
+          elts: [this.parseExpression(element)]
+        },
+        op: { type: 'Mult' },
+        right: { type: 'Constant', value: parseInt(count) }
+      };
+    }
     
     // NOT演算子の検出（最優先）
     if (trimmed.startsWith('not ')) {
@@ -645,6 +705,17 @@ export class PythonASTVisitor extends BaseParser {
   private parseSimpleExpression(expr: string): ASTNode {
     const trimmed = expr.trim();
     
+    // 配列アクセスの検出（例: numbers[0]）
+    const arrayAccessMatch = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\[(\d+)\]$/);
+    if (arrayAccessMatch) {
+      const [, arrayName, indexStr] = arrayAccessMatch;
+      return {
+        type: 'Subscript',
+        value: { type: 'Name', id: arrayName },
+        slice: { type: 'Constant', value: parseInt(indexStr) }
+      };
+    }
+    
     // 文字列リテラル
     if ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
         (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
@@ -712,17 +783,16 @@ export class PythonASTVisitor extends BaseParser {
     const match = line.match(/^print\((.*)\)\s*$/);
     const args = match ? match[1] : '';
     
+    // 引数を適切に解析
+    const argNode = args.trim() ? this.parseExpression(args.trim()) : { type: 'Str', s: '' };
+    
     return {
       type: 'Expr',
       lineno: lineNumber,
       value: {
         type: 'Call',
         func: { type: 'Name', id: 'print' },
-        args: [{
-          type: 'Str',
-          s: args,
-          raw: args
-        }]
+        args: [argNode]
       }
     };
   }

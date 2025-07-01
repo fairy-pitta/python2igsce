@@ -4,12 +4,13 @@ import { Converter } from '../src/converter';
 describe('E2E Tests - Python to IGCSE Pseudocode', () => {
   const converter = new Converter();
 
-  function convertPython(pythonCode: string): string {
-    return converter.convert(pythonCode).code;
+  async function convertPython(pythonCode: string): Promise<string> {
+    const result = await converter.convert(pythonCode);
+    return result.code;
   }
 
   describe('Variables and Assignment', () => {
-    it('should convert variable assignment', () => {
+    it('should convert variable assignment', async () => {
       const python = `
 counter = 5
 name = "John"
@@ -19,11 +20,11 @@ pi = 3.14
 name ← "John"
 pi ← 3.14`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
 
-    it('should convert input statements', () => {
+    it('should convert input statements', async () => {
       const python = `
 name = input("Enter your name: ")
 age = int(input("Enter your age: "))
@@ -33,11 +34,11 @@ INPUT name
 OUTPUT "Enter your age: "
 INPUT age`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
 
-    it('should convert output statements', () => {
+    it('should convert output statements', async () => {
       const python = `
 print("Hello World")
 print("Your score is:", score)
@@ -47,13 +48,13 @@ print(f"Hello {name}")
 OUTPUT "Your score is:", score
 OUTPUT "Hello ", name`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
   });
 
   describe('Iteration Structures', () => {
-    it('should convert FOR loop with range', () => {
+    it('should convert FOR loop with range', async () => {
       const python = `
 for i in range(1, 11):
     print(i)
@@ -62,11 +63,11 @@ for i in range(1, 11):
   OUTPUT i
 NEXT i`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
 
-    it('should convert FOR loop with step', () => {
+    it('should convert FOR loop with step', async () => {
       const python = `
 for i in range(10, 0, -1):
     print(i)
@@ -75,11 +76,11 @@ for i in range(10, 0, -1):
   OUTPUT i
 NEXT i`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
 
-    it('should convert WHILE loop', () => {
+    it('should convert WHILE loop', async () => {
       const python = `
 while x < 10:
     x = x + 1
@@ -90,11 +91,11 @@ while x < 10:
   OUTPUT x
 ENDWHILE`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
 
-    it('should convert do-while equivalent (while True with break)', () => {
+    it('should convert do-while equivalent (while True with break)', async () => {
       const python = `
 while True:
     guess = int(input("Enter guess: "))
@@ -106,13 +107,13 @@ while True:
   INPUT guess
   UNTIL guess = secret`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
   });
 
   describe('Selection Structures', () => {
-    it('should convert simple IF-ELSE', () => {
+    it('should convert simple IF-ELSE', async () => {
       const python = `
 if score >= 50:
     print("Pass")
@@ -125,11 +126,11 @@ ELSE
   OUTPUT "Fail"
 ENDIF`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
 
-    it('should convert nested IF statements', () => {
+    it('should convert nested IF statements', async () => {
       const python = `
 if x > y:
     if x > z:
@@ -149,11 +150,11 @@ ENDIF
 ELSE
 OUTPUT "y might be largest"`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
 
-    it('should convert IF-ELIF-ELSE chain', () => {
+    it('should convert IF-ELIF-ELSE chain', async () => {
       const python = `
 if grade >= 90:
     print("A")
@@ -174,13 +175,13 @@ ELSE
   OUTPUT "F"
 ENDIF`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
   });
 
   describe('Arrays and Lists', () => {
-    it('should convert array declaration and access', () => {
+    it('should convert array declaration and access', async () => {
       const python = `
 numbers = [0] * 5
 numbers[0] = 10
@@ -192,11 +193,11 @@ numbers[1] ← 10
 numbers[2] ← 20
 OUTPUT numbers[1]`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
 
-    it('should convert list operations', () => {
+    it('should convert list operations', async () => {
       const python = `
 names = []
 names.append("Alice")
@@ -211,13 +212,13 @@ FOR i ← 1 TO 2
     OUTPUT names[i]
 NEXT i`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
   });
 
   describe('Functions and Procedures', () => {
-    it('should convert procedure (function without return)', () => {
+    it('should convert procedure (function without return)', async () => {
       const python = `
 def greet(name):
     print("Hello,", name)
@@ -229,11 +230,11 @@ greet("John")
 ENDPROCEDURE
 CALL Greet("John")`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
 
-    it('should convert function with return value', () => {
+    it('should convert function with return value', async () => {
       const python = `
 def add(x, y):
     return x + y
@@ -247,11 +248,11 @@ ENDFUNCTION
 result ← add(5, 3)
 OUTPUT result`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
 
-    it('should convert function with multiple parameters', () => {
+    it('should convert function with multiple parameters', async () => {
       const python = `
 def calculate_area(length, width):
     area = length * width
@@ -265,13 +266,13 @@ my_area = calculate_area(10, 5)
 ENDFUNCTION
 my_area ← calculate_area(10, 5)`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
   });
 
   describe('Operators and Expressions', () => {
-    it('should convert comparison operators', () => {
+    it('should convert comparison operators', async () => {
       const python = `
 if x == y:
     print("Equal")
@@ -295,11 +296,11 @@ IF x ≥ y THEN
   OUTPUT "Greater or equal"
 ENDIF`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
 
-    it('should convert logical operators', () => {
+    it('should convert logical operators', async () => {
       const python = `
 if x > 0 and y > 0:
     print("Both positive")
@@ -318,11 +319,11 @@ IF NOT (x < 0) THEN
   OUTPUT "Not negative"
 ENDIF`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
 
-    it('should convert arithmetic operators', () => {
+    it('should convert arithmetic operators', async () => {
       const python = `
 result = a + b
 quotient = a // b
@@ -334,13 +335,13 @@ quotient ← a DIV b
 remainder ← a MOD b
 power ← a * * 2`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
   });
 
   describe('String Operations', () => {
-    it('should convert string concatenation', () => {
+    it('should convert string concatenation', async () => {
       const python = `
 full_name = first_name + " " + last_name
 greeting = f"Hello {name}!"
@@ -348,11 +349,11 @@ greeting = f"Hello {name}!"
       const expected = `full_name ← first_name & " " & last_name
 greeting ← f"Hello {name}!"`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
 
-    it('should convert string methods', () => {
+    it('should convert string methods', async () => {
       const python = `
 text = "Hello World"
 length = len(text)
@@ -364,13 +365,13 @@ length ← LENGTH(text)
 upper_text ← UCASE(text)
 lower_text ← LCASE(text)`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
   });
 
   describe('Comments', () => {
-    it('should convert single line comments', () => {
+    it('should convert single line comments', async () => {
       const python = `
 # This is a comment
 x = 5  # Another comment
@@ -380,13 +381,13 @@ x = 5  # Another comment
 x ← 5 // Another comment
 // Final comment`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
   });
 
   describe('Complex Examples', () => {
-    it('should convert a complete program with multiple constructs', () => {
+    it('should convert a complete program with multiple constructs', async () => {
       const python = `
 # Simple calculator program
 def add(a, b):
@@ -443,7 +444,7 @@ ENDPROCEDURE
 
 CALL Main()`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       // Note: This is a complex example, exact formatting may vary
       expect(result).toContain('FUNCTION Add');
       expect(result).toContain('PROCEDURE Main');
@@ -451,7 +452,7 @@ CALL Main()`;
       expect(result).toContain('IF num1 < 0 OR num2 < 0 THEN');
     });
 
-    it('should convert array processing example', () => {
+    it('should convert array processing example', async () => {
       const python = `
 # Find maximum in array
 numbers = [23, 45, 12, 67, 34]
@@ -479,7 +480,7 @@ FOR i ← 1 TO LENGTH(numbers)
 NEXT i
 OUTPUT "Maximum value is: ", max_value`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result).toContain('DECLARE numbers : ARRAY');
       expect(result).toContain('FOR i ← 1 TO LENGTH(numbers)');
       expect(result).toContain('IF numbers[i] > max_value THEN');
@@ -487,7 +488,7 @@ OUTPUT "Maximum value is: ", max_value`;
   });
 
   describe.skip('Array Declarations', () => {
-    it('should convert array initialization', () => {
+    it('should convert array initialization', async () => {
       const python = `
 numbers = [0] * 5
 names = ["Alice", "Bob", "Charlie"]
@@ -498,11 +499,11 @@ names[1] ← "Alice"
 names[2] ← "Bob"
 names[3] ← "Charlie"`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
 
-    it('should convert array access and assignment', () => {
+    it('should convert array access and assignment', async () => {
       const python = `
 numbers[0] = 10
 value = numbers[2]
@@ -510,13 +511,13 @@ value = numbers[2]
       const expected = `numbers[1] ← 10
 value ← numbers[3]`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
   });
 
   describe.skip('Type Declarations', () => {
-    it('should convert typed variable declarations', () => {
+    it('should convert typed variable declarations', async () => {
       const python = `
 counter: int = 0
 name: str = "John"
@@ -532,13 +533,13 @@ pi ← 3.14
 DECLARE is_valid : BOOLEAN
 is_valid ← TRUE`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
   });
 
   describe.skip('CASE Statements', () => {
-    it('should convert match statement to CASE', () => {
+    it('should convert match statement to CASE', async () => {
       const python = `
 match direction:
     case "N":
@@ -560,11 +561,11 @@ match direction:
    OTHERWISE : OUTPUT "Invalid direction"
 ENDCASE`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
 
-    it('should convert if-elif-else to CASE when appropriate', () => {
+    it('should convert if-elif-else to CASE when appropriate', async () => {
       const python = `
 if grade == "A":
     points = 4.0
@@ -582,7 +583,7 @@ else:
    OTHERWISE : points ← 0.0
 ENDCASE`;
       
-      const result = convertPython(python);
+      const result = await convertPython(python);
       expect(result.trim()).toBe(expected);
     });
   });

@@ -1,6 +1,19 @@
-import { loadPyodide, PyodideInterface } from 'pyodide';
-import { IR } from '../types/ir';
-import { ParseError as ParseErrorType } from '../types/parser';
+// Pyodide ASTパーサー
+
+let loadPyodide: any;
+
+// 動的インポートでPyodideを読み込み
+async function importPyodide() {
+  try {
+    // @ts-ignore
+    const pyodideModule = await import('pyodide');
+    loadPyodide = pyodideModule.loadPyodide;
+    return true;
+  } catch (error) {
+    console.warn('Pyodide import failed:', error);
+    return false;
+  }
+}
 
 // ASTNode型の定義（Pyodide用）
 export interface ASTNode {
@@ -15,15 +28,17 @@ export interface ASTNode {
 export class ParseError extends Error {
   public line?: number;
   public column?: number;
-  public lineno?: number;
-  public msg?: string;
+  public lineno: number;
+  public msg: string;
+  public errorType?: string;
 
-  constructor(message: string, line?: number, column?: number) {
+  constructor(message: string, errorType?: string, line?: number, column?: number) {
     super(message);
     this.name = 'ParseError';
-    this.line = line;
-    this.column = column;
-    this.lineno = line;
+    if (errorType !== undefined) this.errorType = errorType;
+    if (line !== undefined) this.line = line;
+    if (column !== undefined) this.column = column;
+    this.lineno = line ?? 0;
     this.msg = message;
   }
 }
@@ -33,7 +48,7 @@ export class ParseError extends Error {
  * Pythonの標準astモジュールを使用して正確なAST解析を行う
  */
 export class PyodideASTParser {
-  private pyodide: PyodideInterface | null = null;
+  private pyodide: any | null = null;
   private initialized = false;
 
   /**
@@ -46,6 +61,13 @@ export class PyodideASTParser {
 
     try {
       console.log('Initializing Pyodide...');
+      
+      // Pyodideの動的インポート
+      const importSuccess = await importPyodide();
+      if (!importSuccess) {
+        throw new Error('Failed to import Pyodide module');
+      }
+      
       this.pyodide = await loadPyodide({
         indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/',
       });
@@ -116,7 +138,14 @@ def parse_python_code(source_code: str) -> str:
    */
   async parseToAST(sourceCode: string): Promise<ASTNode> {
     if (!this.initialized || !this.pyodide) {
-      await this.initialize();
+      try {
+        await this.initialize();
+      } catch (error) {
+        throw new ParseError(
+          `Pyodide initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          'initialization_error'
+        );
+      }
     }
 
     try {
@@ -173,11 +202,11 @@ def parse_python_code(source_code: str) -> str:
       if (Array.isArray(value)) {
         // 配列の場合、各要素を再帰的に変換
         (node as any)[key] = value.map(item => 
-          (item && typeof item === 'object' && item.type) 
+          (item && typeof item === 'object' && (item as any).type) 
             ? this.convertPythonASTToASTNode(item)
             : item
         );
-      } else if (value && typeof value === 'object' && value.type) {
+      } else if (value && typeof value === 'object' && (value as any).type) {
         // ASTノードの場合、再帰的に変換
         (node as any)[key] = this.convertPythonASTToASTNode(value);
       } else {

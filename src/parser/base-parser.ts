@@ -40,7 +40,8 @@ export abstract class BaseParser {
       indentSize: options.indentSize ?? 3,
       maxDepth: options.maxDepth ?? 50,
       maxErrors: options.maxErrors ?? 100,
-      timeout: options.timeout ?? 30000
+      timeout: options.timeout ?? 30000,
+      usePyodide: options.usePyodide ?? false
     };
   }
 
@@ -70,7 +71,7 @@ export abstract class BaseParser {
   /**
    * パースの実行（抽象メソッド）
    */
-  abstract parse(source: string): ParseResult;
+  abstract parse(source: string): Promise<ParseResult>;
 
   /**
    * エラーの追加

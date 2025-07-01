@@ -21,8 +21,8 @@ export class DefinitionVisitor extends BaseParser {
   /**
    * パースの実行（DefinitionVisitorでは使用しない）
    */
-  parse(_source: string): ParseResult {
-    throw new Error('DefinitionVisitor.parse() should not be called directly');
+  override async parse(_source: string): Promise<ParseResult> {
+    throw new Error('DefinitionVisitor.parse should not be called directly');
   }
   private expressionVisitor: ExpressionVisitor;
   public visitNode: ((node: ASTNode) => IR) | undefined;

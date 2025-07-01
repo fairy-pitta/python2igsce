@@ -399,6 +399,23 @@ export class ExpressionVisitor {
    * 配列初期化かどうかを判定
    */
   isArrayInitialization(node: ASTNode): boolean {
-    return node.type === 'List' || node.type === 'Tuple';
+    // 通常のリストや配列
+    if (node.type === 'List' || node.type === 'Tuple') {
+      return true;
+    }
+    
+    // [0] * 5 のような配列初期化パターン
+    if (node.type === 'BinOp' && node.op.type === 'Mult') {
+      // 左辺がリストで右辺が数値の場合
+      if (node.left.type === 'List' && node.right.type === 'Constant') {
+        return true;
+      }
+      // 右辺がリストで左辺が数値の場合
+      if (node.right.type === 'List' && node.left.type === 'Constant') {
+        return true;
+      }
+    }
+    
+    return false;
   }
 }

@@ -70,7 +70,7 @@ export class Converter {
     
     try {
       // パース処理
-      const parseResult = this.parser.parse(pythonCode);
+      const parseResult = await this.parser.parse(pythonCode);
       
       if (parseResult.errors.length > 0 && this.options.strictMode) {
         return this.createErrorResult(
