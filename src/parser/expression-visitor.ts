@@ -79,8 +79,16 @@ export class ExpressionVisitor {
    * 簡易的な式の解析
    */
   private parseRawExpression(raw: string): string {
+    // 文字列リテラルを保護
+    const stringMatches: string[] = [];
+    let result = raw.replace(/(["'])(?:(?!\1)[^\\]|\\.)*\1/g, (match) => {
+      const index = stringMatches.length;
+      stringMatches.push(match);
+      return `__STRING_${index}__`;
+    });
+    
     // 比較演算子の変換（単語境界を使用）
-    let result = raw
+    result = result
       .replace(/==/g, ' = ')
       .replace(/!=/g, ' ≠ ')
       .replace(/>=/g, ' ≥ ')
@@ -89,6 +97,11 @@ export class ExpressionVisitor {
       .replace(/\bor\b/g, ' OR ')
       .replace(/\bnot\b/g, 'NOT ')
       .replace(/%/g, ' MOD ');
+    
+    // 文字列リテラルを復元
+    stringMatches.forEach((str, index) => {
+      result = result.replace(`__STRING_${index}__`, str);
+    });
     
     return result.trim();
   }
@@ -158,7 +171,17 @@ export class ExpressionVisitor {
 
   private visitAttribute(node: ASTNode): string {
     const value = this.visitExpression(node.value);
-    return `${value}.${node.attr}`;
+    const attr = node.attr;
+    
+    // Handle string methods
+    if (attr === 'lower') {
+      return `LCASE(${value})`;
+    }
+    if (attr === 'upper') {
+      return `UCASE(${value})`;
+    }
+    
+    return `${value}.${attr}`;
   }
 
   private visitSubscript(node: ASTNode): string {
@@ -217,7 +240,7 @@ export class ExpressionVisitor {
   private convertBuiltinFunction(func: string, args: string[]): string | null {
     switch (func) {
       case 'print':
-        return `OUTPUT ${args.join(', ')}`;
+        return `OUTPUT ${args.join(' & ')}`;
       case 'input':
         // input()は代入文の右辺では特別な処理が必要
         // ここでは一旦そのまま返し、後でエミッターで処理
@@ -445,7 +468,7 @@ export class ExpressionVisitor {
       }
     }
 
-    // 複数の部分がある場合はカンマで結合
-    return parts.length > 1 ? parts.join(', ') : (parts[0] || '""');
+    // 複数の部分がある場合は&で結合
+    return parts.length > 1 ? parts.join(' & ') : (parts[0] || '""');
   }
 }

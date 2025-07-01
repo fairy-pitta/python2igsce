@@ -99,6 +99,7 @@ export class Converter {
       
       const result = {
         code: emitResult.code,
+        igcse: emitResult.code,
         parseResult,
         emitResult,
         stats,

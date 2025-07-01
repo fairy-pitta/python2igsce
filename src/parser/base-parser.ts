@@ -153,14 +153,16 @@ export abstract class BaseParser {
   protected registerVariable(
     name: string,
     type: IGCSEDataType,
-    line?: number
+    line?: number,
+    arraySize?: number
   ): void {
     const variable: VariableInfo = {
       name,
       type,
       scope: this.context.currentScope.name,
       initialized: false,
-      definedAt: line
+      definedAt: line,
+      ...(arraySize !== undefined && { arraySize })
     };
     
     this.context.currentScope.variables.set(name, variable);
@@ -204,6 +206,13 @@ export abstract class BaseParser {
     }
     
     return undefined;
+  }
+
+  /**
+   * 変数情報の取得
+   */
+  protected getVariableInfo(name: string): VariableInfo | undefined {
+    return this.findVariable(name);
   }
 
   /**

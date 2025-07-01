@@ -200,11 +200,24 @@ export abstract class BaseEmitter {
       'AND', 'OR', 'NOT', 'MOD', 'DIV'
     ];
     
-    let result = text;
+    // 文字列リテラルを保護
+    const stringMatches: string[] = [];
+    let result = text.replace(/(["'])(?:(?!\1)[^\\]|\\.)*\1/g, (match) => {
+      const index = stringMatches.length;
+      stringMatches.push(match);
+      return `__STRING_${index}__`;
+    });
+    
+    // キーワードの大文字化（文字列リテラル外のみ）
     for (const keyword of keywords) {
       const regex = new RegExp(`\\b${keyword.toLowerCase()}\\b`, 'gi');
       result = result.replace(regex, keyword);
     }
+    
+    // 文字列リテラルを復元
+    stringMatches.forEach((str, index) => {
+      result = result.replace(`__STRING_${index}__`, str);
+    });
     
     return result;
   }
@@ -233,11 +246,26 @@ export abstract class BaseEmitter {
     // 比較演算子の周りにスペースがある場合は除外
     result = result.replace(/(?<!\s)=(?!\s)/g, ' ← ');
     result = result.replace(/^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*/gm, '$1 ← ');
+    // 属性代入の変換（object.attribute = value）
+    result = result.replace(/^\s*([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*/gm, '$1 ← ');
     
-    // 論理演算子の変換
+    // 文字列リテラルを保護
+    const stringMatches: string[] = [];
+    result = result.replace(/(["'])(?:(?!\1)[^\\]|\\.)*\1/g, (match) => {
+      const index = stringMatches.length;
+      stringMatches.push(match);
+      return `__STRING_${index}__`;
+    });
+    
+    // 論理演算子の変換（文字列リテラル外のみ）
     result = result.replace(/\band\b/gi, 'AND');
     result = result.replace(/\bor\b/gi, 'OR');
     result = result.replace(/\bnot\b/gi, 'NOT');
+    
+    // 文字列リテラルを復元
+    stringMatches.forEach((str, index) => {
+      result = result.replace(`__STRING_${index}__`, str);
+    });
     
     // 文字列連結の変換（文字列リテラルが含まれる行の+を&に変換）
     const lines = result.split('\n');

@@ -16,9 +16,7 @@ export class PythonParser extends BaseParser {
    * Pythonソースコードをパースしてイルに変換
    */
   override async parse(source: string): Promise<ParseResult> {
-    console.log('DEBUG: PythonParser.parse called');
     this.reset();
-    
     try {
       // 前処理
       const preprocessed = this.preprocessSource(source);

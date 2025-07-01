@@ -57,7 +57,7 @@ else:
     OUTPUT "Odd"
   ENDIF
 ELSE
-  OUTPUT "NOT positive"
+  OUTPUT "Not positive"
 ENDIF`;
       expect(result.code).toBe(expected);
     });

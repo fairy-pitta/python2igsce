@@ -14,6 +14,16 @@ interface ASTNode {
 }
 
 /**
+ * クラス定義情報
+ */
+interface ClassInfo {
+  name: string;
+  recordTypeName?: string; // レコード型の場合の型名
+  fields: { name: string; type: string }[];
+  isRecordType: boolean;
+}
+
+/**
  * 文の処理を担当するビジタークラス
  */
 export class StatementVisitor extends BaseParser {
@@ -25,10 +35,31 @@ export class StatementVisitor extends BaseParser {
   }
   private expressionVisitor: ExpressionVisitor;
   public visitNode: ((node: ASTNode) => IR) | undefined;
+  private classRegistry: Map<string, ClassInfo> = new Map();
 
   constructor() {
     super();
     this.expressionVisitor = new ExpressionVisitor();
+  }
+
+  /**
+   * クラス情報を登録
+   */
+  override registerClass(name: string, line?: number): void {
+    // 基底クラスのメソッドを呼び出し
+    super.registerClass(name, line);
+  }
+
+  // クラス情報を登録する新しいメソッド
+  registerClassInfo(classInfo: ClassInfo): void {
+    this.classRegistry.set(classInfo.name, classInfo);
+  }
+
+  /**
+   * クラス情報を取得
+   */
+  getClassInfo(className: string): ClassInfo | undefined {
+    return this.classRegistry.get(className);
   }
 
   /**
@@ -50,6 +81,11 @@ export class StatementVisitor extends BaseParser {
     // クラスのインスタンス化を検出
     if (node.value.type === 'Call' && this.isClassInstantiation(node.value)) {
       return this.handleClassInstantiation(node);
+    }
+
+    // input()関数の特別処理
+    if (this.isInputCall(node.value)) {
+      return this.handleInputAssignment(node);
     }
 
     const target = this.expressionVisitor.visitExpression(node.targets[0]);
@@ -165,8 +201,11 @@ export class StatementVisitor extends BaseParser {
       // 配列の長さを取得するためのコメント
       const lengthComment = this.createIRNode('comment', `// Iterating through ${arrayName}`);
       
-      // FOR i ← 1 TO LENGTH(array) の形式
-      const forText = `FOR ${indexVar} ← 1 TO LENGTH(${arrayName})`;
+      // 配列のサイズを静的に決定できるかチェック
+      const arraySize = this.getStaticArraySize(arrayName);
+      const forText = arraySize 
+        ? `FOR ${indexVar} ← 1 TO ${arraySize}`
+        : `FOR ${indexVar} ← 1 TO LENGTH(${arrayName})`;
       
       this.enterScope('for', 'block');
       this.increaseIndent();
@@ -210,8 +249,11 @@ export class StatementVisitor extends BaseParser {
    * WHILE文の処理
    */
   visitWhile(node: ASTNode): IR {
-    const condition = this.expressionVisitor.visitExpression(node.test);
-    const whileText = `WHILE ${condition}`;
+    let condition = this.expressionVisitor.visitExpression(node.test);
+    
+    // Keep Python True as is for IGCSE compatibility
+    
+    const whileText = `WHILE ${condition} DO`;
     
     this.enterScope('while', 'block');
     this.increaseIndent();
@@ -243,7 +285,7 @@ export class StatementVisitor extends BaseParser {
         const text = `OUTPUT ${convertedArg}`;
         return this.createIRNode('output', text);
       } else {
-        const text = `OUTPUT ${args.join(', ')}`;
+        const text = `OUTPUT ${args.join(' & ')}`;
         return this.createIRNode('output', text);
       }
     }
@@ -309,7 +351,7 @@ export class StatementVisitor extends BaseParser {
    * CONTINUE文の処理
    */
   visitContinue(_node: ASTNode): IR {
-    return this.createIRNode('statement', 'CONTINUE');
+    return this.createIRNode('comment', '// continue statement');
   }
 
   /**
@@ -364,6 +406,52 @@ export class StatementVisitor extends BaseParser {
   }
 
   // ヘルパーメソッド
+  private isInputCall(node: ASTNode): boolean {
+    // 直接のinput()呼び出し
+    if (node.type === 'Call' && node.func.id === 'input') {
+      return true;
+    }
+    
+    // float(input(...)) や int(input(...)) の形式
+    if (node.type === 'Call' && 
+        (node.func.id === 'float' || node.func.id === 'int') &&
+        node.args.length === 1 &&
+        node.args[0].type === 'Call' &&
+        node.args[0].func.id === 'input') {
+      return true;
+    }
+    
+    return false;
+  }
+
+  private handleInputAssignment(node: ASTNode): IR {
+    const target = this.expressionVisitor.visitExpression(node.targets[0]);
+    let prompt = '';
+    
+    // input()の引数（プロンプト）を取得
+    let inputNode = node.value;
+    if (inputNode.type === 'Call' && (inputNode.func.id === 'float' || inputNode.func.id === 'int')) {
+      inputNode = inputNode.args[0]; // float(input(...)) -> input(...)
+    }
+    
+    if (inputNode.args && inputNode.args.length > 0) {
+      prompt = this.expressionVisitor.visitExpression(inputNode.args[0]);
+    }
+    
+    // 変数の型を推論して登録
+    const dataType = this.expressionVisitor.inferTypeFromValue(node.value);
+    if (node.targets[0].type === 'Name') {
+      this.registerVariable(node.targets[0].id, dataType, node.lineno);
+    }
+    
+    // プロンプトがある場合は、OUTPUT文とINPUT文を同じ行に生成
+    if (prompt) {
+      return this.createIRNode('input', `OUTPUT ${prompt} INPUT ${target}`);
+    } else {
+      return this.createIRNode('input', `INPUT ${target}`);
+    }
+  }
+
   private handleRangeFor(node: ASTNode, target: string): IR {
     const args = node.iter.args;
     let startValue = '0';
@@ -386,13 +474,15 @@ export class StatementVisitor extends BaseParser {
     
     // 数値定数の場合は最適化
     // ステップが1の場合のみ終了値から1を引く
+    // ただし、LENGTH()関数の場合は引かない
     if (stepValue === '1') {
       if (this.expressionVisitor.isNumericConstant(args[args.length - 1])) {
         const endNum = this.expressionVisitor.getNumericValue(args[args.length - 1]);
         endValue = (endNum - 1).toString();
-      } else {
+      } else if (!endValue.startsWith('LENGTH(')) {
         endValue = `${endValue} - 1`;
       }
+      // LENGTH()の場合はそのまま使用（すでに正しい上限値）
     } else {
       // ステップが1以外の場合は、最後に到達する値を計算
       if (args.length === 3 && 
@@ -438,6 +528,29 @@ export class StatementVisitor extends BaseParser {
 
   private handleArrayInitialization(node: ASTNode): IR {
     const target = this.expressionVisitor.visitExpression(node.targets[0]);
+    
+    // 空のリストで型アノテーションがある場合の処理
+    if (node.value.type === 'List' && node.value.elts.length === 0 && node.type_comment) {
+      // list[str] -> STRING, list[int] -> INTEGER のように変換
+      let elementType = 'STRING';
+      const typeComment = node.type_comment.toLowerCase();
+      if (typeComment.includes('int')) {
+        elementType = 'INTEGER';
+      } else if (typeComment.includes('float') || typeComment.includes('real')) {
+        elementType = 'REAL';
+      } else if (typeComment.includes('bool')) {
+        elementType = 'BOOLEAN';
+      }
+      
+      // デフォルトサイズは100とする（IGCSE標準）
+      const defaultSize = 100;
+      
+      // 配列サイズ情報を変数として登録
+      this.registerVariable(target, 'ARRAY', undefined, defaultSize);
+      
+      const declText = `DECLARE ${target} : ARRAY[1:${defaultSize}] OF ${elementType}`;
+      return this.createIRNode('array', declText);
+    }
     
     // [0] * 5 のような配列初期化パターンの処理
     if (node.value.type === 'BinOp' && node.value.op.type === 'Mult') {
@@ -504,6 +617,9 @@ export class StatementVisitor extends BaseParser {
       const declText = `DECLARE ${target} : ARRAY[1:${size}] OF ${elementType}`;
       const declIR = this.createIRNode('array', declText);
       
+      // 配列サイズ情報を変数として登録
+      this.registerVariable(target, 'ARRAY', undefined, size);
+      
       // 要素の代入
       const assignments: IR[] = [];
       elements.forEach((element: ASTNode, index: number) => {
@@ -525,26 +641,48 @@ export class StatementVisitor extends BaseParser {
   }
 
   private handleClassInstantiation(node: ASTNode): IR {
-    const className = this.expressionVisitor.visitExpression(node.func);
+    const className = this.expressionVisitor.visitExpression(node.value.func);
     const target = this.expressionVisitor.visitExpression(node.targets[0]);
     const args = node.value.args.map((arg: ASTNode) => this.expressionVisitor.visitExpression(arg));
     
-    // レコード型として扱う場合は、変数宣言と各フィールドの代入を生成
-    const recordTypeName = `${className}Record`;
-    const children: IR[] = [];
+    // クラス情報を取得
+    const classInfo = this.getClassInfo(className);
     
-    // 変数宣言
-    const declareText = `DECLARE ${target} : ${recordTypeName}`;
-    children.push(this.createIRNode('statement', declareText));
-    
-    // フィールドの代入（引数の順序に基づく）
-    // 簡単な実装として、x, y の順序で代入
-    if (args.length >= 2) {
-      children.push(this.createIRNode('assign', `${target}.x ← ${args[0]}`));
-      children.push(this.createIRNode('assign', `${target}.y ← ${args[1]}`));
+    if (classInfo && classInfo.isRecordType) {
+      // レコード型として扱う場合
+      const recordTypeName = classInfo.recordTypeName || `${className}Record`;
+      const children: IR[] = [];
+      
+      // 変数宣言
+      const declareText = `DECLARE ${target} : ${recordTypeName}`;
+      children.push(this.createIRNode('statement', declareText));
+      
+      // フィールドの代入（クラス定義から取得したフィールド名を使用）
+      classInfo.fields.forEach((field, index) => {
+        if (index < args.length) {
+          children.push(this.createIRNode('assign', `${target}.${field.name} ← ${args[index]}`));
+        }
+      });
+      
+      return this.createIRNode('block', '', children);
+    } else {
+      // クラス情報が見つからない場合のフォールバック
+      const children: IR[] = [];
+      
+      // 変数宣言（RECORDタイプとして）
+      const declareText = `DECLARE ${target} : RECORD`;
+      children.push(this.createIRNode('statement', declareText));
+      
+      // デフォルトのフィールド名を使用
+      const defaultFields = ['x', 'y', 'z', 'w']; // 必要に応じて拡張
+      args.forEach((arg: any, index: number) => {
+        if (index < defaultFields.length) {
+          children.push(this.createIRNode('assign', `${target}.${defaultFields[index]} ← ${arg}`));
+        }
+      });
+      
+      return this.createIRNode('block', '', children);
     }
-    
-    return this.createIRNode('block', '', children);
   }
 
   private convertOperator(op: ASTNode): string {
@@ -562,6 +700,18 @@ export class StatementVisitor extends BaseParser {
 
   protected override createIRNode(kind: IRKind, text: string, children: IR[] = [], meta?: IRMeta): IR {
     return createIR(kind, text, children, meta);
+  }
+
+  /**
+   * 配列の静的サイズを取得
+   */
+  private getStaticArraySize(arrayName: string): number | null {
+    // 変数情報から配列サイズを取得
+    const varInfo = this.getVariableInfo(arrayName);
+    if (varInfo && varInfo.arraySize) {
+      return varInfo.arraySize;
+    }
+    return null;
   }
 
   /**

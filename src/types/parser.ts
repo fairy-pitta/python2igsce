@@ -127,6 +127,8 @@ export interface VariableInfo {
   initialized: boolean;
   /** 定義された行番号 */
   definedAt?: number | undefined;
+  /** 配列のサイズ（配列の場合） */
+  arraySize?: number;
 }
 
 /**

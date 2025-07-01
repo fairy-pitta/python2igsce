@@ -2,7 +2,6 @@ import { IR, IRKind, createIR, IRMeta, countIRNodes } from '../types/ir';
 import { BaseParser } from './base-parser';
 import { StatementVisitor } from './statement-visitor';
 import { DefinitionVisitor } from './definition-visitor';
-import { getPyodideParser } from './pyodide-ast-parser';
 
 /**
  * Python ASTノードの基本インターフェース
@@ -26,6 +25,13 @@ export class PythonASTVisitor extends BaseParser {
     this.statementVisitor = new StatementVisitor();
     this.definitionVisitor = new DefinitionVisitor();
     
+    // ビジター間の相互参照を設定
+    this.definitionVisitor.setStatementVisitor(this.statementVisitor);
+    
+    // visitNodeメソッドを設定
+    this.statementVisitor.visitNode = this.visitNode.bind(this);
+    this.definitionVisitor.visitNode = this.visitNode.bind(this);
+    
     // ビジターにコンテキストを共有
     this.statementVisitor.setContext(this.context);
     this.definitionVisitor.setContext(this.context);
@@ -35,7 +41,6 @@ export class PythonASTVisitor extends BaseParser {
    * メインのパース関数
    */
   override async parse(source: string): Promise<import('../types/parser').ParseResult> {
-    console.log('DEBUG: parse called');
     this.startParsing();
     this.resetContext();
     
@@ -43,7 +48,6 @@ export class PythonASTVisitor extends BaseParser {
       // 実際の実装では、PythonのASTパーサーを使用
       // ここでは簡易的な実装を提供
       const ast = await this.parseToAST(source);
-      console.log('DEBUG: parseToAST completed, calling visitNode');
       const ir = this.visitNode(ast);
       
       return this.createParseResult([ir]);
@@ -60,24 +64,17 @@ export class PythonASTVisitor extends BaseParser {
   }
 
   /**
-   * ASTパーサー（Pyodideまたは簡易実装を使用）
+   * ASTパーサー（簡易実装を使用）
    */
   private async parseToAST(source: string): Promise<import('./pyodide-ast-parser').ASTNode> {
-    // Pyodideが利用可能な場合は使用
-    try {
-      const pyodideParser = getPyodideParser();
-      return await pyodideParser.parseToAST(source);
-    } catch (error: any) {
-      console.warn('Pyodide parsing failed, falling back to simple parser:', error?.message || error);
-      return this.parseToASTSimple(source);
-    }
+    // 現在は簡易パーサーのみを使用
+    return this.parseToASTSimple(source);
   }
 
   /**
    * 簡易的なASTパーサー（フォールバック用）
    */
   private parseToASTSimple(source: string): import('./pyodide-ast-parser').ASTNode {
-    console.log('DEBUG: parseToAST called');
     // 実際の実装では、python-astやpyodideなどを使用
     // ここでは簡易的な実装
     const lines = source.split('\n');
@@ -262,8 +259,8 @@ export class PythonASTVisitor extends BaseParser {
       const beforeEqual = trimmed.substring(0, equalIndex).trim();
       const afterEqual = trimmed.substring(equalIndex + 3).trim();
       
-      // 左辺が変数名または配列アクセスで、右辺が存在する場合は代入文
-      if ((/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(beforeEqual) || /^[a-zA-Z_][a-zA-Z0-9_]*\[.+\]$/.test(beforeEqual)) && afterEqual.length > 0) {
+      // 左辺が変数名、型アノテーション付き変数名、配列アクセス、または属性アクセスで、右辺が存在する場合は代入文
+      if ((/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(beforeEqual) || /^[a-zA-Z_][a-zA-Z0-9_]*:\s*.+$/.test(beforeEqual) || /^[a-zA-Z_][a-zA-Z0-9_]*\[.+\]$/.test(beforeEqual) || /^[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*$/.test(beforeEqual)) && afterEqual.length > 0) {
         return this.parseAssignStatement(trimmed, lineNumber);
       }
     }
@@ -527,10 +524,23 @@ export class PythonASTVisitor extends BaseParser {
   }
 
   private parseAssignStatement(line: string, lineNumber: number): ASTNode {
-    // "var = value" の形式を解析
+    // "var = value" または "var: type = value" の形式を解析
     const parts = line.split(' = ');
-    const target = parts[0].trim();
+    let target = parts[0].trim();
     const value = parts.slice(1).join(' = ').trim();
+    
+    // 型アノテーションの処理
+    let annotation = null;
+    if (target.includes(':')) {
+      const colonIndex = target.indexOf(':');
+      const varName = target.substring(0, colonIndex).trim();
+      const typeAnnotation = target.substring(colonIndex + 1).trim();
+      target = varName;
+      annotation = {
+        type: 'Name',
+        id: typeAnnotation
+      };
+    }
     
     // 左辺が配列アクセスの場合（例: numbers[0] = 10）
     const arrayAssignMatch = target.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\[(\d+)\]$/);
@@ -543,6 +553,22 @@ export class PythonASTVisitor extends BaseParser {
           type: 'Subscript',
           value: { type: 'Name', id: arrayName },
           slice: { type: 'Constant', value: parseInt(indexStr) }
+        }],
+        value: this.parseExpression(value)
+      };
+    }
+    
+    // 左辺が属性アクセスの場合（例: person.name = "John"）
+    const attrAssignMatch = target.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\.([a-zA-Z_][a-zA-Z0-9_]*)$/);
+    if (attrAssignMatch) {
+      const [, objectName, attrName] = attrAssignMatch;
+      return {
+        type: 'Assign',
+        lineno: lineNumber,
+        targets: [{
+          type: 'Attribute',
+          value: { type: 'Name', id: objectName },
+          attr: attrName
         }],
         value: this.parseExpression(value)
       };
@@ -577,7 +603,7 @@ export class PythonASTVisitor extends BaseParser {
         }
       }) : [];
       
-      return {
+      const assignNode: any = {
         type: 'Assign',
         lineno: lineNumber,
         targets: [{ type: 'Name', id: target }],
@@ -586,6 +612,13 @@ export class PythonASTVisitor extends BaseParser {
           elts: elements
         }
       };
+      
+      // 型アノテーションがある場合は追加
+      if (annotation) {
+        assignNode.type_comment = annotation.id;
+      }
+      
+      return assignNode;
     }
     
     // 配列アクセスの検出 (例: my_array[0])
@@ -720,6 +753,27 @@ export class PythonASTVisitor extends BaseParser {
    */
   private parseSimpleExpression(expr: string): ASTNode {
     const trimmed = expr.trim();
+    
+    // 関数呼び出しの検出（例: input("prompt"), int(input()), float(input())）
+    const funcCallMatch = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\((.*)\)$/);
+    if (funcCallMatch) {
+      const [, funcName, argsStr] = funcCallMatch;
+      const args: ASTNode[] = [];
+      
+      if (argsStr.trim()) {
+        // 引数を解析
+        const argParts = argsStr.split(',').map(arg => arg.trim());
+        for (const arg of argParts) {
+          args.push(this.parseSimpleExpression(arg));
+        }
+      }
+      
+      return {
+        type: 'Call',
+        func: { type: 'Name', id: funcName },
+        args: args
+      };
+    }
     
     // 配列アクセスの検出（例: numbers[0]）
     const arrayAccessMatch = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\[(\d+)\]$/);
@@ -957,16 +1011,13 @@ export class PythonASTVisitor extends BaseParser {
   }
 
   private visitModule(node: ASTNode): IR {
-    console.log('DEBUG: visitModule called with', node.body.length, 'children');
     const children: IR[] = [];
     
     for (const child of node.body) {
-      console.log('DEBUG: Processing child:', child.type, child.lineno);
       const childIR = this.visitNode(child);
       children.push(childIR);
     }
     
-    console.log('DEBUG: visitModule returning', children.length, 'children');
     return this.createIRNode('compound', '', children);
   }
 
