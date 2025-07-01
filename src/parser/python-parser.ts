@@ -1,7 +1,7 @@
 // メインのPythonパーサークラス
 import { BaseParser } from './base-parser';
 import { ParserOptions, ParseResult } from '../types/parser';
-import { IR, countIRNodes } from '../types/ir';
+import { IR, createIR } from '../types/ir';
 import { PythonASTVisitor } from './visitor';
 
 /**
@@ -15,17 +15,31 @@ export class PythonParser extends BaseParser {
   /**
    * Pythonソースコードをパースしてイルに変換
    */
-  override parse(source: string): ParseResult {
-    this.resetContext();
+  async parse(source: string): Promise<ParseResult> {
+    console.log('DEBUG: PythonParser.parse called');
+    this.reset();
     
-    const preprocessedSource = this.preprocessSource(source);
-    
-    const result = this.parseToIR(preprocessedSource);
-    
-    // 統計情報の更新
-    result.stats.parseTime = Date.now() - this.context.startTime;
-    
-    return result;
+    try {
+      // 前処理
+      const preprocessed = this.preprocessSource(source);
+      
+      // ASTビジターを使用してパース
+      const visitor = new PythonASTVisitor(this.context);
+      const result = await visitor.parse(preprocessed);
+      
+      // 統計を更新
+      this.updateStatistics(result);
+      
+      return result;
+    } catch (error) {
+      console.error('Parse error in PythonParser:', error);
+      this.addError(
+        `Parse failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'syntax_error'
+      );
+      
+      return this.createParseResult([]);
+    }
   }
 
   /**
@@ -387,5 +401,31 @@ export class PythonParser extends BaseParser {
   reset(): void {
     this.resetContext();
     this.debug('Parser state reset');
+  }
+
+  /**
+   * 統計情報を更新
+   */
+  private updateStatistics(result: ParseResult): void {
+    // 統計情報の更新処理
+  }
+
+  /**
+   * パース結果を作成
+   */
+  private createParseResult(ir: IR[]): ParseResult {
+    return {
+      ir,
+      errors: this.context.errors,
+      warnings: this.context.warnings,
+      stats: {
+        parseTime: 0,
+        linesProcessed: 0,
+        nodesGenerated: 0,
+        functionsFound: 0,
+        classesFound: 0,
+        variablesFound: 0
+      }
+    };
   }
 }

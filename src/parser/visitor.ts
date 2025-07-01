@@ -2,6 +2,7 @@ import { IR, IRKind, createIR, IRMeta, countIRNodes } from '../types/ir';
 import { BaseParser } from './base-parser';
 import { StatementVisitor } from './statement-visitor';
 import { DefinitionVisitor } from './definition-visitor';
+import { PyodideASTParser, getPyodideParser } from './pyodide-ast-parser';
 
 /**
  * Python ASTノードの基本インターフェース
@@ -33,7 +34,7 @@ export class PythonASTVisitor extends BaseParser {
   /**
    * メインのパース関数
    */
-  parse(source: string): import('../types/parser').ParseResult {
+  async parse(source: string): Promise<import('../types/parser').ParseResult> {
     console.log('DEBUG: parse called');
     this.startParsing();
     this.resetContext();
@@ -41,7 +42,7 @@ export class PythonASTVisitor extends BaseParser {
     try {
       // 実際の実装では、PythonのASTパーサーを使用
       // ここでは簡易的な実装を提供
-      const ast = this.parseToAST(source);
+      const ast = await this.parseToAST(source);
       console.log('DEBUG: parseToAST completed, calling visitNode');
       const ir = this.visitNode(ast);
       
@@ -59,9 +60,23 @@ export class PythonASTVisitor extends BaseParser {
   }
 
   /**
-   * 簡易的なASTパーサー（実際の実装では外部ライブラリを使用）
+   * ASTパーサー（Pyodideまたは簡易実装を使用）
    */
-  private parseToAST(source: string): ASTNode {
+  private async parseToAST(source: string): Promise<ASTNode> {
+    // Pyodideが利用可能な場合は使用
+    try {
+      const pyodideParser = getPyodideParser();
+      return await pyodideParser.parseToAST(source);
+    } catch (error) {
+      console.warn('Pyodide parsing failed, falling back to simple parser:', error);
+      return this.parseToASTSimple(source);
+    }
+  }
+
+  /**
+   * 簡易的なASTパーサー（フォールバック用）
+   */
+  private parseToASTSimple(source: string): ASTNode {
     console.log('DEBUG: parseToAST called');
     // 実際の実装では、python-astやpyodideなどを使用
     // ここでは簡易的な実装

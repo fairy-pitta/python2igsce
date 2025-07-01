@@ -6,6 +6,19 @@ import { IR } from './types/ir';
 import { ParserOptions, ParseResult } from './types/parser';
 import { EmitterOptions, EmitResult } from './types/emitter';
 
+export interface ConverterOptions {
+  parser?: {
+    strict?: boolean;
+    preserveComments?: boolean;
+    usePyodide?: boolean;  // Pyodideパーサーを使用するかどうか
+  };
+  emitter?: {
+    format?: 'text' | 'html' | 'markdown';
+    indentSize?: number;
+    preserveWhitespace?: boolean;
+  };
+}
+
 /**
  * Python to IGCSE Pseudocode Converter
  */
