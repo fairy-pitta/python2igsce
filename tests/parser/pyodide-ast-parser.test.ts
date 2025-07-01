@@ -2,7 +2,7 @@
  * Pyodide ASTパーサーのテスト
  */
 
-import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { getPyodideParser, parsePythonWithPyodide, PyodideASTParser } from '../../src/parser/pyodide-ast-parser';
 import { ASTNode } from '../../src/types/ast';
 
@@ -11,7 +11,6 @@ describe('PyodideASTParser', () => {
 
   beforeAll(async () => {
     // Pyodideの初期化には時間がかかるため、タイムアウトを延長
-    jest.setTimeout(30000);
     parser = await getPyodideParser();
   }, 30000);
 
