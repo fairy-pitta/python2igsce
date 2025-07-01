@@ -23,7 +23,9 @@ export class ExpressionVisitor {
 
     // If the node has a raw property, use it for simplified parsing
     if (node.raw) {
-      return this.parseRawExpression(node.raw);
+      const result = this.parseRawExpression(node.raw);
+      // keepParenthesesフラグがある場合は括弧を保持
+      return node.keepParentheses ? `(${result})` : result;
     }
 
     switch (node.type) {
@@ -60,6 +62,12 @@ export class ExpressionVisitor {
         return this.visitListComp(node);
       case 'IfExp':
         return this.visitIfExp(node);
+      case 'Expr':
+        // 括弧付きの式の処理
+        if (node.parenthesized) {
+          return `(${this.visitExpression(node.value)})`;
+        }
+        return this.visitExpression(node.value);
       default:
         return `/* ${node.type} */`;
     }
@@ -113,7 +121,7 @@ export class ExpressionVisitor {
   private visitUnaryOp(node: ASTNode): string {
     const operand = this.visitExpression(node.operand);
     const op = this.convertUnaryOperator(node.op);
-    return `${op}${operand}`;
+    return `${op} ${operand}`;
   }
 
   private visitCompare(node: ASTNode): string {
@@ -154,10 +162,30 @@ export class ExpressionVisitor {
   private visitSubscript(node: ASTNode): string {
     const value = this.visitExpression(node.value);
     const slice = this.visitExpression(node.slice);
+    
+    // 数値インデックスの場合、0ベースから1ベースに変換
+    if (node.slice.type === 'Num') {
+      const index = node.slice.n + 1;
+      return `${value}[${index}]`;
+    }
+    
+    // Constant型の数値インデックスの場合も変換
+    if (node.slice.type === 'Constant' && typeof node.slice.value === 'number') {
+      const index = node.slice.value + 1;
+      return `${value}[${index}]`;
+    }
+    
+    // 変数インデックスの場合、+1を追加
+    if (node.slice.type === 'Name') {
+      return `${value}[${slice} + 1]`;
+    }
+    
     return `${value}[${slice}]`;
   }
 
   private visitList(node: ASTNode): string {
+    // 配列初期化の場合は、要素をそのまま文字列として結合しない
+    // statement-visitorのhandleArrayInitializationで適切に処理される
     const elements = node.elts.map((elt: ASTNode) => this.visitExpression(elt));
     return `[${elements.join(', ')}]`;
   }
@@ -311,11 +339,21 @@ export class ExpressionVisitor {
         
         // 算術演算子の場合
         if (['Add', 'Sub', 'Mult', 'Div', 'Mod', 'Pow'].includes(node.op.type)) {
+          // 文字列の連結（+演算子）
+          if (node.op.type === 'Add' && (leftType === 'STRING' || rightType === 'STRING')) {
+            return 'STRING';
+          }
           // 両方が数値型の場合
           if ((leftType === 'INTEGER' || leftType === 'REAL') && 
               (rightType === 'INTEGER' || rightType === 'REAL')) {
-            // どちらかがREALならREAL、両方INTEGERならINTEGER
-            return (leftType === 'REAL' || rightType === 'REAL') ? 'REAL' : 'INTEGER';
+            // 除算の場合はREAL、それ以外で両方がINTEGERの場合はINTEGER
+            if (node.op.type === 'Div') {
+              return 'REAL';
+            } else if (leftType === 'INTEGER' && rightType === 'INTEGER') {
+              return 'INTEGER';
+            } else {
+              return 'REAL';
+            }
           }
         }
         

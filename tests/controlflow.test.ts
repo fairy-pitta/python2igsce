@@ -150,8 +150,9 @@ ENDWHILE`;
       // The presence of ENDWHILE is standard for the WHILE block itself.
       expect(result.code).toContain('ENDWHILE');
       // Update expectations based on actual output
-      expect(result.code).toContain('i += 1');
+      expect(result.code).toContain('i ← i + 1');
       expect(result.code).toContain('IF i = 3 THEN');
+      expect(result.code).toContain('BREAK');
     });
   });
 
@@ -172,7 +173,7 @@ while True:
 WHILE True DO
   OUTPUT "Guess the number: " INPUT guess
   IF guess = "7" THEN
-    break
+    BREAK
   ENDIF
 ENDWHILE`;
       expect(result.code).toBe(expected);

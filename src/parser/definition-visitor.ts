@@ -115,13 +115,20 @@ export class DefinitionVisitor extends BaseParser {
     
     const attributes: string[] = [];
     if (constructor) {
-      // コンストラクタの引数から属性を推論
-      const params = constructor.args.args.slice(1); // selfを除く
-      params.forEach((param: any) => {
-        const paramName = param.arg;
-        const paramType = this.convertPythonTypeToIGCSE(param.annotation);
-        attributes.push(`  DECLARE ${paramName} : ${paramType}`);
-      });
+      // コンストラクタの本体からself.attribute = valueの形式を探す
+      for (const stmt of constructor.body) {
+        if (stmt.type === 'Assign') {
+          const target = stmt.targets[0];
+          if (target.type === 'Attribute' && target.value.id === 'self') {
+            const attrName = target.attr;
+            // パラメータの型注釈から型を推論
+            const paramName = stmt.value.id; // self.x = x_coord の x_coord
+            const param = constructor.args.args.find((p: any) => p.arg === paramName);
+            const paramType = param ? this.convertPythonTypeToIGCSE(param.annotation) : 'INTEGER';
+            attributes.push(`  DECLARE ${attrName} : ${paramType}`);
+          }
+        }
+      }
     }
     
     const children = attributes.map(attr => this.createIRNode('statement', attr));

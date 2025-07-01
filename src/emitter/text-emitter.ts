@@ -534,9 +534,10 @@ export class TextEmitter extends BaseEmitter {
         const text = this.formatText(node.text);
         this.emitLine(text);
       }
+    } else {
+      // テキストが空の場合のみ子ノードを処理
+      this.emitChildren(node);
     }
-    
-    this.emitChildren(node);
   }
 
   /**

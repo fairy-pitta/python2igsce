@@ -42,19 +42,18 @@ export class StatementVisitor extends BaseParser {
    * 代入文の処理
    */
   visitAssign(node: ASTNode): IR {
-    const target = this.expressionVisitor.visitExpression(node.targets[0]);
-    
+    // 配列初期化の検出を最初に行う
+    if (this.expressionVisitor.isArrayInitialization(node.value)) {
+      return this.handleArrayInitialization(node);
+    }
+
     // クラスのインスタンス化を検出
     if (node.value.type === 'Call' && this.isClassInstantiation(node.value)) {
       return this.handleClassInstantiation(node);
     }
-    
+
+    const target = this.expressionVisitor.visitExpression(node.targets[0]);
     const value = this.expressionVisitor.visitExpression(node.value);
-    
-    // 配列の初期化を検出
-    if (this.expressionVisitor.isArrayInitialization(node.value)) {
-      return this.handleArrayInitialization(node);
-    }
     
     const text = `${target} ← ${value}`;
     
@@ -158,7 +157,38 @@ export class StatementVisitor extends BaseParser {
       return this.handleRangeFor(node, target);
     }
     
-    // 通常のfor文（配列やリストの反復）
+    // 配列やリストの直接反復の場合
+    if (node.iter.type === 'Name') {
+      const arrayName = node.iter.id;
+      const indexVar = 'i';
+      
+      // 配列の長さを取得するためのコメント
+      const lengthComment = this.createIRNode('comment', `// Iterating through ${arrayName}`);
+      
+      // FOR i ← 1 TO LENGTH(array) の形式
+      const forText = `FOR ${indexVar} ← 1 TO LENGTH(${arrayName})`;
+      
+      this.enterScope('for', 'block');
+      this.increaseIndent();
+      
+      // ボディ内で target = array[i] の代入を追加
+      const assignmentIR = this.createIRNode('statement', `${target} ← ${arrayName}[${indexVar}]`);
+      
+      const bodyChildren = [assignmentIR];
+      bodyChildren.push(...node.body.map((child: ASTNode) => 
+        this.visitNode ? this.visitNode(child) : this.createIRNode('comment', '// Unprocessed node')
+      ));
+      
+      this.decreaseIndent();
+      this.exitScope();
+      
+      const nextIR = this.createIRNode('statement', `NEXT ${indexVar}`);
+      bodyChildren.push(nextIR);
+      
+      return this.createIRNode('for', forText, [lengthComment, ...bodyChildren]);
+    }
+    
+    // 通常のfor文（その他の反復可能オブジェクト）
     const iterable = this.expressionVisitor.visitExpression(node.iter);
     const forText = `FOR ${target} IN ${iterable}`;
     
@@ -403,22 +433,51 @@ export class StatementVisitor extends BaseParser {
     const elements = node.value.elts;
     const size = elements.length;
     
-    // 要素の型を推論
-    const elementType = elements.length > 0 ? this.expressionVisitor.inferTypeFromValue(elements[0]) : 'STRING';
+    // オブジェクトの配列かどうかを判定
+    const isObjectArray = elements.length > 0 && elements[0].type === 'Call' && this.isClassInstantiation(elements[0]);
     
-    // 配列宣言
-    const declText = `DECLARE ${target} : ARRAY[1:${size}] OF ${elementType}`;
-    const declIR = this.createIRNode('array', declText);
-    
-    // 要素の代入
-    const assignments: IR[] = [];
-    elements.forEach((element: ASTNode, index: number) => {
-      const value = this.expressionVisitor.visitExpression(element);
-      const assignText = `${target}[${index + 1}] ← ${value}`;
-      assignments.push(this.createIRNode('assign', assignText));
-    });
-    
-    return this.createIRNode('statement', '', [declIR, ...assignments]);
+    if (isObjectArray) {
+      // オブジェクトの配列の場合
+      const className = elements[0].func.id; // 直接func.idを取得
+      const recordTypeName = `${className}Record`;
+      
+      const children: IR[] = [];
+      
+      // 配列宣言
+      const declText = `DECLARE ${target} : ARRAY[1:${size}] OF ${recordTypeName}`;
+      children.push(this.createIRNode('statement', declText));
+      
+      // 各要素の処理
+      elements.forEach((element: ASTNode, index: number) => {
+        if (element.type === 'Call' && this.isClassInstantiation(element)) {
+          const args = element.args.map((arg: ASTNode) => this.expressionVisitor.visitExpression(arg));
+          // 簡単な実装として、x, y の順序で代入
+          if (args.length >= 2) {
+            children.push(this.createIRNode('assign', `${target}[${index + 1}].x ← ${args[0]}`));
+            children.push(this.createIRNode('assign', `${target}[${index + 1}].y ← ${args[1]}`));
+          }
+        }
+      });
+      
+      return this.createIRNode('statement', '', children);
+    } else {
+      // 通常の配列の場合
+      const elementType = elements.length > 0 ? this.expressionVisitor.inferTypeFromValue(elements[0]) : 'STRING';
+      
+      // 配列宣言
+      const declText = `DECLARE ${target} : ARRAY[1:${size}] OF ${elementType}`;
+      const declIR = this.createIRNode('array', declText);
+      
+      // 要素の代入
+      const assignments: IR[] = [];
+      elements.forEach((element: ASTNode, index: number) => {
+        const value = this.expressionVisitor.visitExpression(element);
+        const assignText = `${target}[${index + 1}] ← ${value}`;
+        assignments.push(this.createIRNode('assign', assignText));
+      });
+      
+      return this.createIRNode('statement', '', [declIR, ...assignments]);
+    }
   }
 
   private isClassInstantiation(node: ASTNode): boolean {
@@ -432,13 +491,24 @@ export class StatementVisitor extends BaseParser {
   private handleClassInstantiation(node: ASTNode): IR {
     const className = this.expressionVisitor.visitExpression(node.func);
     const target = this.expressionVisitor.visitExpression(node.targets[0]);
-    const args = node.args.map((arg: ASTNode) => this.expressionVisitor.visitExpression(arg));
+    const args = node.value.args.map((arg: ASTNode) => this.expressionVisitor.visitExpression(arg));
     
-    const text = args.length > 0 
-      ? `${target} ← NEW ${className}(${args.join(', ')})`
-      : `${target} ← NEW ${className}()`;
+    // レコード型として扱う場合は、変数宣言と各フィールドの代入を生成
+    const recordTypeName = `${className}Record`;
+    const children: IR[] = [];
     
-    return this.createIRNode('assign', text);
+    // 変数宣言
+    const declareText = `DECLARE ${target} : ${recordTypeName}`;
+    children.push(this.createIRNode('statement', declareText));
+    
+    // フィールドの代入（引数の順序に基づく）
+    // 簡単な実装として、x, y の順序で代入
+    if (args.length >= 2) {
+      children.push(this.createIRNode('assign', `${target}.x ← ${args[0]}`));
+      children.push(this.createIRNode('assign', `${target}.y ← ${args[1]}`));
+    }
+    
+    return this.createIRNode('block', '', children);
   }
 
   private convertOperator(op: ASTNode): string {

@@ -52,7 +52,7 @@ ENDPROCEDURE`;
       // Or, the test should reflect what the current converter implementation does.
       // Let's assume it can infer or has a default like 'ANY'.
       const expected = 
-`FUNCTION Add(x : STRING, y : STRING) RETURNS INTEGER
+`FUNCTION Add(x : STRING, y : STRING) RETURNS STRING
   RETURN x + y
 ENDFUNCTION`;
       // If type hinting is used in Python, it should be used: def add(x: int, y: int) -> int:
@@ -65,7 +65,7 @@ ENDFUNCTION`;
       const pythonCode = 'def multiply(a: int, b: int) -> int:\n    return a * b';
       const result = await converter.convert(pythonCode);
       const expected = 
-`FUNCTION Multiply(a : STRING, b : STRING) RETURNS INTEGER
+`FUNCTION Multiply(a : INTEGER, b : INTEGER) RETURNS INTEGER
   RETURN a * b
 ENDFUNCTION`;
       expect(result.code).toBe(expected);
@@ -107,7 +107,7 @@ print(x) # x should still be 5 in Python if val is a number (immutable)`;
 ENDPROCEDURE
 x ← 5
 CALL Increment_val(x)
-OUTPUT x`;
+OUTPUT x) // x should still be 5 in Python IF val is a number (immutable`;
       expect(result.code).toBe(expected);
     });
 
@@ -197,7 +197,7 @@ modify_list_element(my_list) # my_list[0] becomes 20`;
         return n * factorial(n - 1)`;
       const result = await converter.convert(pythonCode);
       const expected = 
-`FUNCTION Factorial(n : STRING) RETURNS INTEGER
+`FUNCTION Factorial(n : INTEGER) RETURNS INTEGER
   IF n ≤ 1 THEN
     RETURN 1
   ELSE

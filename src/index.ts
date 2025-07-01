@@ -4,6 +4,9 @@
 export { Converter, convertPythonToIGCSE, convertFileToIGCSE, convertFilesToIGCSE } from './converter';
 export { CLI } from './cli';
 
+// Legacy export for compatibility
+export { Converter as PythonToIGCSEConverter } from './converter';
+
 // Import for internal use
 import { Converter } from './converter';
 

@@ -34,6 +34,7 @@ export class PythonASTVisitor extends BaseParser {
    * メインのパース関数
    */
   parse(source: string): import('../types/parser').ParseResult {
+    console.log('DEBUG: parse called');
     this.startParsing();
     this.resetContext();
     
@@ -41,6 +42,7 @@ export class PythonASTVisitor extends BaseParser {
       // 実際の実装では、PythonのASTパーサーを使用
       // ここでは簡易的な実装を提供
       const ast = this.parseToAST(source);
+      console.log('DEBUG: parseToAST completed, calling visitNode');
       const ir = this.visitNode(ast);
       
       return this.createParseResult([ir]);
@@ -60,13 +62,20 @@ export class PythonASTVisitor extends BaseParser {
    * 簡易的なASTパーサー（実際の実装では外部ライブラリを使用）
    */
   private parseToAST(source: string): ASTNode {
+    console.log('DEBUG: parseToAST called');
     // 実際の実装では、python-astやpyodideなどを使用
     // ここでは簡易的な実装
     const lines = source.split('\n');
     const nodes: ASTNode[] = [];
+    const processedLines = new Set<number>();
     
     let i = 0;
     while (i < lines.length) {
+      if (processedLines.has(i)) {
+        i++;
+        continue;
+      }
+      
       const line = lines[i];
       const trimmed = line.trim();
       
@@ -78,14 +87,20 @@ export class PythonASTVisitor extends BaseParser {
           lineno: i + 1
         };
         nodes.push(commentNode);
+        processedLines.add(i);
         i++;
       } else if (trimmed) {
         const result = this.parseStatement(lines, i);
         if (result.node) {
           nodes.push(result.node);
+          // 処理された行をマーク
+          for (let j = i; j < result.nextIndex; j++) {
+            processedLines.add(j);
+          }
         }
         i = result.nextIndex;
       } else {
+        processedLines.add(i);
         i++;
       }
     }
@@ -226,8 +241,16 @@ export class PythonASTVisitor extends BaseParser {
     }
     
     // 代入文の検出
-    if (trimmed.includes(' = ') && !trimmed.includes('==')) {
-      return this.parseAssignStatement(trimmed, lineNumber);
+    if (trimmed.includes(' = ')) {
+      // = の前後をチェックして、代入文かどうかを判定
+      const equalIndex = trimmed.indexOf(' = ');
+      const beforeEqual = trimmed.substring(0, equalIndex).trim();
+      const afterEqual = trimmed.substring(equalIndex + 3).trim();
+      
+      // 左辺が単純な変数名で、右辺が存在する場合は代入文
+      if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(beforeEqual) && afterEqual.length > 0) {
+        return this.parseAssignStatement(trimmed, lineNumber);
+      }
     }
     
     // print文の検出
@@ -240,9 +263,35 @@ export class PythonASTVisitor extends BaseParser {
       return this.parseFunctionDef(trimmed, lineNumber);
     }
     
+    // クラス定義の検出
+    if (trimmed.startsWith('class ')) {
+      return this.parseClassDef(trimmed, lineNumber);
+    }
+    
     // return文の検出
     if (trimmed.startsWith('return')) {
       return this.parseReturnStatement(trimmed, lineNumber);
+    }
+    
+    // break文の検出
+    if (trimmed === 'break') {
+      return {
+        type: 'Break',
+        lineno: lineNumber
+      };
+    }
+    
+    // continue文の検出
+    if (trimmed === 'continue') {
+      return {
+        type: 'Continue',
+        lineno: lineNumber
+      };
+    }
+    
+    // 拡張代入文の検出（+=, -=, *=, /=, %=）
+    if (/^[a-zA-Z_][a-zA-Z0-9_]*\s*[+\-*/%]=/.test(trimmed)) {
+      return this.parseAugAssignStatement(trimmed, lineNumber);
     }
     
     // 関数呼び出しの検出
@@ -276,6 +325,60 @@ export class PythonASTVisitor extends BaseParser {
     };
   }
 
+  /**
+   * 拡張代入文の解析
+   */
+  private parseAugAssignStatement(line: string, lineNumber: number): ASTNode {
+    const match = line.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*([+\-*/%])=\s*(.+)$/);
+    
+    if (!match) {
+      // マッチしない場合は通常の式として処理
+      return {
+        type: 'Expr',
+        lineno: lineNumber,
+        value: {
+          type: 'Call',
+          func: { type: 'Name', id: 'unknown' },
+          args: [],
+          raw: line
+        }
+      };
+    }
+
+    const [, target, op, value] = match;
+    
+    return {
+      type: 'AugAssign',
+      lineno: lineNumber,
+      target: {
+        type: 'Name',
+        id: target
+      },
+      op: {
+        type: this.getAugAssignOpType(op)
+      },
+      value: {
+        type: 'Num',
+        n: isNaN(Number(value)) ? value : Number(value),
+        raw: value
+      }
+    };
+  }
+
+  /**
+   * 拡張代入演算子のタイプを取得
+   */
+  private getAugAssignOpType(op: string): string {
+    switch (op) {
+      case '+': return 'Add';
+      case '-': return 'Sub';
+      case '*': return 'Mult';
+      case '/': return 'Div';
+      case '%': return 'Mod';
+      default: return 'Add';
+    }
+  }
+
   private parseIfStatement(line: string, lineNumber: number): ASTNode {
     // "if condition:" の形式を解析
     const match = line.match(/^if\s+(.+):\s*$/);
@@ -297,7 +400,7 @@ export class PythonASTVisitor extends BaseParser {
   }
 
   private parseForStatement(line: string, lineNumber: number): ASTNode {
-    // "for var in range(...)" の形式を解析
+    // "for var in iterable:" の形式を解析
     const match = line.match(/^for\s+(\w+)\s+in\s+(.+):\s*$/);
     const target = match ? match[1] : 'i';
     const iter = match ? match[2] : 'range(1)';
@@ -314,6 +417,21 @@ export class PythonASTVisitor extends BaseParser {
           raw: arg
         }));
       }
+    }
+    
+    // 配列やリストの直接反復の場合
+    if (!iter.startsWith('range(')) {
+      return {
+        type: 'For',
+        lineno: lineNumber,
+        target: { type: 'Name', id: target },
+        iter: {
+          type: 'Name',
+          id: iter
+        },
+        body: [],
+        orelse: []
+      };
     }
     
     return {
@@ -354,16 +472,224 @@ export class PythonASTVisitor extends BaseParser {
     const target = parts[0].trim();
     const value = parts.slice(1).join(' = ').trim();
     
+    // 配列リテラルの検出
+    if (value.startsWith('[') && value.endsWith(']')) {
+      const elementsStr = value.slice(1, -1).trim();
+      const elements = elementsStr ? elementsStr.split(',').map(elem => {
+        const trimmed = elem.trim();
+        // 数値かどうかを判定
+        if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+          return {
+            type: 'Num',
+            n: parseFloat(trimmed)
+          };
+        } else if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+          return {
+            type: 'Str',
+            s: trimmed.slice(1, -1)
+          };
+        } else if (trimmed.startsWith("'") && trimmed.endsWith("'")) {
+          return {
+            type: 'Str',
+            s: trimmed.slice(1, -1)
+          };
+        } else {
+          return {
+            type: 'Name',
+            id: trimmed
+          };
+        }
+      }) : [];
+      
+      return {
+        type: 'Assign',
+        lineno: lineNumber,
+        targets: [{ type: 'Name', id: target }],
+        value: {
+          type: 'List',
+          elts: elements
+        }
+      };
+    }
+    
+    // 配列アクセスの検出 (例: my_array[0])
+    const arrayAccessMatch = value.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\[(\d+)\]$/);
+    if (arrayAccessMatch) {
+      const [, arrayName, indexStr] = arrayAccessMatch;
+      return {
+        type: 'Assign',
+        lineno: lineNumber,
+        targets: [{ type: 'Name', id: target }],
+        value: {
+          type: 'Subscript',
+          value: { type: 'Name', id: arrayName },
+          slice: { type: 'Num', n: parseInt(indexStr) }
+        }
+      };
+    }
+    
+    // 比較演算子を含む式の検出
+    const valueNode = this.parseExpression(value);
+    
     return {
       type: 'Assign',
       lineno: lineNumber,
       targets: [{ type: 'Name', id: target }],
-      value: {
-        type: 'Str',
-        s: value,
-        raw: value
-      }
+      value: valueNode
     };
+  }
+
+  /**
+   * 式を解析してASTノードに変換
+   */
+  private parseExpression(expr: string): ASTNode {
+    const trimmed = expr.trim();
+    
+    // NOT演算子の検出（最優先）
+    if (trimmed.startsWith('not ')) {
+      const operand = trimmed.substring(4).trim();
+      return {
+        type: 'UnaryOp',
+        op: { type: 'Not' },
+        operand: this.parseExpression(operand)
+      };
+    }
+    
+    // 括弧で囲まれた式の処理
+    if (trimmed.startsWith('(') && trimmed.endsWith(')')) {
+      const innerExpr = trimmed.slice(1, -1);
+      const innerNode = this.parseExpression(innerExpr);
+      // 括弧付きの式として明示的にマーク
+      return {
+        type: 'Expr',
+        value: innerNode,
+        parenthesized: true
+      };
+    }
+    
+    // 比較演算子の検出
+    const compareOps = ['==', '!=', '<=', '>=', '<', '>'];
+    for (const op of compareOps) {
+      const index = trimmed.indexOf(op);
+      if (index !== -1) {
+        const left = trimmed.substring(0, index).trim();
+        const right = trimmed.substring(index + op.length).trim();
+        
+        return {
+          type: 'Compare',
+          left: this.parseSimpleExpression(left),
+          ops: [this.getCompareOpNode(op)],
+          comparators: [this.parseSimpleExpression(right)]
+        };
+      }
+    }
+    
+    // 論理演算子の検出
+    if (trimmed.includes(' and ')) {
+      const parts = trimmed.split(' and ');
+      return {
+        type: 'BoolOp',
+        op: { type: 'And' },
+        values: parts.map(part => this.parseExpression(part.trim()))
+      };
+    }
+    
+    if (trimmed.includes(' or ')) {
+      const parts = trimmed.split(' or ');
+      return {
+        type: 'BoolOp',
+        op: { type: 'Or' },
+        values: parts.map(part => this.parseExpression(part.trim()))
+      };
+    }
+    
+    // 算術演算子の検出（長い演算子を先に検出）
+    const arithOps = ['//', '+', '-', '*', '/', '%'];
+    for (const op of arithOps) {
+      const index = trimmed.indexOf(op);
+      if (index !== -1) {
+        const left = trimmed.substring(0, index).trim();
+        const right = trimmed.substring(index + op.length).trim();
+        
+        return {
+          type: 'BinOp',
+          left: this.parseSimpleExpression(left),
+          op: this.getArithOpNode(op),
+          right: this.parseSimpleExpression(right)
+        };
+      }
+    }
+    
+    // 単純な式として処理
+    return this.parseSimpleExpression(trimmed);
+  }
+  
+  /**
+   * 単純な式（変数、リテラル）を解析
+   */
+  private parseSimpleExpression(expr: string): ASTNode {
+    const trimmed = expr.trim();
+    
+    // 文字列リテラル
+    if ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+        (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+      return {
+        type: 'Str',
+        s: trimmed.slice(1, -1)
+      };
+    }
+    
+    // 数値リテラル
+    if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+      return {
+        type: 'Num',
+        n: parseFloat(trimmed)
+      };
+    }
+    
+    // ブール値
+    if (trimmed === 'True' || trimmed === 'False') {
+      return {
+        type: 'NameConstant',
+        value: trimmed === 'True'
+      };
+    }
+    
+    // 変数名
+    return {
+      type: 'Name',
+      id: trimmed
+    };
+  }
+  
+  /**
+   * 比較演算子のASTノードを取得
+   */
+  private getCompareOpNode(op: string): ASTNode {
+    switch (op) {
+      case '==': return { type: 'Eq' };
+      case '!=': return { type: 'NotEq' };
+      case '<': return { type: 'Lt' };
+      case '<=': return { type: 'LtE' };
+      case '>': return { type: 'Gt' };
+      case '>=': return { type: 'GtE' };
+      default: return { type: 'Eq' };
+    }
+  }
+  
+  /**
+   * 算術演算子のASTノードを取得
+   */
+  private getArithOpNode(op: string): ASTNode {
+    switch (op) {
+      case '+': return { type: 'Add' };
+      case '-': return { type: 'Sub' };
+      case '*': return { type: 'Mult' };
+      case '/': return { type: 'Div' };
+      case '//': return { type: 'FloorDiv' };
+      case '%': return { type: 'Mod' };
+      default: return { type: 'Add' };
+    }
   }
 
   private parsePrintStatement(line: string, lineNumber: number): ASTNode {
@@ -457,8 +783,17 @@ export class PythonASTVisitor extends BaseParser {
   }
 
   private visitModule(node: ASTNode): IR {
-    const children = node.body.map((child: ASTNode) => this.visitNode(child));
-    return this.createIRNode('statement', '', children);
+    console.log('DEBUG: visitModule called with', node.body.length, 'children');
+    const children: IR[] = [];
+    
+    for (const child of node.body) {
+      console.log('DEBUG: Processing child:', child.type, child.lineno);
+      const childIR = this.visitNode(child);
+      children.push(childIR);
+    }
+    
+    console.log('DEBUG: visitModule returning', children.length, 'children');
+    return this.createIRNode('compound', '', children);
   }
 
   /**
@@ -573,6 +908,34 @@ export class PythonASTVisitor extends BaseParser {
         id: value,
         raw: value
       } : null,
+      lineno: lineNumber
+    };
+  }
+
+  /**
+   * クラス定義の解析
+   */
+  private parseClassDef(line: string, lineNumber: number): ASTNode {
+    const match = line.match(/^class\s+(\w+)(?:\s*\(([^)]*)\))?\s*:/);
+    if (!match) {
+       this.addError(`Invalid class definition: ${line}`, 'syntax_error');
+       return {
+         type: 'Unknown',
+         lineno: lineNumber
+       };
+     }
+
+    const [, className, baseClasses] = match;
+    const bases = baseClasses ? baseClasses.split(',').map(base => ({
+      type: 'Name',
+      id: base.trim()
+    })) : [];
+
+    return {
+      type: 'ClassDef',
+      name: className,
+      bases,
+      body: [],
       lineno: lineNumber
     };
   }
