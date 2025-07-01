@@ -732,6 +732,14 @@ export class PythonASTVisitor extends BaseParser {
       };
     }
     
+    // f-string の検出
+    if (trimmed.startsWith('f"') && trimmed.endsWith('"')) {
+      return this.parseFString(trimmed);
+    }
+    if (trimmed.startsWith("f'") && trimmed.endsWith("'")) {
+      return this.parseFString(trimmed);
+    }
+    
     // 文字列リテラル
     if ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
         (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
@@ -792,6 +800,71 @@ export class PythonASTVisitor extends BaseParser {
       case '%': return { type: 'Mod' };
       default: return { type: 'Add' };
     }
+  }
+
+  /**
+   * f-stringを解析してJoinedStrノードを作成
+   */
+  private parseFString(fstring: string): ASTNode {
+    // f"Hello {name}" -> "Hello {name}"
+    const content = fstring.slice(2, -1); // f" と " を除去
+    const values: ASTNode[] = [];
+    
+    let i = 0;
+    let currentText = '';
+    
+    while (i < content.length) {
+      if (content[i] === '{') {
+        // 現在のテキスト部分を追加
+        if (currentText) {
+          values.push({
+            type: 'Constant',
+            value: currentText
+          });
+          currentText = '';
+        }
+        
+        // {} 内の変数を探す
+        const start = i + 1;
+        let braceCount = 1;
+        let end = start;
+        
+        while (end < content.length && braceCount > 0) {
+          if (content[end] === '{') braceCount++;
+          if (content[end] === '}') braceCount--;
+          if (braceCount > 0) end++;
+        }
+        
+        if (braceCount === 0) {
+          const varName = content.slice(start, end);
+          values.push({
+            type: 'FormattedValue',
+            value: { type: 'Name', id: varName }
+          });
+          i = end + 1;
+        } else {
+          // 閉じ括弧が見つからない場合
+          currentText += content[i];
+          i++;
+        }
+      } else {
+        currentText += content[i];
+        i++;
+      }
+    }
+    
+    // 残りのテキストを追加
+    if (currentText) {
+      values.push({
+        type: 'Constant',
+        value: currentText
+      });
+    }
+    
+    return {
+      type: 'JoinedStr',
+      values: values
+    };
   }
 
   private parsePrintStatement(line: string, lineNumber: number): ASTNode {

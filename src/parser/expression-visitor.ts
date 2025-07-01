@@ -62,6 +62,8 @@ export class ExpressionVisitor {
         return this.visitListComp(node);
       case 'IfExp':
         return this.visitIfExp(node);
+      case 'JoinedStr':
+        return this.visitJoinedStr(node);
       case 'Expr':
         // 括弧付きの式の処理
         if (node.parenthesized) {
@@ -417,5 +419,33 @@ export class ExpressionVisitor {
     }
     
     return false;
+  }
+
+  /**
+   * JoinedStr (f-string) の処理
+   */
+  private visitJoinedStr(node: ASTNode): string {
+    if (!node.values || !Array.isArray(node.values)) {
+      return '""';
+    }
+
+    const parts: string[] = [];
+    
+    for (const value of node.values) {
+      if (value.type === 'Constant' || value.type === 'Str') {
+        // 文字列リテラル部分
+        const str = value.value || value.s || '';
+        if (str) {
+          parts.push(`"${str}"`);
+        }
+      } else if (value.type === 'FormattedValue') {
+        // 変数部分 {variable}
+        const expr = this.visitExpression(value.value);
+        parts.push(expr);
+      }
+    }
+
+    // 複数の部分がある場合はカンマで結合
+    return parts.length > 1 ? parts.join(', ') : (parts[0] || '""');
   }
 }
