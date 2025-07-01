@@ -455,11 +455,27 @@ export class PythonASTVisitor extends BaseParser {
       const argsStr = iter.slice(6, -1); // "range(" と ")" を除去
       if (argsStr.trim()) {
         const argParts = argsStr.split(',').map(arg => arg.trim());
-        args = argParts.map(arg => ({
-          type: 'Num',
-          n: isNaN(Number(arg)) ? arg : Number(arg),
-          raw: arg
-        }));
+        args = argParts.map(arg => {
+          // len()関数の処理
+          if (arg.startsWith('len(') && arg.endsWith(')')) {
+            const arrayName = arg.slice(4, -1).trim();
+            return {
+              type: 'Call',
+              func: { type: 'Name', id: 'len' },
+              args: [{ type: 'Name', id: arrayName }]
+            };
+          }
+          // 数値の場合
+          if (!isNaN(Number(arg))) {
+            return {
+              type: 'Num',
+              n: Number(arg),
+              raw: arg
+            };
+          }
+          // その他の式
+          return this.parseExpression(arg);
+        });
       }
     }
     
