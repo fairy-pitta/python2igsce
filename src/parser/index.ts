@@ -1,18 +1,18 @@
-// パーサーモジュールのエクスポート
+// Export parser modules
 
 export { BaseParser } from './base-parser';
 export { PythonASTVisitor } from './visitor';
 
-// メインのパーサークラス
+// Main parser class
 export { PythonParser } from './python-parser';
 
-// 追加のビジター
+// Additional visitors
 export { StatementVisitor } from './statement-visitor';
 export { ExpressionVisitor } from './expression-visitor';
 export { DefinitionVisitor } from './definition-visitor';
 
-// Pyodide AST パーサー
+// Pyodide AST parser
 export { PyodideASTParser, getPyodideParser, parsePythonWithPyodide } from './pyodide-ast-parser';
 
-// パーサーファクトリー
+// Parser factory
 export { createParser } from './factory';

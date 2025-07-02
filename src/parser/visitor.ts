@@ -4,7 +4,7 @@ import { StatementVisitor } from './statement-visitor';
 import { DefinitionVisitor } from './definition-visitor';
 
 /**
- * Python ASTノードの基本インターフェース
+ * Base interface for Python AST nodes.
  */
 interface ASTNode {
   type: string;
@@ -14,7 +14,7 @@ interface ASTNode {
 }
 
 /**
- * Python ASTからIRへの変換ビジター
+ * Visitor for converting Python AST to IR.
  */
 export class PythonASTVisitor extends BaseParser {
   private statementVisitor: StatementVisitor;
@@ -25,28 +25,28 @@ export class PythonASTVisitor extends BaseParser {
     this.statementVisitor = new StatementVisitor();
     this.definitionVisitor = new DefinitionVisitor();
     
-    // ビジター間の相互参照を設定
+    // Set up cross-references between visitors.
     this.definitionVisitor.setStatementVisitor(this.statementVisitor);
     
-    // visitNodeメソッドを設定
+    // Set the visitNode method.
     this.statementVisitor.visitNode = this.visitNode.bind(this);
     this.definitionVisitor.visitNode = this.visitNode.bind(this);
     
-    // ビジターにコンテキストを共有
+    // Share context with visitors.
     this.statementVisitor.setContext(this.context);
     this.definitionVisitor.setContext(this.context);
   }
 
   /**
-   * メインのパース関数
+   * Main parsing function.
    */
   override async parse(source: string): Promise<import('../types/parser').ParseResult> {
     this.startParsing();
     this.resetContext();
     
     try {
-      // 実際の実装では、PythonのASTパーサーを使用
-      // ここでは簡易的な実装を提供
+      // In a real implementation, a Python AST parser would be used.
+      // Here, a simplified implementation is provided.
       const ast = await this.parseToAST(source);
       const ir = this.visitNode(ast);
       
@@ -57,26 +57,26 @@ export class PythonASTVisitor extends BaseParser {
         'syntax_error'
       );
       
-      // エラー時は空のIRを返す
+      // Return an empty IR on error.
       const emptyIR = createIR('statement', '', []);
       return this.createParseResult([emptyIR]);
     }
   }
 
   /**
-   * ASTパーサー（簡易実装を使用）
+   * AST parser (uses a simplified implementation).
    */
   private async parseToAST(source: string): Promise<import('./pyodide-ast-parser').ASTNode> {
-    // 現在は簡易パーサーのみを使用
+    // Currently, only the simple parser is used.
     return this.parseToASTSimple(source);
   }
 
   /**
-   * 簡易的なASTパーサー（フォールバック用）
+   * Simplified AST parser (for fallback).
    */
   private parseToASTSimple(source: string): import('./pyodide-ast-parser').ASTNode {
-    // 実際の実装では、python-astやpyodideなどを使用
-    // ここでは簡易的な実装
+    // In a real implementation, python-ast, pyodide, or similar would be used.
+    // This is a simplified implementation.
     const lines = source.split('\n');
     const nodes: ASTNode[] = [];
     const processedLines = new Set<number>();
@@ -92,7 +92,7 @@ export class PythonASTVisitor extends BaseParser {
       const trimmed = line.trim();
       
       if (trimmed.startsWith('#')) {
-        // コメント行を処理
+        // Process comment lines.
         const commentNode: ASTNode = {
           type: 'Comment',
           value: trimmed.substring(1).trim(),
@@ -105,7 +105,7 @@ export class PythonASTVisitor extends BaseParser {
         const result = this.parseStatement(lines, i);
         if (result.node) {
           nodes.push(result.node);
-          // 処理された行をマーク
+          // Mark processed lines.
           for (let j = i; j < result.nextIndex; j++) {
             processedLines.add(j);
           }
@@ -124,40 +124,40 @@ export class PythonASTVisitor extends BaseParser {
   }
 
   /**
-   * 文とその子ブロックを解析
+   * Parses a statement and its child block.
    */
   private parseStatement(lines: string[], startIndex: number): { node: ASTNode | null, nextIndex: number } {
     const line = lines[startIndex];
     const trimmed = line.trim();
     const indent = line.length - line.trimStart().length;
     
-    // 基本的な文ノードを作成
+    // Create a basic statement node.
     const node = this.parseLineToASTNode(trimmed, startIndex + 1);
     if (!node) {
       return { node: null, nextIndex: startIndex + 1 };
     }
     
-    // コロンで終わる文（ブロック文）の場合、子ブロックを解析
+    // If the statement ends with a colon (block statement), parse the child block.
     if (trimmed.endsWith(':')) {
       const bodyNodes: ASTNode[] = [];
       let i = startIndex + 1;
       
-      // 次の行から子ブロックを解析
+      // Parse the child block from the next line.
       while (i < lines.length) {
         const childLine = lines[i];
         const childTrimmed = childLine.trim();
         const childIndent = childLine.length - childLine.trimStart().length;
         
-        // 空行やコメント行はスキップ
+        // Skip empty or comment lines.
         if (!childTrimmed || childTrimmed.startsWith('#')) {
           i++;
           continue;
         }
         
-        // IF文の場合、ELIF文とELSE文を特別に処理
+        // For IF statements, handle ELIF and ELSE statements specially.
         if (node.type === 'If' && childIndent === indent) {
           if (childTrimmed.startsWith('elif ')) {
-            // ELIF文を新しいIF文として処理し、orelseに追加
+            // Process ELIF as a new IF statement and add to orelse.
             const elifResult = this.parseStatement(lines, i);
             if (elifResult.node) {
               node.orelse = [elifResult.node];
@@ -165,28 +165,28 @@ export class PythonASTVisitor extends BaseParser {
             i = elifResult.nextIndex;
             break;
           } else if (childTrimmed.startsWith('else:')) {
-            // ELSE節の処理
+            // Process the ELSE clause.
             const elseNodes: ASTNode[] = [];
-            i++; // else行をスキップ
+            i++; // Skip the else line.
             
-            // ELSE節の子ブロックを解析
+            // Parse the child block of the ELSE clause.
             while (i < lines.length) {
               const elseChildLine = lines[i];
               const elseChildTrimmed = elseChildLine.trim();
               const elseChildIndent = elseChildLine.length - elseChildLine.trimStart().length;
               
-              // 空行やコメント行はスキップ
+              // Skip empty or comment lines.
               if (!elseChildTrimmed || elseChildTrimmed.startsWith('#')) {
                 i++;
                 continue;
               }
               
-              // インデントが同じかそれより少ない場合、ELSE節終了
+              // If the indent is the same or less, the ELSE clause ends.
               if (elseChildIndent <= indent) {
                 break;
               }
               
-              // ELSE節の子文を解析
+              // Parse the child statement of the ELSE clause.
               const elseChildResult = this.parseStatement(lines, i);
               if (elseChildResult.node) {
                 elseNodes.push(elseChildResult.node);
@@ -194,7 +194,7 @@ export class PythonASTVisitor extends BaseParser {
               i = elseChildResult.nextIndex;
             }
             
-            // ELSE節をノードに設定
+            // Set the ELSE clause on the node.
             node.orelse = elseNodes;
             break;
           }

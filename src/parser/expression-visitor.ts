@@ -2,7 +2,7 @@
 import { IGCSEDataType } from '../types/igcse';
 
 /**
- * Python ASTノードの基本インターフェース
+ * Base interface for Python AST nodes.
  */
 interface ASTNode {
   type: string;
@@ -12,11 +12,11 @@ interface ASTNode {
 }
 
 /**
- * 式の処理を担当するビジタークラス
+ * Visitor class responsible for processing expressions.
  */
 export class ExpressionVisitor {
   /**
-   * 式をIGCSE疑似コードに変換
+   * Converts an expression to IGCSE pseudocode.
    */
   visitExpression(node: ASTNode): string {
     if (!node) return '';
@@ -24,7 +24,7 @@ export class ExpressionVisitor {
     // If the node has a raw property, use it for simplified parsing
     if (node.raw) {
       const result = this.parseRawExpression(node.raw);
-      // keepParenthesesフラグがある場合は括弧を保持
+      // Keep parentheses if the keepParentheses flag is set.
       return node.keepParentheses ? `(${result})` : result;
     }
 
@@ -65,7 +65,7 @@ export class ExpressionVisitor {
       case 'JoinedStr':
         return this.visitJoinedStr(node);
       case 'Expr':
-        // 括弧付きの式の処理
+        // Process parenthesized expressions.
         if (node.parenthesized) {
           return `(${this.visitExpression(node.value)})`;
         }
@@ -76,10 +76,10 @@ export class ExpressionVisitor {
   }
 
   /**
-   * 簡易的な式の解析
+   * Simple expression parsing.
    */
   private parseRawExpression(raw: string): string {
-    // 文字列リテラルを保護
+    // Protect string literals.
     const stringMatches: string[] = [];
     let result = raw.replace(/(["'])(?:(?!\1)[^\\]|\\.)*\1/g, (match) => {
       const index = stringMatches.length;
@@ -87,7 +87,7 @@ export class ExpressionVisitor {
       return `__STRING_${index}__`;
     });
     
-    // 比較演算子の変換（単語境界を使用）
+    // Convert comparison operators (using word boundaries).
     result = result
       .replace(/==/g, ' = ')
       .replace(/!=/g, ' ≠ ')
@@ -98,7 +98,7 @@ export class ExpressionVisitor {
       .replace(/\bnot\b/g, 'NOT ')
       .replace(/%/g, ' MOD ');
     
-    // 文字列リテラルを復元
+    // Restore string literals.
     stringMatches.forEach((str, index) => {
       result = result.replace(`__STRING_${index}__`, str);
     });
@@ -160,7 +160,7 @@ export class ExpressionVisitor {
     const func = this.visitExpression(node.func);
     const args = node.args.map((arg: ASTNode) => this.visitExpression(arg));
     
-    // 組み込み関数の変換
+    // Convert built-in functions.
     const builtinResult = this.convertBuiltinFunction(func, args);
     if (builtinResult) {
       return builtinResult;
@@ -188,13 +188,13 @@ export class ExpressionVisitor {
     const value = this.visitExpression(node.value);
     const slice = this.visitExpression(node.slice);
     
-    // 数値インデックスの場合、0ベースから1ベースに変換
+    // If it's a numeric index, convert from 0-based to 1-based.
     if (node.slice.type === 'Num') {
       const index = node.slice.n + 1;
       return `${value}[${index}]`;
     }
     
-    // Constant型の数値インデックスの場合も変換
+    // Also convert for Constant type numeric indices.
     if (node.slice.type === 'Constant' && typeof node.slice.value === 'number') {
       const index = node.slice.value + 1;
       return `${value}[${index}]`;

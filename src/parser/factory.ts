@@ -1,28 +1,28 @@
-// パーサーファクトリー
+// Parser factory
 import { PythonParser } from './python-parser';
 import { ParserOptions } from '../types/parser';
 
 /**
- * パーサーの種類
+ * Parser type.
  */
 export type ParserType = 'python' | 'javascript' | 'java' | 'cpp';
 
 /**
- * パーサーファクトリーの設定
+ * Parser factory configuration.
  */
 export interface ParserFactoryOptions {
-  /** パーサーの種類 */
+  /** Parser type */
   type: ParserType;
-  /** パーサーオプション */
+  /** Parser options */
   options?: ParserOptions;
 }
 
 /**
- * パーサーファクトリークラス
+ * Parser factory class.
  */
 export class ParserFactory {
   /**
-   * パーサーを作成
+   * Creates a parser.
    */
   static create(config: ParserFactoryOptions): PythonParser {
     switch (config.type) {
@@ -40,14 +40,14 @@ export class ParserFactory {
   }
 
   /**
-   * サポートされているパーサーの一覧を取得
+   * Gets a list of supported parsers.
    */
   static getSupportedParsers(): ParserType[] {
     return ['python'];
   }
 
   /**
-   * パーサーがサポートされているかチェック
+   * Checks if a parser is supported.
    */
   static isSupported(type: ParserType): boolean {
     return this.getSupportedParsers().includes(type);
@@ -55,7 +55,7 @@ export class ParserFactory {
 }
 
 /**
- * 便利な関数：Pythonパーサーを作成
+ * Utility function: Creates a Python parser.
  */
 export function createParser(options?: ParserOptions): PythonParser {
   return ParserFactory.create({
@@ -65,7 +65,7 @@ export function createParser(options?: ParserOptions): PythonParser {
 }
 
 /**
- * 便利な関数：設定済みのパーサーを作成
+ * Utility function: Creates a preconfigured parser.
  */
 export function createPreconfiguredParser(preset: 'strict' | 'lenient' | 'debug'): PythonParser {
   const presets: Record<string, ParserOptions> = {
@@ -93,7 +93,7 @@ export function createPreconfiguredParser(preset: 'strict' | 'lenient' | 'debug'
 }
 
 /**
- * パーサーの能力を取得
+ * Gets the capabilities of a parser.
  */
 export function getParserCapabilities(type: ParserType): {
   supportedFeatures: string[];
@@ -133,21 +133,21 @@ export function getParserCapabilities(type: ParserType): {
 }
 
 /**
- * パーサーのベンチマーク情報
+ * Parser benchmark information.
  */
 export interface ParserBenchmark {
-  /** パーサーの種類 */
+  /** Parser type */
   type: ParserType;
-  /** 平均パース時間（ミリ秒/行） */
+  /** Average parse time (ms/line) */
   avgParseTimePerLine: number;
-  /** メモリ使用量（MB/1000行） */
+  /** Memory usage (MB/1000 lines) */
   memoryUsagePer1000Lines: number;
-  /** 最大処理可能行数 */
+  /** Maximum recommended lines */
   maxRecommendedLines: number;
 }
 
 /**
- * パーサーのベンチマーク情報を取得
+ * Gets the benchmark information for a parser.
  */
 export function getParserBenchmark(type: ParserType): ParserBenchmark {
   switch (type) {

@@ -1,11 +1,11 @@
-// メインのPythonパーサークラス
+// Main Python parser class
 import { BaseParser } from './base-parser';
 import { ParserOptions, ParseResult } from '../types/parser';
 import { IR } from '../types/ir';
 import { PythonASTVisitor } from './visitor';
 
 /**
- * PythonからIGCSE Pseudocodeへの変換パーサー
+ * Parser for converting Python to IGCSE Pseudocode.
  */
 export class PythonParser extends BaseParser {
   constructor(options: ParserOptions = {}) {
@@ -13,19 +13,19 @@ export class PythonParser extends BaseParser {
   }
 
   /**
-   * Pythonソースコードをパースしてイルに変換
+   * Parses Python source code and converts it to IR.
    */
   override async parse(source: string): Promise<ParseResult> {
     this.reset();
     try {
-      // 前処理
+      // Preprocessing
       const preprocessed = this.preprocessSource(source);
       
-      // ASTビジターを使用してパース
+      // Parse using the AST visitor
       const visitor = new PythonASTVisitor();
       const result = await visitor.parse(preprocessed);
       
-      // 統計を更新
+      // Update statistics
       this.updateStatistics(result);
       
       return result;
@@ -43,7 +43,7 @@ export class PythonParser extends BaseParser {
 
 
   /**
-   * ソースコードの前処理
+   * Preprocesses the source code.
    */
   private preprocessSource(source: string): string {
     return this.preprocess(source);
@@ -52,24 +52,24 @@ export class PythonParser extends BaseParser {
 
 
   /**
-   * ソースコードの前処理（内部実装）
+   * Preprocesses the source code (internal implementation).
    */
   private preprocess(source: string): string {
     let processed = source;
     
-    // 空行の正規化
+    // Normalize empty lines
     processed = processed.replace(/\r\n/g, '\n');
     processed = processed.replace(/\r/g, '\n');
     
-    // タブをスペースに変換
+    // Convert tabs to spaces
     processed = processed.replace(/\t/g, ' '.repeat(this.options.indentSize));
     
-    // 末尾の空白を除去
+    // Remove trailing whitespace
     processed = processed.split('\n')
       .map(line => line.trimEnd())
       .join('\n');
     
-    // 連続する空行を1つにまとめる
+    // Collapse consecutive empty lines into one
     processed = processed.replace(/\n\s*\n\s*\n/g, '\n\n');
     
     this.debug(`Preprocessed ${source.split('\n').length} lines`);
@@ -78,14 +78,14 @@ export class PythonParser extends BaseParser {
   }
 
   /**
-   * IRの後処理
+   * Postprocesses the IR.
    */
   /*
   private postprocess(ir: IR): IR {
-    // IRの最適化
+    // Optimize the IR
     const optimized = this.optimizeIR(ir);
     
-    // 検証
+    // Validate
     this.validateIR(optimized);
     
     return optimized;
@@ -101,32 +101,32 @@ export class PythonParser extends BaseParser {
   }
 
   /**
-   * IRの最適化
+   * Optimizes the IR.
    */
   private optimizeIR(ir: IR): IR {
-    // 子ノードを再帰的に最適化
+    // Recursively optimize child nodes
     const optimizedChildren = ir.children.map(child => this.optimizeIR(child));
     
-    // 空のノードを除去（ただし、子ノードを持つstatementノードは保持）
+    // Remove empty nodes (but keep statement nodes with children)
     const filteredChildren = optimizedChildren
       .filter(child => {
-        // テキストがあるノードは保持
+        // Keep nodes with text
         if (child.text.trim() !== '') {
           return true;
         }
-        // statementノードで子ノードがある場合は保持
+        // Keep statement nodes with children
         if (child.kind === 'statement' && child.children.length > 0) {
           return true;
         }
-        // assign, input, output, if, for, while等の重要なノードは保持
+        // Keep important nodes like assign, input, output, if, for, while, etc.
         if (['assign', 'input', 'output', 'if', 'for', 'while', 'function', 'class'].includes(child.kind)) {
           return true;
         }
-        // その他の空のノードは除去
+        // Remove other empty nodes
         return false;
       });
     
-    // 連続するコメントをまとめる
+    // Merge consecutive comments
     const mergedChildren = this.mergeConsecutiveComments(filteredChildren);
     
     return {
@@ -136,7 +136,7 @@ export class PythonParser extends BaseParser {
   }
 
   /**
-   * 連続するコメントをまとめる
+   * Merges consecutive comments.
    */
   private mergeConsecutiveComments(children: IR[]): IR[] {
     const result: IR[] = [];
@@ -146,12 +146,12 @@ export class PythonParser extends BaseParser {
       if (child.kind === 'comment') {
         currentCommentGroup.push(child);
       } else {
-        // コメントグループを処理
+        // Process the comment group
         if (currentCommentGroup.length > 0) {
           if (currentCommentGroup.length === 1) {
             result.push(currentCommentGroup[0]);
           } else {
-            // 複数のコメントを1つにまとめる
+            // Merge multiple comments into one
             const mergedText = currentCommentGroup
               .map(comment => comment.text)
               .join('\n');
@@ -167,7 +167,7 @@ export class PythonParser extends BaseParser {
       }
     }
     
-    // 最後のコメントグループを処理
+    // Process the last comment group
     if (currentCommentGroup.length > 0) {
       if (currentCommentGroup.length === 1) {
         result.push(currentCommentGroup[0]);
@@ -186,7 +186,7 @@ export class PythonParser extends BaseParser {
   }
 
   /**
-   * IRの検証（一時的に無効化）
+   * Validates the IR (temporarily disabled).
    */
   /*
   private validateIR(ir: IR): void {
@@ -194,7 +194,7 @@ export class PythonParser extends BaseParser {
   }
 
   private validateNode(node: IR): void {
-    // 必須フィールドの検証
+    // Validate required fields
     if (!node.kind) {
       this.addError('IR node missing kind', 'validation_error');
     }

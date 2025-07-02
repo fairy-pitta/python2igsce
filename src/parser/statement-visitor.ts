@@ -4,7 +4,7 @@ import { BaseParser } from './base-parser';
 import { ParseResult } from '../types/parser';
 
 /**
- * Python ASTノードの基本インターフェース
+ * Base interface for Python AST nodes.
  */
 interface ASTNode {
   type: string;
@@ -14,21 +14,21 @@ interface ASTNode {
 }
 
 /**
- * クラス定義情報
+ * Class definition information.
  */
 interface ClassInfo {
   name: string;
-  recordTypeName?: string; // レコード型の場合の型名
+  recordTypeName?: string; // Type name for record types
   fields: { name: string; type: string }[];
   isRecordType: boolean;
 }
 
 /**
- * 文の処理を担当するビジタークラス
+ * Visitor class responsible for processing statements.
  */
 export class StatementVisitor extends BaseParser {
   /**
-   * パースの実行（StatementVisitorでは使用しない）
+   * Executes parsing (not used in StatementVisitor).
    */
   override async parse(_source: string): Promise<ParseResult> {
     throw new Error('StatementVisitor.parse should not be called directly');
@@ -43,47 +43,47 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * クラス情報を登録
+   * Registers class information.
    */
   override registerClass(name: string, line?: number): void {
-    // 基底クラスのメソッドを呼び出し
+    // Call the base class method.
     super.registerClass(name, line);
   }
 
-  // クラス情報を登録する新しいメソッド
+  // New method to register class information.
   registerClassInfo(classInfo: ClassInfo): void {
     this.classRegistry.set(classInfo.name, classInfo);
   }
 
   /**
-   * クラス情報を取得
+   * Gets class information.
    */
   getClassInfo(className: string): ClassInfo | undefined {
     return this.classRegistry.get(className);
   }
 
   /**
-   * コンテキストを設定
+   * Sets the context.
    */
   setContext(context: any): void {
     this.context = context;
   }
 
   /**
-   * 代入文の処理
+   * Processes an assignment statement.
    */
   visitAssign(node: ASTNode): IR {
-    // 配列初期化の検出を最初に行う
+    // Detect array initialization first.
     if (this.expressionVisitor.isArrayInitialization(node.value)) {
       return this.handleArrayInitialization(node);
     }
 
-    // クラスのインスタンス化を検出
+    // Detect class instantiation.
     if (node.value.type === 'Call' && this.isClassInstantiation(node.value)) {
       return this.handleClassInstantiation(node);
     }
 
-    // input()関数の特別処理
+    // Special handling for the input() function.
     if (this.isInputCall(node.value)) {
       return this.handleInputAssignment(node);
     }
@@ -93,7 +93,7 @@ export class StatementVisitor extends BaseParser {
     
     const text = `${target} ← ${value}`;
     
-    // 変数の型を推論して登録
+    // Infer and register the variable type.
     const dataType = this.expressionVisitor.inferTypeFromValue(node.value);
     if (node.targets[0].type === 'Name') {
       this.registerVariable(node.targets[0].id, dataType, node.lineno);
@@ -103,7 +103,7 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * 拡張代入文の処理
+   * Processes an augmented assignment statement.
    */
   visitAugAssign(node: ASTNode): IR {
     const target = this.expressionVisitor.visitExpression(node.target);
@@ -115,7 +115,7 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * IF文の処理
+   * Processes an if statement.
    */
   visitIf(node: ASTNode): IR {
     const condition = this.expressionVisitor.visitExpression(node.test);
@@ -131,11 +131,11 @@ export class StatementVisitor extends BaseParser {
     
     let children = bodyChildren;
     
-    // ELSE節の処理
+    // Process the ELSE clause.
     if (node.orelse && node.orelse.length > 0) {
       const firstElse = node.orelse[0];
       
-      // 最初の要素がIF文の場合、ELSE IFとして処理
+      // If the first element is an IF statement, process it as ELSE IF.
       if (firstElse.type === 'If') {
         const condition = this.expressionVisitor.visitExpression(firstElse.test);
         const elseIfText = `ELSE IF ${condition} THEN`;
@@ -151,7 +151,7 @@ export class StatementVisitor extends BaseParser {
         
         children = [...bodyChildren, elseIfIR, ...elseIfBodyChildren];
         
-        // 再帰的にELSE IF文のorelse節を処理
+        // Recursively process the orelse clause of the ELSE IF statement.
         if (firstElse.orelse && firstElse.orelse.length > 0) {
           const nestedElseResult = this.visitIf({
             ...firstElse,
@@ -159,13 +159,13 @@ export class StatementVisitor extends BaseParser {
             test: null // testも不要
           } as ASTNode);
           
-          // ネストしたELSE/ELSE IF文の子要素を追加
+          // Add child elements of nested ELSE/ELSE IF statements.
           if (nestedElseResult.children) {
             children = [...children, ...nestedElseResult.children];
           }
         }
       } else {
-        // 通常のELSE節
+        // Normal ELSE clause.
         const elseIR = this.createIRNode('else', 'ELSE');
         this.enterScope('else', 'block');
         this.increaseIndent();
@@ -183,17 +183,17 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * FOR文の処理
+   * Processes a for statement.
    */
   visitFor(node: ASTNode): IR {
     const target = this.expressionVisitor.visitExpression(node.target);
     
-    // range()関数を使用したfor文の処理
+    // Process for loops using the range() function.
     if (node.iter.type === 'Call' && node.iter.func.id === 'range') {
       return this.handleRangeFor(node, target);
     }
     
-    // 配列やリストの直接反復の場合
+    // For direct iteration over arrays or lists.
     if (node.iter.type === 'Name') {
       const arrayName = node.iter.id;
       const indexVar = 'i';

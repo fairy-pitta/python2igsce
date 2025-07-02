@@ -1,5 +1,5 @@
 /**
- * Pyodide ASTパーサーのテスト
+ * Tests for the Pyodide AST parser.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -9,7 +9,7 @@ describe('PyodideASTParser', () => {
   let parser: PyodideASTParser;
 
   beforeAll(async () => {
-    // Pyodideの初期化には時間がかかるため、タイムアウトを延長
+    // Initialization of Pyodide can be slow, so extend the timeout.
     parser = await getPyodideParser();
   }, 30000);
 
@@ -19,18 +19,19 @@ describe('PyodideASTParser', () => {
     }
   });
 
-  describe('基本的な構文解析', () => {
-    it('単純な代入文を解析できる', async () => {
+  describe('Basic Syntax Parsing', () => {
+    it('should parse a simple assignment statement', async () => {
       const code = 'x = 10';
       const ast = await parsePythonWithPyodide(code);
       
       expect(ast).toBeDefined();
       expect(ast.type).toBe('Module');
-      expect(ast.body).toHaveLength(1);
-      expect(ast.body[0].type).toBe('Assign');
+      expect(ast.body).toBeDefined();
+      expect(ast.body!).toHaveLength(1);
+      expect(ast.body![0].type).toBe('Assign');
     });
 
-    it('複数の文を解析できる', async () => {
+    it('should parse multiple statements', async () => {
       const code = `
 x = 10
 y = 20
@@ -40,10 +41,11 @@ z = x + y
       
       expect(ast).toBeDefined();
       expect(ast.type).toBe('Module');
-      expect(ast.body).toHaveLength(3);
+      expect(ast.body).toBeDefined();
+      expect(ast.body!).toHaveLength(3);
     });
 
-    it('if文を解析できる', async () => {
+    it('should parse an if statement', async () => {
       const code = `
 if x > 10:
     print("Greater")
@@ -53,11 +55,12 @@ else:
       const ast = await parsePythonWithPyodide(code);
       
       expect(ast).toBeDefined();
-      expect(ast.body).toHaveLength(1);
-      expect(ast.body[0].type).toBe('If');
+      expect(ast.body).toBeDefined();
+      expect(ast.body!).toHaveLength(1);
+      expect(ast.body![0].type).toBe('If');
     });
 
-    it('for文を解析できる', async () => {
+    it('should parse a for statement', async () => {
       const code = `
 for i in range(10):
     print(i)
@@ -65,11 +68,12 @@ for i in range(10):
       const ast = await parsePythonWithPyodide(code);
       
       expect(ast).toBeDefined();
-      expect(ast.body).toHaveLength(1);
-      expect(ast.body[0].type).toBe('For');
+      expect(ast.body).toBeDefined();
+      expect(ast.body!).toHaveLength(1);
+      expect(ast.body![0].type).toBe('For');
     });
 
-    it('while文を解析できる', async () => {
+    it('should parse a while statement', async () => {
       const code = `
 while x < 10:
     x += 1
@@ -77,13 +81,14 @@ while x < 10:
       const ast = await parsePythonWithPyodide(code);
       
       expect(ast).toBeDefined();
-      expect(ast.body).toHaveLength(1);
-      expect(ast.body[0].type).toBe('While');
+      expect(ast.body).toBeDefined();
+      expect(ast.body!).toHaveLength(1);
+      expect(ast.body![0].type).toBe('While');
     });
   });
 
-  describe('関数とクラス', () => {
-    it('関数定義を解析できる', async () => {
+  describe('Functions and Classes', () => {
+    it('should parse a function definition', async () => {
       const code = `
 def add(a, b):
     return a + b
@@ -91,11 +96,12 @@ def add(a, b):
       const ast = await parsePythonWithPyodide(code);
       
       expect(ast).toBeDefined();
-      expect(ast.body).toHaveLength(1);
-      expect(ast.body[0].type).toBe('FunctionDef');
+      expect(ast.body).toBeDefined();
+      expect(ast.body!).toHaveLength(1);
+      expect(ast.body![0].type).toBe('FunctionDef');
     });
 
-    it('クラス定義を解析できる', async () => {
+    it('should parse a class definition', async () => {
       const code = `
 class Person:
     def __init__(self, name):
@@ -104,33 +110,36 @@ class Person:
       const ast = await parsePythonWithPyodide(code);
       
       expect(ast).toBeDefined();
-      expect(ast.body).toHaveLength(1);
-      expect(ast.body[0].type).toBe('ClassDef');
+      expect(ast.body).toBeDefined();
+      expect(ast.body!).toHaveLength(1);
+      expect(ast.body![0].type).toBe('ClassDef');
     });
 
-    it('メソッド呼び出しを解析できる', async () => {
+    it('should parse a method call', async () => {
       const code = `
 obj.method(arg1, arg2)
       `;
       const ast = await parsePythonWithPyodide(code);
       
       expect(ast).toBeDefined();
-      expect(ast.body).toHaveLength(1);
-      expect(ast.body[0].type).toBe('Expr');
+      expect(ast.body).toBeDefined();
+      expect(ast.body!).toHaveLength(1);
+      expect(ast.body![0].type).toBe('Expr');
     });
   });
 
-  describe('式の解析', () => {
-    it('算術式を解析できる', async () => {
+  describe('Expression Parsing', () => {
+    it('should parse an arithmetic expression', async () => {
       const code = 'result = (a + b) * c - d / e';
       const ast = await parsePythonWithPyodide(code);
       
       expect(ast).toBeDefined();
-      expect(ast.body).toHaveLength(1);
-      expect(ast.body[0].type).toBe('Assign');
+      expect(ast.body).toBeDefined();
+      expect(ast.body!).toHaveLength(1);
+      expect(ast.body![0].type).toBe('Assign');
     });
 
-    it('比較式を解析できる', async () => {
+    it('should parse a comparison expression', async () => {
       const code = 'result = x > y and a <= b or c != d';
       const ast = await parsePythonWithPyodide(code);
       
@@ -139,7 +148,7 @@ obj.method(arg1, arg2)
       expect(ast.body[0].type).toBe('Assign');
     });
 
-    it('リスト内包表記を解析できる', async () => {
+    it('should parse a list comprehension', async () => {
       const code = 'squares = [x**2 for x in range(10) if x % 2 == 0]';
       const ast = await parsePythonWithPyodide(code);
       
@@ -149,8 +158,8 @@ obj.method(arg1, arg2)
     });
   });
 
-  describe('エラーハンドリング', () => {
-    it('構文エラーを適切に処理する', async () => {
+  describe('Error Handling', () => {
+    it('should handle syntax errors properly', async () => {
       const code = `
 if x > 10
     print("Missing colon")
@@ -159,7 +168,7 @@ if x > 10
       await expect(parsePythonWithPyodide(code)).rejects.toThrow();
     });
 
-    it('インデントエラーを適切に処理する', async () => {
+    it('should handle indentation errors properly', async () => {
       const code = `
 if x > 10:
 print("Wrong indentation")
@@ -168,16 +177,17 @@ print("Wrong indentation")
       await expect(parsePythonWithPyodide(code)).rejects.toThrow();
     });
 
-    it('空のコードを処理できる', async () => {
+    it('should handle empty code', async () => {
       const code = '';
       const ast = await parsePythonWithPyodide(code);
       
       expect(ast).toBeDefined();
       expect(ast.type).toBe('Module');
-      expect(ast.body).toHaveLength(0);
+      expect(ast.body).toBeDefined();
+      expect(ast.body!).toHaveLength(0);
     });
 
-    it('コメントのみのコードを処理できる', async () => {
+    it('should handle code with only comments', async () => {
       const code = `
 # This is a comment
 # Another comment
@@ -190,8 +200,8 @@ print("Wrong indentation")
     });
   });
 
-  describe('複雑なコード構造', () => {
-    it('ネストした制御構造を解析できる', async () => {
+  describe('Complex Code Structures', () => {
+    it('should parse nested control structures', async () => {
       const code = `
 for i in range(10):
     if i % 2 == 0:
@@ -208,11 +218,12 @@ for i in range(10):
       const ast = await parsePythonWithPyodide(code);
       
       expect(ast).toBeDefined();
-      expect(ast.body).toHaveLength(1);
-      expect(ast.body[0].type).toBe('For');
+      expect(ast.body).toBeDefined();
+      expect(ast.body!).toHaveLength(1);
+      expect(ast.body![0].type).toBe('For');
     });
 
-    it('例外処理を解析できる', async () => {
+    it('should parse exception handling', async () => {
       const code = `
 try:
     result = risky_operation()
@@ -226,11 +237,12 @@ finally:
       const ast = await parsePythonWithPyodide(code);
       
       expect(ast).toBeDefined();
-      expect(ast.body).toHaveLength(1);
-      expect(ast.body[0].type).toBe('Try');
+      expect(ast.body).toBeDefined();
+      expect(ast.body!).toHaveLength(1);
+      expect(ast.body![0].type).toBe('Try');
     });
 
-    it('デコレータを解析できる', async () => {
+    it('should parse decorators', async () => {
       const code = `
 @property
 @staticmethod
@@ -245,10 +257,10 @@ def decorated_function():
     });
   });
 
-  describe('パフォーマンステスト', () => {
-    it('大きなファイルを適切な時間で解析できる', async () => {
+  describe('Performance Tests', () => {
+    it('should parse a large file in a reasonable amount of time', async () => {
       const largeCode = `
-# 大きなPythonファイルのシミュレーション
+# Simulate a large Python file
 ${Array.from({ length: 100 }, (_, i) => `
 def function_${i}(param):
     result = param * ${i}
@@ -270,13 +282,14 @@ ${Array.from({ length: 50 }, (_, i) => `    def method_${i}(self):
       const parseTime = endTime - startTime;
       
       expect(ast).toBeDefined();
-      expect(parseTime).toBeLessThan(5000); // 5秒以内
-      expect(ast.body.length).toBeGreaterThan(100);
+      expect(parseTime).toBeLessThan(5000); // Less than 5 seconds
+      expect(ast.body).toBeDefined();
+      expect(ast.body!.length).toBeGreaterThan(100);
     }, 10000);
   });
 
-  describe('AST変換の正確性', () => {
-    it('Python ASTからTypeScript ASTへの変換が正確', async () => {
+  describe('AST Conversion Accuracy', () => {
+    it('should accurately convert from Python AST to TypeScript AST', async () => {
       const code = `
 def test_function(a, b=10):
     """Test function with default parameter"""
@@ -292,9 +305,10 @@ def test_function(a, b=10):
       
       expect(ast).toBeDefined();
       expect(ast.type).toBe('Module');
-      expect(ast.body).toHaveLength(1);
+      expect(ast.body).toBeDefined();
+      expect(ast.body!).toHaveLength(1);
       
-      const funcDef = ast.body[0];
+      const funcDef = ast.body![0];
       expect(funcDef.type).toBe('FunctionDef');
       expect(funcDef.name).toBe('test_function');
       expect(funcDef.args).toBeDefined();
@@ -302,29 +316,30 @@ def test_function(a, b=10):
       expect(Array.isArray(funcDef.body)).toBe(true);
     });
 
-    it('位置情報が正しく保持される', async () => {
+    it('should correctly maintain position information', async () => {
       const code = `x = 10\ny = 20`;
       const ast = await parsePythonWithPyodide(code);
       
       expect(ast).toBeDefined();
-      expect(ast.body).toHaveLength(2);
+      expect(ast.body).toBeDefined();
+      expect(ast.body!).toHaveLength(2);
       
-      // 最初の文の位置情報
-      const firstStmt = ast.body[0];
+      // Position information of the first statement
+      const firstStmt = ast.body![0];
       expect(firstStmt.lineno).toBe(1);
       expect(firstStmt.col_offset).toBeDefined();
       
-      // 2番目の文の位置情報
-      const secondStmt = ast.body[1];
+      // Position information of the second statement
+      const secondStmt = ast.body![1];
       expect(secondStmt.lineno).toBe(2);
       expect(secondStmt.col_offset).toBeDefined();
     });
   });
 });
 
-describe('Pyodideパーサーのユーティリティ関数', () => {
+describe('Pyodide Parser Utility Functions', () => {
   describe('getPyodideParser', () => {
-    it('シングルトンパターンで動作する', async () => {
+    it('should work as a singleton pattern', async () => {
       const parser1 = await getPyodideParser();
       const parser2 = await getPyodideParser();
       
@@ -333,13 +348,14 @@ describe('Pyodideパーサーのユーティリティ関数', () => {
   });
 
   describe('parsePythonWithPyodide', () => {
-    it('直接呼び出しで正常に動作する', async () => {
+    it('should work correctly when called directly', async () => {
       const code = 'print("Hello, World!")';
       const ast = await parsePythonWithPyodide(code);
       
       expect(ast).toBeDefined();
       expect(ast.type).toBe('Module');
-      expect(ast.body).toHaveLength(1);
+      expect(ast.body).toBeDefined();
+      expect(ast.body!).toHaveLength(1);
     });
   });
 });

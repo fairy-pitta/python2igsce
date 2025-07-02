@@ -1,8 +1,8 @@
-// Pyodide ASTパーサー
+// Pyodide AST parser
 
 let loadPyodide: any;
 
-// 動的インポートでPyodideを読み込み
+// Dynamically import Pyodide
 async function importPyodide() {
   try {
     // @ts-ignore
@@ -15,7 +15,7 @@ async function importPyodide() {
   }
 }
 
-// ASTNode型の定義（Pyodide用）
+// ASTNode type definition (for Pyodide)
 export interface ASTNode {
   type: string;
   body?: ASTNode[];
@@ -24,7 +24,7 @@ export interface ASTNode {
   [key: string]: any;
 }
 
-// ParseErrorクラスの実装
+// Implementation of the ParseError class
 export class ParseError extends Error {
   public line?: number;
   public column?: number;
@@ -44,15 +44,15 @@ export class ParseError extends Error {
 }
 
 /**
- * PyodideベースのPython ASTパーサー
- * Pythonの標準astモジュールを使用して正確なAST解析を行う
+ * Pyodide-based Python AST parser.
+ * Uses Python's standard `ast` module for accurate AST parsing.
  */
 export class PyodideASTParser {
   private pyodide: any | null = null;
   private initialized = false;
 
   /**
-   * Pyodideの初期化
+   * Initializes Pyodide.
    */
   async initialize(): Promise<void> {
     if (this.initialized) {
@@ -62,7 +62,7 @@ export class PyodideASTParser {
     try {
       console.log('Initializing Pyodide...');
       
-      // Pyodideの動的インポート
+      // Dynamic import of Pyodide
       const importSuccess = await importPyodide();
       if (!importSuccess) {
         throw new Error('Failed to import Pyodide module');
@@ -72,14 +72,14 @@ export class PyodideASTParser {
         indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/',
       });
 
-      // Python ASTパーサーのセットアップ
+      // Set up the Python AST parser.
       await this.pyodide.runPython(`
 import ast
 import json
 from typing import Dict, Any, List, Union
 
 def node_to_dict(node: ast.AST) -> Dict[str, Any]:
-    """AST nodeを辞書形式に変換"""
+    """Convert AST node to a dictionary format"""
     if node is None:
         return None
     
@@ -91,7 +91,7 @@ def node_to_dict(node: ast.AST) -> Dict[str, Any]:
         'end_col_offset': getattr(node, 'end_col_offset', None)
     }
     
-    # ノードの属性を処理
+    # Process node attributes
     for field, value in ast.iter_fields(node):
         if isinstance(value, list):
             result[field] = [node_to_dict(item) if isinstance(item, ast.AST) else item for item in value]
@@ -103,7 +103,7 @@ def node_to_dict(node: ast.AST) -> Dict[str, Any]:
     return result
 
 def parse_python_code(source_code: str) -> str:
-    """PythonコードをパースしてJSON形式のASTを返す"""
+    """Parse Python code and return a JSON-formatted AST"""
     try:
         tree = ast.parse(source_code)
         ast_dict = node_to_dict(tree)
@@ -134,7 +134,7 @@ def parse_python_code(source_code: str) -> str:
   }
 
   /**
-   * PythonコードをASTに変換
+   * Converts Python code to an AST.
    */
   async parseToAST(sourceCode: string): Promise<ASTNode> {
     if (!this.initialized || !this.pyodide) {
@@ -149,11 +149,11 @@ def parse_python_code(source_code: str) -> str:
     }
 
     try {
-      // Pythonコードを実行してASTを取得
+      // Execute Python code to get the AST
       const result = this.pyodide!.runPython(`parse_python_code('''${sourceCode.replace(/'''/g, "\\'''")}''')`);
       const astData = JSON.parse(result);
 
-      // エラーチェック
+      // Error checking
       if (astData.error) {
         const error = astData.error;
         throw new ParseError(
@@ -164,7 +164,7 @@ def parse_python_code(source_code: str) -> str:
         );
       }
 
-      // Python ASTをTypeScript ASTNodeに変換
+      // Convert Python AST to TypeScript ASTNode
       return this.convertPythonASTToASTNode(astData);
     } catch (error) {
       if (error instanceof ParseError) {
@@ -178,7 +178,7 @@ def parse_python_code(source_code: str) -> str:
   }
 
   /**
-   * Python ASTの辞書形式をASTNodeに変換
+   * Converts a Python AST dictionary to an ASTNode.
    */
   private convertPythonASTToASTNode(pythonAST: any): ASTNode {
     if (!pythonAST || typeof pythonAST !== 'object') {
@@ -193,10 +193,10 @@ def parse_python_code(source_code: str) -> str:
       end_col_offset: pythonAST.end_col_offset
     };
 
-    // 各フィールドを処理
+    // Process each field
     for (const [key, value] of Object.entries(pythonAST)) {
       if (['type', 'lineno', 'col_offset', 'end_lineno', 'end_col_offset'].includes(key)) {
-        continue; // 既に処理済み
+        continue; // Already processed
       }
 
       if (Array.isArray(value)) {

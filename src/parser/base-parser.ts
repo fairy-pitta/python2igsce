@@ -1,4 +1,4 @@
-// パーサーの基本クラス
+// Base class for parsers
 import { IR, createIR } from '../types/ir';
 import { 
   ParserOptions, 
@@ -13,8 +13,8 @@ import {
 import { IGCSEDataType } from '../types/igcse';
 
 /**
- * パーサーの基本クラス
- * 共通的なパース機能を提供
+ * Base class for parsers.
+ * Provides common parsing functionality.
  */
 export abstract class BaseParser {
   protected options: Required<ParserOptions>;
@@ -27,7 +27,7 @@ export abstract class BaseParser {
   }
 
   /**
-   * デフォルトオプションの取得
+   * Gets the default options.
    */
   private getDefaultOptions(options: ParserOptions): Required<ParserOptions> {
     return {
@@ -46,7 +46,7 @@ export abstract class BaseParser {
   }
 
   /**
-   * 初期コンテキストの作成
+   * Creates the initial context.
    */
   private createInitialContext(): ParserContext {
     const globalScope: ScopeInfo = {
@@ -69,12 +69,12 @@ export abstract class BaseParser {
   }
 
   /**
-   * パースの実行（抽象メソッド）
+   * Executes parsing (abstract method).
    */
   abstract parse(source: string): Promise<ParseResult>;
 
   /**
-   * エラーの追加
+   * Adds an error.
    */
   protected addError(
     message: string,
@@ -91,7 +91,7 @@ export abstract class BaseParser {
   }
 
   /**
-   * 警告の追加
+   * Adds a warning.
    */
   protected addWarning(
     message: string,
@@ -108,7 +108,7 @@ export abstract class BaseParser {
   }
 
   /**
-   * 新しいスコープの開始
+   * Enters a new scope.
    */
   protected enterScope(name: string, type: import('../types/parser').ScopeType): void {
     const newScope: ScopeInfo = {
@@ -124,7 +124,7 @@ export abstract class BaseParser {
   }
 
   /**
-   * スコープの終了
+   * Exits the current scope.
    */
   protected exitScope(): void {
     if (this.context.scopeStack.length > 1) {
@@ -134,10 +134,10 @@ export abstract class BaseParser {
   }
 
   /**
-   * 現在のループタイプを取得
+   * Gets the current loop type.
    */
   protected getCurrentLoopType(): 'while' | 'for' | null {
-    // スコープスタックを逆順で検索して最初に見つかったループスコープを返す
+    // Search the scope stack in reverse order and return the first loop scope found.
     for (let i = this.context.scopeStack.length - 1; i >= 0; i--) {
       const scope = this.context.scopeStack[i];
       if (scope.type === 'while' || scope.type === 'for') {
@@ -148,7 +148,7 @@ export abstract class BaseParser {
   }
 
   /**
-   * 変数の登録
+   * Registers a variable.
    */
   protected registerVariable(
     name: string,
@@ -169,7 +169,7 @@ export abstract class BaseParser {
   }
 
   /**
-   * 関数の登録
+   * Registers a function.
    */
   protected registerFunction(
     name: string,
@@ -191,10 +191,10 @@ export abstract class BaseParser {
   }
 
   /**
-   * 変数の検索
+   * Finds a variable.
    */
   protected findVariable(name: string): VariableInfo | undefined {
-    // 現在のスコープから上位スコープへ順番に検索
+    // Search from the current scope to the parent scopes.
     let scope: ScopeInfo | undefined = this.context.currentScope;
     
     while (scope) {

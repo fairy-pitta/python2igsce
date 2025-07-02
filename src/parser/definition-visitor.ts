@@ -6,7 +6,7 @@ import { BaseParser } from './base-parser';
 import type { StatementVisitor } from './statement-visitor';
 
 /**
- * Python ASTノードの基本インターフェース
+ * Base interface for Python AST nodes.
  */
 interface ASTNode {
   type: string;
@@ -16,11 +16,11 @@ interface ASTNode {
 }
 
 /**
- * 関数とクラス定義の処理を担当するビジタークラス
+ * Visitor class responsible for processing function and class definitions.
  */
 export class DefinitionVisitor extends BaseParser {
   /**
-   * パースの実行（DefinitionVisitorでは使用しない）
+   * Executes parsing (not used in DefinitionVisitor).
    */
   override async parse(_source: string): Promise<ParseResult> {
     throw new Error('DefinitionVisitor.parse should not be called directly');
@@ -35,28 +35,28 @@ export class DefinitionVisitor extends BaseParser {
   }
 
   /**
-   * StatementVisitorの参照を設定
+   * Sets the reference to StatementVisitor.
    */
   setStatementVisitor(statementVisitor: StatementVisitor): void {
     this.statementVisitor = statementVisitor;
   }
 
   /**
-   * コンテキストを設定
+   * Sets the context.
    */
   setContext(context: any): void {
     this.context = context;
   }
 
   /**
-   * 関数定義の処理
+   * Processes a function definition.
    */
   visitFunctionDef(node: ASTNode): IR {
     const funcName = this.capitalizeFirstLetter(node.name);
     const params = this.extractParameters(node.args);
     const paramText = params.map(p => `${p.name} : ${p.type}`).join(', ');
     
-    // 戻り値の型を推論
+    // Infer the return type.
     const hasReturn = this.hasReturnStatement(node.body);
     const returnType = hasReturn ? this.inferReturnType(node) : null;
     
@@ -67,16 +67,16 @@ export class DefinitionVisitor extends BaseParser {
       funcText = `PROCEDURE ${funcName}(${paramText})`;
     }
     
-    // 関数スコープに入る
+    // Enter function scope.
     this.enterScope(funcName, 'function');
     this.increaseIndent();
     
-    // パラメータを変数として登録
+    // Register parameters as variables.
     params.forEach(param => {
       this.registerVariable(param.name, param.type, node.lineno);
     });
     
-    // 関数本体を処理
+    // Process the function body.
     const bodyChildren = node.body.map((child: ASTNode) => 
       this.visitNode ? this.visitNode(child) : this.createIRNode('comment', '// Unprocessed node')
     );
@@ -84,7 +84,7 @@ export class DefinitionVisitor extends BaseParser {
     this.decreaseIndent();
     this.exitScope();
     
-    // 終了文を追加
+    // Add the end statement.
     const endText = returnType ? `ENDFUNCTION` : `ENDPROCEDURE`;
     const endIR = this.createIRNode('statement', endText);
     bodyChildren.push(endIR);
@@ -93,13 +93,13 @@ export class DefinitionVisitor extends BaseParser {
   }
 
   /**
-   * クラス定義の処理
+   * Processes a class definition.
    */
   visitClassDef(node: ASTNode): IR {
     const className = node.name;
     const isRecordType = this.shouldTreatAsRecordType(node);
     
-    // レコード型として扱う場合
+    // If treated as a record type.
     if (isRecordType) {
       return this.createRecordType(className, node);
     } else {
@@ -108,13 +108,13 @@ export class DefinitionVisitor extends BaseParser {
   }
 
   /**
-   * レコード型の作成
+   * Creates a record type.
    */
   private createRecordType(className: string, node: ASTNode): IR {
     const recordTypeName = `${className}Record`;
     const typeText = `TYPE ${recordTypeName}`;
     
-    // __init__メソッドから属性を抽出
+    // Extract attributes from the __init__ method.
     const constructor = node.body.find((item: ASTNode) => 
       item.type === 'FunctionDef' && item.name === '__init__'
     );
@@ -123,13 +123,13 @@ export class DefinitionVisitor extends BaseParser {
     const fields: { name: string; type: string }[] = [];
     
     if (constructor) {
-      // コンストラクタの本体からself.attribute = valueの形式を探す
+      // Search for 'self.attribute = value' format in the constructor body.
       for (const stmt of constructor.body) {
         if (stmt.type === 'Assign') {
           const target = stmt.targets[0];
           if (target.type === 'Attribute' && target.value.id === 'self') {
             const attrName = target.attr;
-            // パラメータの型注釈から型を推論
+            // Infer type from parameter type annotation.
             const paramName = stmt.value.id; // self.name = name の name
             const param = constructor.args.args.find((p: any) => p.arg === paramName);
             const paramType = param ? this.convertPythonTypeToIGCSE(param.annotation) : 'STRING';
@@ -139,8 +139,8 @@ export class DefinitionVisitor extends BaseParser {
         }
       }
     } else {
-      // 簡易パーサーでコンストラクタが解析されない場合のフォールバック
-      // 一般的なデータクラスのフィールドを推測
+      // Fallback for when the constructor is not parsed by the simple parser.
+      // Infer fields for a typical data class.
       const defaultFields = [
         { name: 'name', type: 'STRING' },
         { name: 'age', type: 'INTEGER' }
@@ -152,11 +152,11 @@ export class DefinitionVisitor extends BaseParser {
       });
     }
     
-    // クラス情報をStatementVisitorに登録
+    // Register class information with StatementVisitor.
     if (this.statementVisitor) {
       this.statementVisitor.registerClassInfo({
-        name: className, // 元のクラス名で登録
-        recordTypeName: recordTypeName, // レコード型名も保存
+        name: className, // Register with the original class name.
+        recordTypeName: recordTypeName, // Also save the record type name.
         fields: fields,
         isRecordType: true
       });
@@ -170,7 +170,7 @@ export class DefinitionVisitor extends BaseParser {
   }
 
   /**
-   * 通常のクラスの作成
+   * Creates a regular class.
    */
   private createClass(node: ASTNode, className: string): IR {
     const baseClass = node.bases.length > 0 ? node.bases[0].id : null;
@@ -184,11 +184,11 @@ export class DefinitionVisitor extends BaseParser {
     
     const members: IR[] = [];
     
-    // クラス属性とメソッドを処理
+    // Process class attributes and methods.
     for (const item of node.body) {
       if (item.type === 'FunctionDef') {
         if (item.name === '__init__') {
-          // コンストラクタから属性を抽出
+          // Extract attributes from the constructor.
           const attributes = this.extractAttributesFromConstructor(item);
           attributes.forEach(attr => {
             members.push(this.createIRNode('statement', `PRIVATE ${attr}`));
@@ -196,7 +196,7 @@ export class DefinitionVisitor extends BaseParser {
         }
         members.push(this.visitNode ? this.visitNode(item) : this.createIRNode('comment', '// Unprocessed node'));
       } else if (item.type === 'Assign') {
-        // クラス属性
+        // Class attribute.
         const attrIR = this.visitNode ? this.visitNode(item) : this.createIRNode('comment', '// Unprocessed node');
         attrIR.text = `PRIVATE ${attrIR.text}`;
         members.push(attrIR);
