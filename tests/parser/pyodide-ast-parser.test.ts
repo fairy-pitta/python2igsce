@@ -27,6 +27,7 @@ describe('PyodideASTParser', () => {
       expect(ast).toBeDefined();
       expect(ast.type).toBe('Module');
       expect(ast.body).toBeDefined();
+      expect(ast.body).toBeDefined();
       expect(ast.body!).toHaveLength(1);
       expect(ast.body![0].type).toBe('Assign');
     });
@@ -42,6 +43,7 @@ z = x + y
       expect(ast).toBeDefined();
       expect(ast.type).toBe('Module');
       expect(ast.body).toBeDefined();
+      expect(ast.body).toBeDefined();
       expect(ast.body!).toHaveLength(3);
     });
 
@@ -56,6 +58,7 @@ else:
       
       expect(ast).toBeDefined();
       expect(ast.body).toBeDefined();
+      expect(ast.body).toBeDefined();
       expect(ast.body!).toHaveLength(1);
       expect(ast.body![0].type).toBe('If');
     });
@@ -69,6 +72,7 @@ for i in range(10):
       
       expect(ast).toBeDefined();
       expect(ast.body).toBeDefined();
+      expect(ast.body).toBeDefined();
       expect(ast.body!).toHaveLength(1);
       expect(ast.body![0].type).toBe('For');
     });
@@ -81,6 +85,7 @@ while x < 10:
       const ast = await parsePythonWithPyodide(code);
       
       expect(ast).toBeDefined();
+      expect(ast.body).toBeDefined();
       expect(ast.body).toBeDefined();
       expect(ast.body!).toHaveLength(1);
       expect(ast.body![0].type).toBe('While');
@@ -97,6 +102,7 @@ def add(a, b):
       
       expect(ast).toBeDefined();
       expect(ast.body).toBeDefined();
+      expect(ast.body).toBeDefined();
       expect(ast.body!).toHaveLength(1);
       expect(ast.body![0].type).toBe('FunctionDef');
     });
@@ -111,6 +117,7 @@ class Person:
       
       expect(ast).toBeDefined();
       expect(ast.body).toBeDefined();
+      expect(ast.body).toBeDefined();
       expect(ast.body!).toHaveLength(1);
       expect(ast.body![0].type).toBe('ClassDef');
     });
@@ -122,6 +129,7 @@ obj.method(arg1, arg2)
       const ast = await parsePythonWithPyodide(code);
       
       expect(ast).toBeDefined();
+      expect(ast.body).toBeDefined();
       expect(ast.body).toBeDefined();
       expect(ast.body!).toHaveLength(1);
       expect(ast.body![0].type).toBe('Expr');
@@ -144,8 +152,9 @@ obj.method(arg1, arg2)
       const ast = await parsePythonWithPyodide(code);
       
       expect(ast).toBeDefined();
-      expect(ast.body).toHaveLength(1);
-      expect(ast.body[0].type).toBe('Assign');
+      expect(ast.body).toBeDefined();
+      expect(ast.body!).toHaveLength(1);
+      expect(ast.body![0].type).toBe('Assign');
     });
 
     it('should parse a list comprehension', async () => {
@@ -196,7 +205,8 @@ print("Wrong indentation")
       
       expect(ast).toBeDefined();
       expect(ast.type).toBe('Module');
-      expect(ast.body).toHaveLength(0);
+      expect(ast.body).toBeDefined();
+      expect(ast.body!).toHaveLength(0);
     });
   });
 
