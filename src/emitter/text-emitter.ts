@@ -60,6 +60,14 @@ export class TextEmitter extends BaseEmitter {
         this.emitAssign(node);
         break;
         
+      case 'element_assign':
+        this.emitAssign(node);
+        break;
+        
+      case 'attribute_assign':
+        this.emitAssign(node);
+        break;
+        
       case 'output':
         this.emitOutput(node);
         break;

@@ -25,6 +25,8 @@ export type IRKind =
   
   // 基本構文
   | 'assign'     // 代入文
+  | 'element_assign' // 配列要素代入
+  | 'attribute_assign' // 属性代入
   | 'output'     // 出力文
   | 'input'      // 入力文
   | 'comment'    // コメント

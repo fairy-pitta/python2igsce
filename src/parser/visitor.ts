@@ -34,7 +34,6 @@ export class PythonASTVisitor extends BaseParser {
    * メインのパース関数
    */
   parse(source: string): import('../types/parser').ParseResult {
-    console.log('DEBUG: parse called');
     this.startParsing();
     this.resetContext();
     
@@ -42,8 +41,12 @@ export class PythonASTVisitor extends BaseParser {
       // 実際の実装では、PythonのASTパーサーを使用
       // ここでは簡易的な実装を提供
       const ast = this.parseToAST(source);
-      console.log('DEBUG: parseToAST completed, calling visitNode');
       const ir = this.visitNode(ast);
+      
+      // IRが配列でない場合は、その子要素を返す
+      if (ir.kind === 'compound' && ir.children) {
+        return this.createParseResult(ir.children);
+      }
       
       return this.createParseResult([ir]);
     } catch (error) {
@@ -62,7 +65,6 @@ export class PythonASTVisitor extends BaseParser {
    * 簡易的なASTパーサー（実際の実装では外部ライブラリを使用）
    */
   private parseToAST(source: string): ASTNode {
-    console.log('DEBUG: parseToAST called');
     // 実際の実装では、python-astやpyodideなどを使用
     // ここでは簡易的な実装
     const lines = source.split('\n');
@@ -202,7 +204,7 @@ export class PythonASTVisitor extends BaseParser {
       }
       
       // ノードに子ブロックを設定
-      if (node.type === 'If' || node.type === 'For' || node.type === 'While' || node.type === 'FunctionDef') {
+      if (node.type === 'If' || node.type === 'For' || node.type === 'While' || node.type === 'FunctionDef' || node.type === 'ClassDef') {
         node.body = bodyNodes;
       }
       
@@ -240,12 +242,108 @@ export class PythonASTVisitor extends BaseParser {
       return this.parseWhileStatement(trimmed, lineNumber);
     }
     
+    // クラス定義の検出
+    if (trimmed.startsWith('class ')) {
+      return this.parseClassDef(trimmed, lineNumber);
+    }
+    
+    // 関数定義の検出
+    if (trimmed.startsWith('def ')) {
+      return this.parseFunctionDef(trimmed, lineNumber);
+    }
+    
+    // 型注釈付き代入文の検出（例: items: list[str] = []）
+    if (trimmed.includes(': ') && trimmed.includes(' = ')) {
+      const colonIndex = trimmed.indexOf(': ');
+      const equalIndex = trimmed.indexOf(' = ');
+      
+      // コロンが等号より前にある場合は型注釈付き代入
+      if (colonIndex < equalIndex) {
+        const varName = trimmed.substring(0, colonIndex).trim();
+        const typeAnnotation = trimmed.substring(colonIndex + 2, equalIndex).trim();
+        const value = trimmed.substring(equalIndex + 3).trim();
+        
+        if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(varName)) {
+          return {
+            type: 'AnnAssign',
+            target: {
+              type: 'Name',
+              id: varName,
+              ctx: 'Store'
+            },
+            annotation: {
+              type: 'Subscript',
+              value: {
+                type: 'Name',
+                id: typeAnnotation.includes('[') ? typeAnnotation.substring(0, typeAnnotation.indexOf('[')) : typeAnnotation
+              },
+              slice: typeAnnotation.includes('[') ? {
+                type: 'Name',
+                id: typeAnnotation.substring(typeAnnotation.indexOf('[') + 1, typeAnnotation.indexOf(']'))
+              } : null
+            },
+            value: value ? this.parseExpression(value) : null,
+            lineno: lineNumber
+          };
+        }
+      }
+    }
+    
     // 代入文の検出
     if (trimmed.includes(' = ')) {
       // = の前後をチェックして、代入文かどうかを判定
       const equalIndex = trimmed.indexOf(' = ');
       const beforeEqual = trimmed.substring(0, equalIndex).trim();
       const afterEqual = trimmed.substring(equalIndex + 3).trim();
+      
+      // 配列要素代入の検出（例: data[1] = 100）
+      const arrayAssignMatch = beforeEqual.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\[(.+)\]$/);
+      if (arrayAssignMatch && afterEqual.length > 0) {
+        const [, arrayName, indexExpr] = arrayAssignMatch;
+        return {
+          type: 'Assign',
+          targets: [{
+            type: 'Subscript',
+            value: {
+              type: 'Name',
+              id: arrayName,
+              ctx: 'Load'
+            },
+            slice: {
+              type: 'Index',
+              value: {
+                type: 'Constant',
+                value: parseInt(indexExpr),
+                kind: null
+              }
+            },
+            ctx: 'Store'
+          }],
+          value: this.parseExpression(afterEqual),
+          lineno: lineNumber
+        };
+      }
+      
+      // 属性代入の検出（例: self.name = value）
+      const attrAssignMatch = beforeEqual.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\.([a-zA-Z_][a-zA-Z0-9_]*)$/);
+      if (attrAssignMatch && afterEqual.length > 0) {
+        const [, objName, attrName] = attrAssignMatch;
+        return {
+          type: 'Assign',
+          targets: [{
+            type: 'Attribute',
+            value: {
+              type: 'Name',
+              id: objName,
+              ctx: 'Load'
+            },
+            attr: attrName,
+            ctx: 'Store'
+          }],
+          value: this.parseExpression(afterEqual),
+          lineno: lineNumber
+        };
+      }
       
       // 左辺が単純な変数名で、右辺が存在する場合は代入文
       if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(beforeEqual) && afterEqual.length > 0) {
@@ -545,6 +643,73 @@ export class PythonASTVisitor extends BaseParser {
   private parseExpression(expr: string): ASTNode {
     const trimmed = expr.trim();
     
+    // 空リストの検出
+    if (trimmed === '[]') {
+      return {
+        type: 'List',
+        elts: [],
+        ctx: 'Load'
+      };
+    }
+    
+    // リストリテラルの検出
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      const content = trimmed.slice(1, -1).trim();
+      if (!content) {
+        return {
+          type: 'List',
+          elts: [],
+          ctx: 'Load'
+        };
+      }
+      
+      // リスト要素の解析
+      const elements = content.split(',').map(elem => {
+        const elemTrimmed = elem.trim();
+        
+        // 数値の検出
+        if (/^\d+$/.test(elemTrimmed)) {
+          return {
+            type: 'Constant',
+            value: parseInt(elemTrimmed),
+            kind: null
+          };
+        }
+        
+        // 文字列の検出
+        if ((elemTrimmed.startsWith('"') && elemTrimmed.endsWith('"')) ||
+            (elemTrimmed.startsWith("'") && elemTrimmed.endsWith("'"))) {
+          return {
+            type: 'Constant',
+            value: elemTrimmed.slice(1, -1),
+            kind: null
+          };
+        }
+        
+        // 変数名の検出
+        if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(elemTrimmed)) {
+          return {
+            type: 'Name',
+            id: elemTrimmed,
+            ctx: 'Load'
+          };
+        }
+        
+        // その他の式
+        return {
+          type: 'Name',
+          id: elemTrimmed,
+          ctx: 'Load'
+        };
+      });
+      
+      return {
+        type: 'List',
+        elts: elements,
+        ctx: 'Load'
+      };
+    }
+    
     // NOT演算子の検出（最優先）
     if (trimmed.startsWith('not ')) {
       const operand = trimmed.substring(4).trim();
@@ -733,6 +898,8 @@ export class PythonASTVisitor extends BaseParser {
         return this.statementVisitor.visitAssign(node);
       case 'AugAssign':
         return this.statementVisitor.visitAugAssign(node);
+      case 'AnnAssign':
+        return this.statementVisitor.visitAnnAssign(node);
       case 'If':
         return this.statementVisitor.visitIf(node);
       case 'For':
@@ -783,16 +950,13 @@ export class PythonASTVisitor extends BaseParser {
   }
 
   private visitModule(node: ASTNode): IR {
-    console.log('DEBUG: visitModule called with', node.body.length, 'children');
     const children: IR[] = [];
     
     for (const child of node.body) {
-      console.log('DEBUG: Processing child:', child.type, child.lineno);
       const childIR = this.visitNode(child);
       children.push(childIR);
     }
     
-    console.log('DEBUG: visitModule returning', children.length, 'children');
     return this.createIRNode('compound', '', children);
   }
 

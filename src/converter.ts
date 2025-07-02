@@ -73,7 +73,14 @@ export class Converter {
         ? this.markdownEmitter 
         : this.textEmitter;
       
-      const emitResult = emitter.emit(parseResult.ir[0] || { kind: 'statement', text: '', children: [] });
+      // すべてのIRノードを処理するため、compound IRを作成
+      const compoundIR: IR = {
+        kind: 'compound',
+        text: '',
+        children: parseResult.ir
+      };
+      
+      const emitResult = emitter.emit(compoundIR);
       
       // 結果の作成
       const endTime = Date.now();

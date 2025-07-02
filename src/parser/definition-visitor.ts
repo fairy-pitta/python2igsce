@@ -113,26 +113,20 @@ export class DefinitionVisitor extends BaseParser {
       item.type === 'FunctionDef' && item.name === '__init__'
     );
     
-    const attributes: string[] = [];
-    if (constructor) {
-      // コンストラクタの本体からself.attribute = valueの形式を探す
-      for (const stmt of constructor.body) {
-        if (stmt.type === 'Assign') {
-          const target = stmt.targets[0];
-          if (target.type === 'Attribute' && target.value.id === 'self') {
-            const attrName = target.attr;
-            // パラメータの型注釈から型を推論
-            const paramName = stmt.value.id; // self.x = x_coord の x_coord
-            const param = constructor.args.args.find((p: any) => p.arg === paramName);
-            const paramType = param ? this.convertPythonTypeToIGCSE(param.annotation) : 'INTEGER';
-            attributes.push(`  DECLARE ${attrName} : ${paramType}`);
-          }
-        }
+    const children: IR[] = [];
+    if (constructor && constructor.args && constructor.args.args) {
+      // selfパラメータを除いたパラメータから属性を抽出
+      const params = constructor.args.args.slice(1); // selfを除く
+      
+      for (const param of params) {
+        const attrName = param.arg;
+        const paramType = param.annotation ? this.convertPythonTypeToIGCSE(param.annotation) : 'STRING';
+        const attrDeclaration = `  DECLARE ${attrName} : ${paramType}`;
+        children.push(this.createIRNode('statement', attrDeclaration));
       }
     }
     
-    const children = attributes.map(attr => this.createIRNode('statement', attr));
-    const endTypeIR = this.createIRNode('statement', 'ENDTYPE');
+    const endTypeIR = this.createIRNode('statement', '  ENDTYPE');
     children.push(endTypeIR);
     
     return this.createIRNode('type', typeText, children);
@@ -242,10 +236,54 @@ export class DefinitionVisitor extends BaseParser {
    */
   private shouldTreatAsRecordType(node: ASTNode): boolean {
     // クラスがレコード型として使用されるかを判定
-    // 簡単なヒューリスティック: メソッドが__init__のみの場合はレコード型とみなす
     const methods = node.body.filter((item: ASTNode) => item.type === 'FunctionDef');
-    const hasOnlyConstructor = methods.length === 1 && methods[0].name === '__init__';
-    return hasOnlyConstructor;
+    
+    // __init__メソッドのみを持つ場合
+    if (methods.length === 1 && methods[0].name === '__init__') {
+      const initMethod = methods[0];
+      // __init__内が単純なフィールド代入のみかチェック
+      return this.isSimpleConstructor(initMethod);
+    }
+    
+    // メソッドがない場合（データクラス的な使用）
+    if (methods.length === 0) {
+      // クラス属性のみを持つ場合はレコード型として扱う
+      const hasOnlyAttributes = node.body.every((item: ASTNode) => 
+        item.type === 'Assign' || item.type === 'AnnAssign'
+      );
+      return hasOnlyAttributes;
+    }
+    
+    return false;
+  }
+
+  /**
+   * __init__メソッドが単純なコンストラクタかどうかを判定
+   */
+  private isSimpleConstructor(initMethod: ASTNode): boolean {
+    // __init__の本体をチェック
+    for (const stmt of initMethod.body) {
+      if (stmt.type === 'Assign') {
+        // self.field = parameter の形式かチェック
+        const target = stmt.targets[0];
+        if (target.type === 'Attribute' && 
+            target.value.type === 'Name' && 
+            target.value.id === 'self') {
+          // 単純なフィールド代入
+          continue;
+        } else {
+          // 複雑な代入があるため、レコード型として扱わない
+          return false;
+        }
+      } else if (stmt.type === 'Expr' && stmt.value.type === 'Constant') {
+        // ドキュメント文字列は許可
+        continue;
+      } else {
+        // その他の複雑な処理があるため、レコード型として扱わない
+        return false;
+      }
+    }
+    return true;
   }
 
   /**
