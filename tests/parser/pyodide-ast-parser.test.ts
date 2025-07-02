@@ -27,7 +27,6 @@ describe('PyodideASTParser', () => {
       expect(ast).toBeDefined();
       expect(ast.type).toBe('Module');
       expect(ast.body).toBeDefined();
-      expect(ast.body).toBeDefined();
       expect(ast.body!).toHaveLength(1);
       expect(ast.body![0].type).toBe('Assign');
     });
@@ -162,8 +161,9 @@ obj.method(arg1, arg2)
       const ast = await parsePythonWithPyodide(code);
       
       expect(ast).toBeDefined();
-      expect(ast.body).toHaveLength(1);
-      expect(ast.body[0].type).toBe('Assign');
+      expect(ast.body).toBeDefined();
+      expect(ast.body!).toHaveLength(1);
+      expect(ast.body![0].type).toBe('Assign');
     });
   });
 
@@ -262,8 +262,9 @@ def decorated_function():
       const ast = await parsePythonWithPyodide(code);
       
       expect(ast).toBeDefined();
-      expect(ast.body).toHaveLength(1);
-      expect(ast.body[0].type).toBe('FunctionDef');
+      expect(ast.body).toBeDefined();
+      expect(ast.body!).toHaveLength(1);
+      expect(ast.body![0].type).toBe('FunctionDef');
     });
   });
 
