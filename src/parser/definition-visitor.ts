@@ -114,19 +114,17 @@ export class DefinitionVisitor extends BaseParser {
     );
     
     const children: IR[] = [];
-    if (constructor && constructor.args && constructor.args.args) {
-      // selfパラメータを除いたパラメータから属性を抽出
-      const params = constructor.args.args.slice(1); // selfを除く
+    if (constructor) {
+      // コンストラクタから実際のフィールド名と型を抽出
+      const attributes = this.extractAttributesFromConstructor(constructor);
       
-      for (const param of params) {
-        const attrName = param.arg;
-        const paramType = param.annotation ? this.convertPythonTypeToIGCSE(param.annotation) : 'STRING';
-        const attrDeclaration = `  DECLARE ${attrName} : ${paramType}`;
+      for (const attr of attributes) {
+        const attrDeclaration = `  DECLARE ${attr}`;
         children.push(this.createIRNode('statement', attrDeclaration));
       }
     }
     
-    const endTypeIR = this.createIRNode('statement', '  ENDTYPE');
+    const endTypeIR = this.createIRNode('statement', 'ENDTYPE');
     children.push(endTypeIR);
     
     return this.createIRNode('type', typeText, children);
@@ -216,13 +214,33 @@ export class DefinitionVisitor extends BaseParser {
   private extractAttributesFromConstructor(constructor: ASTNode): string[] {
     const attributes: string[] = [];
     
+    // コンストラクタのパラメータから型情報を取得
+    const paramTypes = new Map<string, IGCSEDataType>();
+    if (constructor.args && constructor.args.args) {
+      constructor.args.args.forEach((arg: any) => {
+        if (arg.arg !== 'self') {
+          const type = this.convertPythonTypeToIGCSE(arg.annotation);
+          paramTypes.set(arg.arg, type);
+        }
+      });
+    }
+    
     // self.attribute = value の形式を探す
     for (const stmt of constructor.body) {
       if (stmt.type === 'Assign') {
         const target = stmt.targets[0];
         if (target.type === 'Attribute' && target.value.id === 'self') {
           const attrName = target.attr;
-          const attrType = this.expressionVisitor.inferTypeFromValue(stmt.value);
+          
+          // 代入される値がパラメータの場合、パラメータの型を使用
+          let attrType: IGCSEDataType = 'STRING';
+          if (stmt.value.type === 'Name' && paramTypes.has(stmt.value.id)) {
+            attrType = paramTypes.get(stmt.value.id)!;
+          } else {
+            // パラメータでない場合は値から型を推論
+            attrType = this.expressionVisitor.inferTypeFromValue(stmt.value);
+          }
+          
           attributes.push(`${attrName} : ${attrType}`);
         }
       }

@@ -155,6 +155,34 @@ export class ExpressionVisitor {
   }
 
   private visitAttribute(node: ASTNode): string {
+    // 属性アクセスの対象がSubscriptの場合、直接処理してインデックス変換を確実に適用
+    if (node.value.type === 'Subscript') {
+      const subscriptValue = this.visitExpression(node.value.value);
+      const slice = node.value.slice;
+      
+      // 数値インデックスの場合、0ベースから1ベースに変換
+      if (slice.type === 'Num') {
+        const index = slice.n + 1;
+        return `${subscriptValue}[${index}].${node.attr}`;
+      }
+      
+      // Constant型の数値インデックスの場合も変換
+      if (slice.type === 'Constant' && typeof slice.value === 'number') {
+        const index = slice.value + 1;
+        return `${subscriptValue}[${index}].${node.attr}`;
+      }
+      
+      // 変数インデックスの場合、+1を追加
+      if (slice.type === 'Name') {
+        const sliceValue = this.visitExpression(slice);
+        return `${subscriptValue}[${sliceValue} + 1].${node.attr}`;
+      }
+      
+      // その他の場合はそのまま
+      const sliceValue = this.visitExpression(slice);
+      return `${subscriptValue}[${sliceValue}].${node.attr}`;
+    }
+    
     const value = this.visitExpression(node.value);
     return `${value}.${node.attr}`;
   }

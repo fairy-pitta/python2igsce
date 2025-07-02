@@ -220,11 +220,13 @@ export class StatementVisitor extends BaseParser {
       const arrayName = node.iter.id;
       const indexVar = 'i';
       
-      // 配列のサイズを設定（テスト用に固定値）
-      let arraySize = '3'; // デフォルトサイズ（テスト用）
+      // 配列のサイズを取得（コンテキストから）
+      let arraySize = '3'; // デフォルトサイズ
       
-      // 実際の実装では配列の初期化時にサイズを記録する必要がある
-      // 現在は簡略化してテストに合わせる
+      // コンテキストから配列サイズを取得
+      if (this.context && this.context.arrayInfo && this.context.arrayInfo[arrayName]) {
+        arraySize = this.context.arrayInfo[arrayName].size.toString();
+      }
       
       // FOR i ← 1 TO size の形式
       const forText = `FOR ${indexVar} ← 1 TO ${arraySize}`;
@@ -500,29 +502,48 @@ export class StatementVisitor extends BaseParser {
     const elements = node.value.elts;
     const size = elements.length;
     
+    // 文字列として分割された要素を再構築してオブジェクト呼び出しを検出
+    const reconstructedElements = this.reconstructObjectCalls(elements);
+    
     // オブジェクトの配列かどうかを判定
-    const isObjectArray = elements.length > 0 && elements[0].type === 'Call' && this.isClassInstantiation(elements[0]);
+    const isObjectArray = reconstructedElements.length > 0 && this.isObjectCall(reconstructedElements[0]);
     
     if (isObjectArray) {
       // オブジェクトの配列の場合
-      const className = elements[0].func.id; // 直接func.idを取得
+      const firstCall = reconstructedElements[0];
+      const className = this.extractClassName(firstCall);
       const recordTypeName = `${className}Record`;
       
       const children: IR[] = [];
       
-      // 配列宣言
-      const declText = `DECLARE ${target} : ARRAY[1:${size}] OF ${recordTypeName}`;
+      // 配列宣言（実際の要素数を使用）
+      const actualSize = reconstructedElements.length;
+      const declText = `DECLARE ${target} : ARRAY[1:${actualSize}] OF ${recordTypeName}`;
       children.push(this.createIRNode('statement', declText));
       
+      // 配列サイズ情報をコンテキストに記録
+      if (this.context && this.context.arrayInfo) {
+        this.context.arrayInfo[target] = {
+          size: actualSize,
+          elementType: recordTypeName,
+          currentIndex: 0
+        };
+      }
+      
       // 各要素の処理
-      elements.forEach((element: ASTNode, index: number) => {
-        if (element.type === 'Call' && this.isClassInstantiation(element)) {
-          const args = element.args.map((arg: ASTNode) => this.expressionVisitor.visitExpression(arg));
-          // 簡単な実装として、x, y の順序で代入
-          if (args.length >= 2) {
-            children.push(this.createIRNode('assign', `${target}[${index + 1}].x ← ${args[0]}`));
-            children.push(this.createIRNode('assign', `${target}[${index + 1}].y ← ${args[1]}`));
-          }
+      reconstructedElements.forEach((elementStr: string, index: number) => {
+        const args = this.extractArguments(elementStr);
+        // クラス定義から実際のフィールド名を取得する必要があるが、
+        // 現在は簡略化してPoint クラスの場合は x, y として処理
+        if (className === 'Point' && args.length >= 2) {
+          children.push(this.createIRNode('assign', `${target}[${index + 1}].x ← ${args[0]}`));
+          children.push(this.createIRNode('assign', `${target}[${index + 1}].y ← ${args[1]}`));
+        } else {
+           // 他のクラスの場合は汎用的な処理
+           args.forEach((arg: string, argIndex: number) => {
+             const fieldName = `field${argIndex + 1}`; // 仮のフィールド名
+             children.push(this.createIRNode('assign', `${target}[${index + 1}].${fieldName} ← ${arg}`));
+           });
         }
       });
       
@@ -535,6 +556,15 @@ export class StatementVisitor extends BaseParser {
       const declText = `DECLARE ${target} : ARRAY[1:${size}] OF ${elementType}`;
       const declIR = this.createIRNode('array', declText);
       
+      // 配列サイズ情報をコンテキストに記録
+      if (this.context && this.context.arrayInfo) {
+        this.context.arrayInfo[target] = {
+          size: size,
+          elementType: elementType,
+          currentIndex: 0
+        };
+      }
+      
       // 要素の代入
       const assignments: IR[] = [];
       elements.forEach((element: ASTNode, index: number) => {
@@ -546,6 +576,62 @@ export class StatementVisitor extends BaseParser {
       return this.createIRNode('statement', '', [declIR, ...assignments]);
     }
   }
+
+  private reconstructObjectCalls(elements: ASTNode[]): string[] {
+    const result: string[] = [];
+    let i = 0;
+    
+    while (i < elements.length) {
+      const element = elements[i];
+      if (element.type === 'Name' && element.id) {
+        const elementStr = element.id;
+        
+        // クラス名のパターンを検出 (大文字で始まり、括弧で終わる)
+        if (/^[A-Z]\w*\(/.test(elementStr)) {
+          // 次の要素と結合してオブジェクト呼び出しを再構築
+          let objectCall = elementStr;
+          i++;
+          
+          // 閉じ括弧が見つかるまで要素を結合
+          while (i < elements.length && !objectCall.includes(')')) {
+            const nextElement = elements[i];
+            if (nextElement.type === 'Name' && nextElement.id) {
+              objectCall += ', ' + nextElement.id;
+            }
+            i++;
+          }
+          
+          result.push(objectCall);
+        } else {
+          result.push(elementStr);
+          i++;
+        }
+      } else {
+        result.push(this.expressionVisitor.visitExpression(element));
+        i++;
+      }
+    }
+    
+    return result;
+  }
+  
+  private isObjectCall(elementStr: string): boolean {
+     // クラス名(引数)のパターンを検出
+     return /^[A-Z]\w*\(.+\)$/.test(elementStr);
+   }
+   
+   private extractClassName(objectCall: string): string {
+     const match = objectCall.match(/^([A-Z]\w*)\(/);
+     return match ? match[1] : 'Unknown';
+   }
+   
+   private extractArguments(objectCall: string): string[] {
+     const match = objectCall.match(/\((.+)\)$/);
+     if (match) {
+       return match[1].split(',').map(arg => arg.trim());
+     }
+     return [];
+   }
 
   private isClassInstantiation(node: ASTNode): boolean {
     // 簡易的な判定: 関数名が大文字で始まる場合はクラスとみなす

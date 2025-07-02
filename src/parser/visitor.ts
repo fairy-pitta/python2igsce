@@ -568,7 +568,13 @@ export class PythonASTVisitor extends BaseParser {
     // "var = value" の形式を解析
     const parts = line.split(' = ');
     const target = parts[0].trim();
-    const value = parts.slice(1).join(' = ').trim();
+    let value = parts.slice(1).join(' = ').trim();
+    
+    // コメント部分を除去（# 以降を削除）
+    const commentIndex = value.indexOf('#');
+    if (commentIndex !== -1) {
+      value = value.substring(0, commentIndex).trim();
+    }
     
     // 配列リテラルの検出
     if (value.startsWith('[') && value.endsWith(']')) {
@@ -794,6 +800,34 @@ export class PythonASTVisitor extends BaseParser {
    */
   private parseSimpleExpression(expr: string): ASTNode {
     const trimmed = expr.trim();
+    
+    // 属性アクセスの検出（例: path[0].x）
+    const attrMatch = trimmed.match(/^(.+)\.([a-zA-Z_][a-zA-Z0-9_]*)$/);
+    if (attrMatch) {
+      const [, valueExpr, attr] = attrMatch;
+      return {
+        type: 'Attribute',
+        value: this.parseSimpleExpression(valueExpr),
+        attr: attr,
+        ctx: 'Load'
+      };
+    }
+    
+    // 配列インデックスの検出（例: path[0]）
+    const subscriptMatch = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\[(.+)\]$/);
+    if (subscriptMatch) {
+      const [, arrayName, indexExpr] = subscriptMatch;
+      return {
+        type: 'Subscript',
+        value: {
+          type: 'Name',
+          id: arrayName,
+          ctx: 'Load'
+        },
+        slice: this.parseSimpleExpression(indexExpr),
+        ctx: 'Load'
+      };
+    }
     
     // 文字列リテラル
     if ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
