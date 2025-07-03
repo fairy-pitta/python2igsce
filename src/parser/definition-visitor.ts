@@ -255,6 +255,11 @@ export class DefinitionVisitor extends BaseParser {
       return false;
     }
     
+    // このクラスが他のクラスの親クラスとして使用されているかチェック
+    if (this.isUsedAsBaseClass(node.name)) {
+      return false;
+    }
+    
     // クラスがレコード型として使用されるかを判定
     const methods = node.body.filter((item: ASTNode) => item.type === 'FunctionDef');
     
@@ -305,6 +310,21 @@ export class DefinitionVisitor extends BaseParser {
     }
     return true;
   }
+
+  /**
+   * このクラスが他のクラスの親クラスとして使用されているかチェック
+   */
+  private isUsedAsBaseClass(className: string): boolean {
+       // コンテキストから全てのクラス定義を取得し、継承関係をチェック
+       if (this.context && this.context.classDefinitions) {
+         for (const [, classDef] of Object.entries(this.context.classDefinitions)) {
+           if (classDef.bases && classDef.bases.includes(className)) {
+             return true;
+           }
+         }
+       }
+       return false;
+     }
 
   /**
    * 戻り値文があるかどうかを判定

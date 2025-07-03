@@ -42,6 +42,13 @@ export class PythonASTVisitor extends BaseParser {
       // 実際の実装では、PythonのASTパーサーを使用
       // ここでは簡易的な実装を提供
       const ast = this.parseToAST(source);
+      // 2パス処理: まずすべてのクラス定義を事前登録
+      this.preRegisterAllClasses(ast.body);
+      
+      // クラス定義登録後、ビジターに最新のコンテキストを再共有
+      this.statementVisitor.setContext(this.context);
+      this.definitionVisitor.setContext(this.context);
+      
       const ir = this.visitNode(ast);
       
       // IRが配列でない場合は、その子要素を返す
@@ -1000,8 +1007,7 @@ export class PythonASTVisitor extends BaseParser {
       case 'FunctionDef':
         return this.definitionVisitor.visitFunctionDef(node);
       case 'ClassDef':
-        // クラス定義をコンテキストに登録
-        this.registerClassDefinition(node);
+        // クラス定義は既にpreRegisterAllClassesで登録済み
         return this.definitionVisitor.visitClassDef(node);
       
       default:
@@ -1188,16 +1194,36 @@ export class PythonASTVisitor extends BaseParser {
       }
     }
     
+    // 継承情報を抽出
+    const bases: string[] = [];
+    if (node.bases && node.bases.length > 0) {
+      node.bases.forEach((base: any) => {
+        if (base.type === 'Name') {
+          bases.push(base.id);
+        }
+      });
+    }
+    
     // コンテキストに登録
     if (!this.context.classDefinitions) {
       this.context.classDefinitions = {};
     }
     
     this.context.classDefinitions[className] = {
-      attributes: attributes
+      attributes: attributes,
+      bases: bases
     };
-    
-    console.log('DEBUG: Registered class', className, 'with attributes:', attributes);
+  }
+
+  /**
+   * すべてのクラス定義を事前に登録（2パス処理の1パス目）
+   */
+  private preRegisterAllClasses(nodes: ASTNode[]): void {
+    for (const node of nodes) {
+      if (node.type === 'ClassDef') {
+        this.registerClassDefinition(node);
+      }
+    }
   }
 
   /**
