@@ -215,9 +215,9 @@ export abstract class BaseEmitter {
   private convertOperators(text: string): string {
     let result = text;
     
-    // コメント部分を保護（Pythonの#コメントを一時的に置き換え）
+    // コメント部分を保護（Pythonの#コメントとIGCSEの//コメントを一時的に置き換え）
     const commentMatches: string[] = [];
-    result = result.replace(/#.*$/gm, (match) => {
+    result = result.replace(/(#.*$|\/\/.*$)/gm, (match) => {
       const index = commentMatches.length;
       commentMatches.push(match);
       return `__COMMENT_${index}__`;
@@ -261,9 +261,9 @@ export abstract class BaseEmitter {
     result = result.replace(/\binput\(\)/g, 'INPUT');
     result = result.replace(/\binput\(([^)]+)\)/g, 'INPUT($1)');
     
-    // コメントを復元（#を//に変換）
+    // コメントを復元（#を//に変換、//はそのまま）
     commentMatches.forEach((comment, index) => {
-      const convertedComment = comment.replace(/^#/, '//');
+      const convertedComment = comment.startsWith('#') ? comment.replace(/^#/, '//') : comment;
       result = result.replace(`__COMMENT_${index}__`, convertedComment);
     });
     

@@ -68,7 +68,12 @@ export class StatementVisitor extends BaseParser {
     const target = this.expressionVisitor.visitExpression(targetNode);
     const value = this.expressionVisitor.visitExpression(node.value);
     
-    const text = `${target} ← ${value}`;
+    let text = `${target} ← ${value}`;
+    
+    // インラインコメントがある場合は追加
+    if (node.inlineComment) {
+      text += ` // ${node.inlineComment}`;
+    }
     
     // 変数の型を推論して登録
     const dataType = this.expressionVisitor.inferTypeFromValue(node.value);

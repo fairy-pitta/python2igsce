@@ -10,6 +10,7 @@ interface ASTNode {
   type: string;
   lineno?: number;
   col_offset?: number;
+  inlineComment?: string;
   [key: string]: any;
 }
 
@@ -570,9 +571,11 @@ export class PythonASTVisitor extends BaseParser {
     const target = parts[0].trim();
     let value = parts.slice(1).join(' = ').trim();
     
-    // コメント部分を除去（# 以降を削除）
+    // インラインコメント部分を抽出（# 以降）
+    let inlineComment = '';
     const commentIndex = value.indexOf('#');
     if (commentIndex !== -1) {
+      inlineComment = value.substring(commentIndex + 1).trim();
       value = value.substring(0, commentIndex).trim();
     }
     
@@ -635,12 +638,21 @@ export class PythonASTVisitor extends BaseParser {
     // 比較演算子を含む式の検出
     const valueNode = this.parseExpression(value);
     
-    return {
+    const assignNode: ASTNode = {
       type: 'Assign',
       lineno: lineNumber,
-      targets: [{ type: 'Name', id: target }],
+      targets: [{
+        type: 'Name',
+        id: target
+      }],
       value: valueNode
     };
+    
+    if (inlineComment) {
+      assignNode.inlineComment = inlineComment;
+    }
+    
+    return assignNode;
   }
 
   /**
