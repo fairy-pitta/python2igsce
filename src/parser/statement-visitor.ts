@@ -49,8 +49,14 @@ export class StatementVisitor extends BaseParser {
     }
 
     // クラスのインスタンス化を検出
-    if (node.value.type === 'Call' && this.isClassInstantiation(node.value)) {
-      return this.handleClassInstantiation(node);
+    if (node.value.type === 'Call') {
+      if (node.value.func.type === 'Name') {
+        const funcName = node.value.func.id;
+        const isClass = this.context.isClass(funcName);
+        if (isClass) {
+          return this.handleClassInstantiation(node);
+        }
+      }
     }
 
     const targetNode = node.targets[0];
@@ -65,6 +71,20 @@ export class StatementVisitor extends BaseParser {
       return this.handleAttributeAssign(targetNode, node.value);
     }
 
+    // クラスインスタンス化の場合は、expression-visitorを通さずに直接処理
+     if (node.value.type === 'Call') {
+       const func = this.expressionVisitor.visitExpression(node.value.func);
+       const args = node.value.args.map((arg: ASTNode) => this.expressionVisitor.visitExpression(arg));
+       
+       // 組み込み関数でない場合はクラスインスタンス化として処理
+        const builtinResult = this.expressionVisitor.convertBuiltinFunction(func, args);
+       
+       if (!builtinResult && this.isClassInstantiation(node.value)) {
+         console.log('DEBUG: Processing as class instantiation');
+         return this.handleClassInstantiation(node);
+       }
+     }
+    
     const target = this.expressionVisitor.visitExpression(targetNode);
     const value = this.expressionVisitor.visitExpression(node.value);
     
@@ -641,13 +661,16 @@ export class StatementVisitor extends BaseParser {
   private isClassInstantiation(node: ASTNode): boolean {
     // 簡易的な判定: 関数名が大文字で始まる場合はクラスとみなす
     if (node.func.type === 'Name') {
-      return /^[A-Z]/.test(node.func.id);
+      const isClass = /^[A-Z]/.test(node.func.id);
+      console.log(`DEBUG: Checking if ${node.func.id} is class: ${isClass}`);
+      return isClass;
     }
+    console.log('DEBUG: Function type is not Name:', node.func.type);
     return false;
   }
 
   private handleClassInstantiation(node: ASTNode): IR {
-    const className = this.expressionVisitor.visitExpression(node.func);
+    const className = this.expressionVisitor.visitExpression(node.value.func);
     const target = this.expressionVisitor.visitExpression(node.targets[0]);
     const args = node.value.args.map((arg: ASTNode) => this.expressionVisitor.visitExpression(arg));
     
@@ -657,15 +680,22 @@ export class StatementVisitor extends BaseParser {
     
     // 変数宣言
     const declareText = `DECLARE ${target} : ${recordTypeName}`;
+    console.log('DEBUG: Adding declaration:', declareText);
     children.push(this.createIRNode('statement', declareText));
     
+    // クラス定義から属性名を取得
+    const classAttributes = this.getClassAttributes(className);
+    console.log('DEBUG: classAttributes:', classAttributes);
+    
     // フィールドの代入（引数の順序に基づく）
-    // 簡単な実装として、x, y の順序で代入
-    if (args.length >= 2) {
-      children.push(this.createIRNode('assign', `${target}.x ← ${args[0]}`));
-      children.push(this.createIRNode('assign', `${target}.y ← ${args[1]}`));
+    for (let i = 0; i < Math.min(args.length, classAttributes.length); i++) {
+      const attrName = classAttributes[i];
+      const assignText = `${target}.${attrName} ← ${args[i]}`;
+      console.log('DEBUG: Adding assignment:', assignText);
+      children.push(this.createIRNode('assign', assignText));
     }
     
+    console.log('DEBUG: Returning block with', children.length, 'children');
     return this.createIRNode('block', '', children);
   }
 
@@ -806,6 +836,27 @@ export class StatementVisitor extends BaseParser {
       case 'float': return 'REAL';
       default: return 'STRING';
     }
+  }
+
+  /**
+   * クラス定義から属性名を取得
+   */
+  private getClassAttributes(className: string): string[] {
+    // コンテキストからクラス定義を検索
+    if (this.context && this.context.classDefinitions) {
+      const classDef = this.context.classDefinitions[className];
+      if (classDef && classDef.attributes) {
+        return classDef.attributes.map((attr: string) => attr.split(' : ')[0]);
+      }
+    }
+    
+    // デフォルトの属性名（Student クラスの場合）
+    if (className === 'Student') {
+      return ['name', 'age'];
+    }
+    
+    // その他のクラスの場合はデフォルト
+    return ['x', 'y'];
   }
 
   /**

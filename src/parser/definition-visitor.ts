@@ -119,13 +119,10 @@ export class DefinitionVisitor extends BaseParser {
       const attributes = this.extractAttributesFromConstructor(constructor);
       
       for (const attr of attributes) {
-        const attrDeclaration = `  DECLARE ${attr}`;
+        const attrDeclaration = `DECLARE ${attr}`;
         children.push(this.createIRNode('statement', attrDeclaration));
       }
     }
-    
-    const endTypeIR = this.createIRNode('statement', 'ENDTYPE');
-    children.push(endTypeIR);
     
     return this.createIRNode('type', typeText, children);
   }
@@ -253,6 +250,11 @@ export class DefinitionVisitor extends BaseParser {
    * レコード型として扱うかどうかを判定
    */
   private shouldTreatAsRecordType(node: ASTNode): boolean {
+    // 継承を持つクラスはレコード型として扱わない
+    if (node.bases && node.bases.length > 0) {
+      return false;
+    }
+    
     // クラスがレコード型として使用されるかを判定
     const methods = node.body.filter((item: ASTNode) => item.type === 'FunctionDef');
     

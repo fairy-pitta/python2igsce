@@ -786,6 +786,19 @@ export class PythonASTVisitor extends BaseParser {
       };
     }
     
+    // 関数呼び出しの検出
+    const callMatch = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\((.*)\)$/);
+    if (callMatch) {
+      const [, funcName, argsStr] = callMatch;
+      const args = this.parseArguments(argsStr);
+      
+      return {
+        type: 'Call',
+        func: { type: 'Name', id: funcName },
+        args: args
+      };
+    }
+    
     // 算術演算子の検出（長い演算子を先に検出）
     const arithOps = ['//', '+', '-', '*', '/', '%'];
     for (const op of arithOps) {
@@ -987,6 +1000,8 @@ export class PythonASTVisitor extends BaseParser {
       case 'FunctionDef':
         return this.definitionVisitor.visitFunctionDef(node);
       case 'ClassDef':
+        // クラス定義をコンテキストに登録
+        this.registerClassDefinition(node);
         return this.definitionVisitor.visitClassDef(node);
       
       default:
@@ -1148,6 +1163,41 @@ export class PythonASTVisitor extends BaseParser {
       body: [],
       lineno: lineNumber
     };
+  }
+
+  /**
+   * クラス定義をコンテキストに登録
+   */
+  private registerClassDefinition(node: ASTNode): void {
+    const className = node.name;
+    
+    // __init__メソッドから属性を抽出
+    const constructor = node.body.find((item: ASTNode) => 
+      item.type === 'FunctionDef' && item.name === '__init__'
+    );
+    
+    const attributes: string[] = [];
+    if (constructor) {
+      // コンストラクタのパラメータから属性名を取得
+      if (constructor.args && constructor.args.args) {
+        constructor.args.args.forEach((arg: any) => {
+          if (arg.arg !== 'self') {
+            attributes.push(arg.arg);
+          }
+        });
+      }
+    }
+    
+    // コンテキストに登録
+    if (!this.context.classDefinitions) {
+      this.context.classDefinitions = {};
+    }
+    
+    this.context.classDefinitions[className] = {
+      attributes: attributes
+    };
+    
+    console.log('DEBUG: Registered class', className, 'with attributes:', attributes);
   }
 
   /**

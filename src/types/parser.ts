@@ -238,8 +238,12 @@ export interface ParserContext {
   arrayInfo: { [key: string]: { size: number; elementType: string; currentIndex: number } };
   /** パラメータマッピング（コンストラクタ用） */
   parameterMapping: { [key: string]: string };
+  /** クラス定義情報 */
+  classDefinitions?: { [key: string]: any };
   /** パース開始時刻 */
   startTime: number;
+  /** クラスかどうかを判定するメソッド */
+  isClass: (name: string) => boolean;
 }
 
 /**

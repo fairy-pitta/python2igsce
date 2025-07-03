@@ -465,6 +465,9 @@ export class TextEmitter extends BaseEmitter {
     this.emitChildren(node);
     this.decreaseIndent();
     
+    // ENDTYPEを元のインデントレベルで出力
+    this.emitLine('ENDTYPE');
+    
     if (this.context.formatter.insertBlankLines) {
       this.emitBlankLine();
     }

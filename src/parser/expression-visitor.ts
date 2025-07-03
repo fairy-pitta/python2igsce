@@ -240,7 +240,7 @@ export class ExpressionVisitor {
     return `IF ${test} THEN ${body} ELSE ${orelse}`;
   }
 
-  private convertBuiltinFunction(func: string, args: string[]): string | null {
+  public convertBuiltinFunction(func: string, args: string[]): string | null {
     switch (func) {
       case 'print':
         return `OUTPUT ${args.join(', ')}`;

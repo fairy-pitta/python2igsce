@@ -55,7 +55,7 @@ export abstract class BaseParser {
       type: 'global'
     };
 
-    return {
+    const context: ParserContext = {
       currentScope: globalScope,
       scopeStack: [globalScope],
       indentLevel: 0,
@@ -63,8 +63,13 @@ export abstract class BaseParser {
       warnings: [],
       arrayInfo: {},
       parameterMapping: {},
-      startTime: Date.now()
+      startTime: Date.now(),
+      isClass: (name: string) => {
+        return !!(context.classDefinitions && context.classDefinitions[name] !== undefined);
+      }
     };
+
+    return context;
   }
 
   /**
