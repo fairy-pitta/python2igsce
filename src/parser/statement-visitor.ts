@@ -48,6 +48,11 @@ export class StatementVisitor extends BaseParser {
       return this.handleArrayInitialization(node);
     }
 
+    // input()関数の代入を特別に処理（ネストした関数呼び出しも含む）
+    if (this.containsInputCall(node.value)) {
+      return this.handleInputAssignment(node);
+    }
+
     // クラスのインスタンス化を検出
     if (node.value.type === 'Call') {
       if (node.value.func.type === 'Name') {
@@ -102,6 +107,89 @@ export class StatementVisitor extends BaseParser {
     }
     
     return this.createIRNode('assign', text);
+  }
+
+  /**
+   * input()関数の代入を処理
+   */
+  private handleInputAssignment(node: ASTNode): IR {
+    const targetNode = node.targets[0];
+    const target = this.expressionVisitor.visitExpression(targetNode);
+    
+    // input()関数を見つける（ネストした関数呼び出しも考慮）
+    const inputCall = this.findInputCall(node.value);
+    if (!inputCall) {
+      // input()が見つからない場合は通常の代入として処理
+      const value = this.expressionVisitor.visitExpression(node.value);
+      const text = `${target} ← ${value}`;
+      return this.createIRNode('assign', text);
+    }
+    
+    const args = inputCall.args.map((arg: ASTNode) => this.expressionVisitor.visitExpression(arg));
+    
+    // プロンプトがある場合は、OUTPUT文とINPUT文の2つのIRノードを作成
+    if (args.length > 0) {
+      const outputText = `OUTPUT ${args[0]}`;
+      const inputText = `INPUT ${target}`;
+      
+      // 複合IRノードを作成（OUTPUT文とINPUT文を含む）
+      const outputIR = this.createIRNode('output', outputText);
+      const inputIR = this.createIRNode('input', inputText);
+      
+      // 変数の型を推論して登録
+      if (targetNode.type === 'Name') {
+        // int(input(...))の場合はINTEGER型として登録
+        if (node.value.type === 'Call' && node.value.func.type === 'Name' && node.value.func.id === 'int') {
+          this.registerVariable(targetNode.id, 'INTEGER', node.lineno);
+        } else {
+          this.registerVariable(targetNode.id, 'STRING', node.lineno);
+        }
+      }
+      
+      // 複合ノードとして返す
+      return this.createIRNode('compound', '', [outputIR, inputIR]);
+    } else {
+      // プロンプトがない場合は、INPUT文のみ
+      const inputText = `INPUT ${target}`;
+      
+      // 変数の型を推論して登録
+      if (targetNode.type === 'Name') {
+        // int(input(...))の場合はINTEGER型として登録
+        if (node.value.type === 'Call' && node.value.func.type === 'Name' && node.value.func.id === 'int') {
+          this.registerVariable(targetNode.id, 'INTEGER', node.lineno);
+        } else {
+          this.registerVariable(targetNode.id, 'STRING', node.lineno);
+        }
+      }
+      
+      return this.createIRNode('input', inputText);
+    }
+  }
+
+  /**
+   * ネストした関数呼び出しからinput()を見つける
+   */
+  private findInputCall(node: ASTNode): ASTNode | null {
+    if (node.type === 'Call' && node.func.type === 'Name' && node.func.id === 'input') {
+      return node;
+    }
+    
+    // ネストした関数呼び出しを再帰的に検索
+    if (node.type === 'Call' && node.args) {
+      for (const arg of node.args) {
+        const result = this.findInputCall(arg);
+        if (result) return result;
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * ノードにinput()呼び出しが含まれているかチェック
+   */
+  private containsInputCall(node: ASTNode): boolean {
+    return this.findInputCall(node) !== null;
   }
 
   /**

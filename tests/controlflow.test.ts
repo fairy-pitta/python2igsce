@@ -171,7 +171,8 @@ while True:
       const expected = 
 `// Simulating REPEAT-UNTIL
 WHILE True DO
-  OUTPUT "Guess the number: " INPUT guess
+  OUTPUT "Guess the number: "
+  INPUT guess
   IF guess = "7" THEN
     BREAK
   ENDIF

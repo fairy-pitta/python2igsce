@@ -1069,8 +1069,16 @@ export class PythonASTVisitor extends BaseParser {
       return [];
     }
     
-    return argsStr.split(',').map(arg => {
+    // 括弧のバランスを考慮して引数を分割
+    const args = this.splitArgumentsRespectingParentheses(argsStr);
+    
+    return args.map(arg => {
       const trimmed = arg.trim();
+      
+      // 関数呼び出しの場合（括弧を含む）
+      if (trimmed.includes('(') && trimmed.includes(')')) {
+        return this.parseExpression(trimmed);
+      }
       
       // 文字列リテラルの場合
       if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
@@ -1094,6 +1102,49 @@ export class PythonASTVisitor extends BaseParser {
         id: trimmed
       };
     });
+  }
+
+  /**
+   * 括弧のバランスを考慮して引数を分割
+   */
+  private splitArgumentsRespectingParentheses(argsStr: string): string[] {
+    const args: string[] = [];
+    let currentArg = '';
+    let parenDepth = 0;
+    let inString = false;
+    let stringChar = '';
+    
+    for (let i = 0; i < argsStr.length; i++) {
+      const char = argsStr[i];
+      
+      if (!inString) {
+        if (char === '"' || char === "'") {
+          inString = true;
+          stringChar = char;
+        } else if (char === '(') {
+          parenDepth++;
+        } else if (char === ')') {
+          parenDepth--;
+        } else if (char === ',' && parenDepth === 0) {
+          args.push(currentArg.trim());
+          currentArg = '';
+          continue;
+        }
+      } else {
+        if (char === stringChar && (i === 0 || argsStr[i - 1] !== '\\')) {
+          inString = false;
+          stringChar = '';
+        }
+      }
+      
+      currentArg += char;
+    }
+    
+    if (currentArg.trim()) {
+      args.push(currentArg.trim());
+    }
+    
+    return args;
   }
 
   /**
