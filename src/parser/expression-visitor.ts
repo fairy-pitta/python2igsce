@@ -86,7 +86,15 @@ export class ExpressionVisitor {
       .replace(/\band\b/g, ' AND ')
       .replace(/\bor\b/g, ' OR ')
       .replace(/\bnot\b/g, 'NOT ')
-      .replace(/%/g, ' MOD ');
+      .replace(/%/g, ' MOD ')
+      .replace(/\blen\(/g, 'LENGTH(')
+      .replace(/\bstr\(/g, 'STRING(')
+      .replace(/\bint\(/g, 'INTEGER(')
+      .replace(/\bfloat\(/g, 'REAL(')
+      .replace(/\babs\(/g, 'ABS(')
+      .replace(/\bmax\(/g, 'MAX(')
+      .replace(/\bmin\(/g, 'MIN(')
+      .replace(/\bround\(/g, 'ROUND(');
     
     return result.trim();
   }

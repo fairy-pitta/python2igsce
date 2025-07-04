@@ -473,7 +473,10 @@ export class StatementVisitor extends BaseParser {
     // 数値定数の場合は最適化
     // ステップが1の場合のみ終了値から1を引く
     if (stepValue === '1') {
-      if (this.expressionVisitor.isNumericConstant(args[args.length - 1])) {
+      // LENGTH()関数や他の関数呼び出しの場合は特別な処理
+      if (endValue.startsWith('LENGTH(') || endValue.includes('(')) {
+        endValue = `${endValue} - 1`;
+      } else if (this.expressionVisitor.isNumericConstant(args[args.length - 1])) {
         const endNum = this.expressionVisitor.getNumericValue(args[args.length - 1]);
         endValue = (endNum - 1).toString();
       } else {
