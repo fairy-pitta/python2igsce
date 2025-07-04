@@ -80,7 +80,8 @@ ENDFUNCTION`;
     it('should handle RETURN statements correctly', async () => {
       const pythonCode = 'def get_value():\n    return 42';
       const result = await converter.convert(pythonCode);
-      expect(result.code).toContain('RETURN 42');
+      const expected = 'FUNCTION Get_value() RETURNS INTEGER\n  RETURN 42\nENDFUNCTION';
+      expect(result.code).toBe(expected);
     });
   });
 

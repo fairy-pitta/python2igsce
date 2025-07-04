@@ -210,14 +210,39 @@ export abstract class BaseEmitter {
   }
 
   /**
+   * 論理演算子の置換（文字列リテラル外のみ）
+   */
+  private replaceLogicalOperators(text: string): string {
+    // 文字列リテラルを一時的に置換
+    const stringMatches: string[] = [];
+    let result = text.replace(/(["'])(?:(?!\1)[^\\]|\\.)*\1/g, (match) => {
+      const index = stringMatches.length;
+      stringMatches.push(match);
+      return `__STRING_${index}__`;
+    });
+
+    // 論理演算子の変換（文字列リテラル外のみ）
+    result = result.replace(/\band\b/g, 'AND');
+    result = result.replace(/\bor\b/g, 'OR');
+    result = result.replace(/\bnot\b/g, 'NOT');
+
+    // 文字列リテラルを復元
+    stringMatches.forEach((str, index) => {
+      result = result.replace(`__STRING_${index}__`, str);
+    });
+
+    return result;
+  }
+
+  /**
    * 演算子の変換（Python → IGCSE）
    */
   private convertOperators(text: string): string {
     let result = text;
     
-    // コメント部分を保護（Pythonの#コメントとIGCSEの//コメントを一時的に置き換え）
+    // コメント部分を保護（Pythonの#コメントのみ、//は算術演算子として扱う）
     const commentMatches: string[] = [];
-    result = result.replace(/(#.*$|\/\/.*$)/gm, (match) => {
+    result = result.replace(/(#.*$)/gm, (match) => {
       const index = commentMatches.length;
       commentMatches.push(match);
       return `__COMMENT_${index}__`;
@@ -234,10 +259,8 @@ export abstract class BaseEmitter {
     result = result.replace(/(?<!\s)=(?!\s)/g, ' ← ');
     result = result.replace(/^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*/gm, '$1 ← ');
     
-    // 論理演算子の変換
-    result = result.replace(/\band\b/gi, 'AND');
-    result = result.replace(/\bor\b/gi, 'OR');
-    result = result.replace(/\bnot\b/gi, 'NOT');
+    // 論理演算子の変換（文字列リテラル内は除外）
+    result = this.replaceLogicalOperators(result);
     
     // 文字列連結の変換（文字列リテラルが含まれる行の+を&に変換）
     const lines = result.split('\n');

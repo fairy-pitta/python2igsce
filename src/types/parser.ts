@@ -3,6 +3,16 @@ import { IR } from './ir';
 import { IGCSEDataType } from './igcse';
 
 /**
+ * Python ASTノードの基本インターフェース
+ */
+export interface ASTNode {
+  type: string;
+  lineno?: number;
+  col_offset?: number;
+  [key: string]: any;
+}
+
+/**
  * パーサーの設定オプション
  */
 export interface ParserOptions {

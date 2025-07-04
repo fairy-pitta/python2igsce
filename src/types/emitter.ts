@@ -290,7 +290,7 @@ export function getDefaultFormatterConfig(): FormatterConfig {
     spaceAroundOperators: true,
     spaceAfterComma: true,
     spaceInsideParentheses: false,
-    insertBlankLines: false,
+    insertBlankLines: true,
     wrapLongLines: true
   };
 }

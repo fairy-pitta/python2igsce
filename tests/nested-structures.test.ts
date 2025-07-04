@@ -12,41 +12,40 @@ describe('Nested Structures Comprehensive Tests', () => {
       const pythonCode = 'if a > 0:\n    if b > 0:\n        print("Both positive")';
       
       const result = converter.convert(pythonCode);
-      expect(result.code).toContain('IF a > 0 THEN');
-      expect(result.code).toContain('IF b > 0 THEN');
+      const expected = 'IF a > 0 THEN\n  IF b > 0 THEN\n    OUTPUT "Both positive"\n  ENDIF\nENDIF';
+      expect(result.code).toBe(expected);
     });
 
     it('should handle nested FOR loops', () => {
       const pythonCode = 'for i in range(2):\n    for j in range(2):\n        print("nested")';
       
       const result = converter.convert(pythonCode);
-      expect(result.code).toContain('FOR i ← 0 TO 1');
-      expect(result.code).toContain('FOR j ← 0 TO 1');
+      const expected = 'FOR i ← 0 TO 1\n  FOR j ← 0 TO 1\n    OUTPUT "nested"\n  NEXT j\nNEXT i';
+      expect(result.code).toBe(expected);
     });
 
     it('should handle FOR with nested IF', () => {
       const pythonCode = 'for i in range(3):\n    if i > 0:\n        print(i)';
       
       const result = converter.convert(pythonCode);
-      expect(result.code).toContain('FOR i ← 0 TO 2');
-      expect(result.code).toContain('IF i > 0 THEN');
+      const expected = 'FOR i ← 0 TO 2\n  IF i > 0 THEN\n    OUTPUT i\n  ENDIF\nNEXT i';
+      expect(result.code).toBe(expected);
     });
 
     it('should handle nested WHILE loops', () => {
       const pythonCode = 'i = 0\nwhile i < 2:\n    j = 0\n    while j < 2:\n        print("nested")\n        j += 1\n    i += 1';
       
       const result = converter.convert(pythonCode);
-      expect(result.code).toContain('WHILE i < 2');
-      expect(result.code).toContain('WHILE j < 2');
+      const expected = 'i ← 0\nWHILE i < 2 DO\n  j ← 0\n  WHILE j < 2 DO\n    OUTPUT "nested"\n    j ← j + 1\n  ENDWHILE\n  i ← i + 1\nENDWHILE';
+      expect(result.code).toBe(expected);
     });
 
     it('should handle deeply nested IF statements', () => {
       const pythonCode = 'if a > 0:\n    if b > 0:\n        if c > 0:\n            print("all positive")';
       
       const result = converter.convert(pythonCode);
-      expect(result.code).toContain('IF a > 0 THEN');
-      expect(result.code).toContain('IF b > 0 THEN');
-      expect(result.code).toContain('IF c > 0 THEN');
+      const expected = 'IF a > 0 THEN\n  IF b > 0 THEN\n    IF c > 0 THEN\n      OUTPUT "all positive"\n    ENDIF\n  ENDIF\nENDIF';
+      expect(result.code).toBe(expected);
     });
 
     it('should calculate correct IR depth for nested structures', () => {

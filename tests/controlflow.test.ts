@@ -143,16 +143,15 @@ ENDWHILE`;
       //     // break simulation
       //   ENDIF
       // ENDWHILE`;
-      // Let's simplify the expectation for now, focusing on the components.
-      expect(result.code).toContain('i ← 0');
-      expect(result.code).toContain('WHILE True DO');
-      expect(result.code).toContain('OUTPUT i');
-      // The presence of ENDWHILE is standard for the WHILE block itself.
-      expect(result.code).toContain('ENDWHILE');
-      // Update expectations based on actual output
-      expect(result.code).toContain('i ← i + 1');
-      expect(result.code).toContain('IF i = 3 THEN');
-      expect(result.code).toContain('BREAK');
+      const expected = `i ← 0
+WHILE True DO
+  OUTPUT i
+  i ← i + 1
+  IF i = 3 THEN
+    BREAK
+  ENDIF
+ENDWHILE`;
+      expect(result.code).toBe(expected);
     });
   });
 

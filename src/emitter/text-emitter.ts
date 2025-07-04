@@ -407,7 +407,8 @@ export class TextEmitter extends BaseEmitter {
    * FUNCTION文の出力
    */
   protected emitFunction(node: IR): void {
-    if (this.context.formatter.insertBlankLines) {
+    // 最初のノードでない場合のみ空行を追加
+    if (this.context.formatter.insertBlankLines && this.context.output.length > 0) {
       this.emitBlankLine();
     }
     
@@ -454,7 +455,8 @@ export class TextEmitter extends BaseEmitter {
    * TYPE定義の出力
    */
   private emitType(node: IR): void {
-    if (this.context.formatter.insertBlankLines) {
+    // 最初のノードでない場合のみ空行を追加
+    if (this.context.formatter.insertBlankLines && this.context.output.length > 0) {
       this.emitBlankLine();
     }
     
@@ -477,21 +479,26 @@ export class TextEmitter extends BaseEmitter {
    * CLASS定義の出力
    */
   private emitClass(node: IR): void {
-    if (this.context.formatter.insertBlankLines) {
-      this.emitBlankLine();
-    }
-    
     const text = this.formatText(node.text);
     this.emitLine(text);
     
     this.increaseIndent();
-    this.emitChildren(node);
-    this.decreaseIndent();
     
-    if (this.context.formatter.insertBlankLines) {
-      this.emitBlankLine();
+    // 子要素を処理（ENDCLASSは特別扱い）
+    if (node.children) {
+      for (const child of node.children) {
+        if (child.text === 'ENDCLASS') {
+          this.decreaseIndent();
+          this.emitNode(child);
+        } else {
+          this.emitNode(child);
+        }
+      }
     }
+    
+    // クラス定義の後は空行を追加しない
   }
+
 
   /**
    * CASE文の出力

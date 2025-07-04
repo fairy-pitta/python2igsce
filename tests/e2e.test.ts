@@ -444,11 +444,7 @@ ENDPROCEDURE
 CALL Main()`;
       
       const result = convertPython(python);
-      // Note: This is a complex example, exact formatting may vary
-      expect(result).toContain('FUNCTION Add');
-      expect(result).toContain('PROCEDURE Main');
-      expect(result).toContain('WHILE TRUE');
-      expect(result).toContain('IF num1 < 0 OR num2 < 0 THEN');
+      expect(result).toBe(expected);
     });
 
     it('should convert array processing example', () => {
@@ -480,9 +476,7 @@ NEXT i
 OUTPUT "Maximum value is: ", max_value`;
       
       const result = convertPython(python);
-      expect(result).toContain('DECLARE numbers : ARRAY');
-      expect(result).toContain('FOR i ← 1 TO LENGTH(numbers)');
-      expect(result).toContain('IF numbers[i] > max_value THEN');
+      expect(result).toBe(expected);
     });
   });
 

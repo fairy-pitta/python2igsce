@@ -1,15 +1,6 @@
 // import { IR, IRKind, createIR } from '../types/ir';
 import { IGCSEDataType } from '../types/igcse';
-
-/**
- * Python ASTノードの基本インターフェース
- */
-interface ASTNode {
-  type: string;
-  lineno?: number;
-  col_offset?: number;
-  [key: string]: any;
-}
+import { ASTNode } from '../types/parser';
 
 /**
  * 式の処理を担当するビジタークラス
@@ -77,18 +68,45 @@ export class ExpressionVisitor {
    * 簡易的な式の解析
    */
   private parseRawExpression(raw: string): string {
+    // 文字列メソッドの変換
+    let result = raw;
+    result = result.replace(/(\w+)\.upper\(\)/g, 'UCASE($1)');
+    result = result.replace(/(\w+)\.lower\(\)/g, 'LCASE($1)');
+    
     // 比較演算子の変換（単語境界を使用）
-    let result = raw
+    result = this.replaceLogicalOperators(result)
       .replace(/==/g, ' = ')
       .replace(/!=/g, ' ≠ ')
       .replace(/>=/g, ' ≥ ')
       .replace(/<=/g, ' ≤ ')
-      .replace(/\band\b/g, ' AND ')
-      .replace(/\bor\b/g, ' OR ')
-      .replace(/\bnot\b/g, 'NOT ')
       .replace(/%/g, ' MOD ');
     
     return result.trim();
+  }
+
+  /**
+   * 論理演算子の置換（文字列リテラル外のみ）
+   */
+  private replaceLogicalOperators(text: string): string {
+    // 文字列リテラルを一時的に置換
+    const stringMatches: string[] = [];
+    let result = text.replace(/(["'])(?:(?!\1)[^\\]|\\.)*\1/g, (match) => {
+      const index = stringMatches.length;
+      stringMatches.push(match);
+      return `__STRING_${index}__`;
+    });
+
+    // 論理演算子の変換（文字列リテラル外のみ）
+    result = result.replace(/\band\b/g, ' AND ');
+    result = result.replace(/\bor\b/g, ' OR ');
+    result = result.replace(/\bnot\b/g, 'NOT ');
+
+    // 文字列リテラルを復元
+    stringMatches.forEach((str, index) => {
+      result = result.replace(`__STRING_${index}__`, str);
+    });
+
+    return result;
   }
 
   private formatConstant(value: any): string {
@@ -241,6 +259,22 @@ export class ExpressionVisitor {
   }
 
   public convertBuiltinFunction(func: string, args: string[]): string | null {
+    // Handle string methods like text.upper(), text.lower()
+    if (func.includes('.')) {
+      const parts = func.split('.');
+      if (parts.length === 2) {
+        const [object, method] = parts;
+        switch (method) {
+          case 'upper':
+            return `UCASE(${object})`;
+          case 'lower':
+            return `LCASE(${object})`;
+          default:
+            return null;
+        }
+      }
+    }
+    
     switch (func) {
       case 'print':
         return `OUTPUT ${args.join(', ')}`;

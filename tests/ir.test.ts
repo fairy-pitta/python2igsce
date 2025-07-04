@@ -49,7 +49,7 @@ describe('IGCSE Pseudocode IR Types', () => {
     it('should handle assignment with ← operator', () => {
       const assignIR = createIR('assign', 'counter ← 0');
       
-      expect(assignIR.text).toContain('←');
+      expect(assignIR.text).toBe('counter ← 0');
       expect(assignIR.text).toMatch(/\w+ ← .+/);
       expect(assignIR.kind).toBe('assign');
     });
@@ -60,9 +60,7 @@ describe('IGCSE Pseudocode IR Types', () => {
       forIR.children.push(outputIR);
       forIR.meta = { name: 'i', startValue: '1', endValue: '10' };
       
-      expect(forIR.text).toContain('FOR');
-      expect(forIR.text).toContain('TO');
-      expect(forIR.text).toContain('←');
+      expect(forIR.text).toBe('FOR i ← 1 TO 10');
       expect(forIR.meta?.name).toBe('i');
       expect(forIR.children).toHaveLength(1);
     });
@@ -73,7 +71,7 @@ describe('IGCSE Pseudocode IR Types', () => {
       whileIR.children.push(assignIR);
       whileIR.meta = { endText: 'ENDWHILE' };
       
-      expect(whileIR.text).toContain('WHILE');
+      expect(whileIR.text).toBe('WHILE x < 10');
       expect(whileIR.meta?.endText).toBe('ENDWHILE');
       expect(whileIR.children).toHaveLength(1);
       expect(whileIR.children[0].kind).toBe('assign');
@@ -90,7 +88,7 @@ describe('IGCSE Pseudocode IR Types', () => {
         endText: 'ENDPROCEDURE'
       };
       
-      expect(procedureIR.text).toContain('PROCEDURE');
+      expect(procedureIR.text).toBe('PROCEDURE Greet(name : STRING)');
       expect(procedureIR.meta?.hasReturn).toBe(false);
       expect(procedureIR.meta?.endText).toBe('ENDPROCEDURE');
       expect(procedureIR.meta?.name).toBe('Greet');
@@ -107,8 +105,7 @@ describe('IGCSE Pseudocode IR Types', () => {
         returnType: 'INTEGER'
       };
       
-      expect(functionIR.text).toContain('FUNCTION');
-      expect(functionIR.text).toContain('RETURNS');
+      expect(functionIR.text).toBe('FUNCTION Add(x : INTEGER, y : INTEGER) RETURNS INTEGER');
       expect(functionIR.meta?.hasReturn).toBe(true);
       expect(functionIR.meta?.returnType).toBe('INTEGER');
       expect(functionIR.meta?.name).toBe('Add');
@@ -117,8 +114,7 @@ describe('IGCSE Pseudocode IR Types', () => {
     it('should handle ARRAY declaration', () => {
       const arrayIR = createIR('array', 'DECLARE numbers : ARRAY[1:5] OF INTEGER');
       
-      expect(arrayIR.text).toContain('DECLARE');
-      expect(arrayIR.text).toContain('ARRAY');
+      expect(arrayIR.text).toBe('DECLARE numbers : ARRAY[1:5] OF INTEGER');
       expect(arrayIR.text).toMatch(/ARRAY\[\d+:\d+\] OF \w+/);
       expect(arrayIR.kind).toBe('array');
     });
@@ -133,7 +129,7 @@ describe('IGCSE Pseudocode IR Types', () => {
         name: 'StudentRecord'
       };
       
-      expect(typeIR.text).toContain('TYPE');
+      expect(typeIR.text).toBe('TYPE StudentRecord');
       expect(typeIR.meta?.name).toBe('StudentRecord');
       expect(typeIR.children).toHaveLength(2);
     });
@@ -147,7 +143,7 @@ describe('IGCSE Pseudocode IR Types', () => {
       caseIR.children.push(option1, option2, otherwise);
       caseIR.meta = { endText: 'ENDCASE' };
       
-      expect(caseIR.text).toContain('CASE OF');
+      expect(caseIR.text).toBe('CASE OF direction');
       expect(caseIR.meta?.endText).toBe('ENDCASE');
       expect(caseIR.children).toHaveLength(3);
       expect(caseIR.children[2].kind).toBe('statement');

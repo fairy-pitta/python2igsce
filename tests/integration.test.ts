@@ -19,9 +19,11 @@ print(result)`;
 
       const result = converter.convert(pythonCode);
       
-      expect(result.code).toBeDefined();
-      expect(result.code).toContain('←');
-      expect(result.code.length).toBeGreaterThan(0);
+      const expected = `num1 ← 5
+num2 ← 3
+result ← num1 + num2
+OUTPUT result`;
+      expect(result.code).toBe(expected);
     });
 
     it('should convert simple assignment', () => {
@@ -31,9 +33,10 @@ z = x + y`;
 
       const result = converter.convert(pythonCode);
       
-      expect(result.code).toBeDefined();
-      expect(result.code).toContain('←');
-      expect(result.code.length).toBeGreaterThan(0);
+      const expected = `x ← 10
+y ← 20
+z ← x + y`;
+      expect(result.code).toBe(expected);
     });
 
     it('should convert simple if statement', () => {
@@ -43,9 +46,11 @@ if x > 0:
 
       const result = converter.convert(pythonCode);
       
-      expect(result.code).toBeDefined();
-      expect(result.code).toContain('←');
-      expect(result.code.length).toBeGreaterThan(0);
+      const expected = `x ← 5
+IF x > 0 THEN
+  OUTPUT "positive"
+ENDIF`;
+      expect(result.code).toBe(expected);
     });
 
     it('should convert simple arithmetic', () => {
@@ -55,9 +60,10 @@ c = a * b`;
 
       const result = converter.convert(pythonCode);
       
-      expect(result.code).toBeDefined();
-      expect(result.code).toContain('←');
-      expect(result.code.length).toBeGreaterThan(0);
+      const expected = `a ← 10
+b ← 5
+c ← a * b`;
+      expect(result.code).toBe(expected);
     });
 
     it('should convert simple function', () => {
@@ -68,8 +74,12 @@ result = add(3, 4)`;
 
       const result = converter.convert(pythonCode);
       
-      expect(result.code).toBeDefined();
-      expect(result.code.length).toBeGreaterThan(0);
+      const expected = `FUNCTION add(a : INTEGER, b : INTEGER) RETURNS INTEGER
+  RETURN a + b
+ENDFUNCTION
+
+result ← add(3, 4)`;
+      expect(result.code).toBe(expected);
     });
 
     it('should convert simple loop', () => {
@@ -78,8 +88,10 @@ result = add(3, 4)`;
 
       const result = converter.convert(pythonCode);
       
-      expect(result.code).toBeDefined();
-      expect(result.code.length).toBeGreaterThan(0);
+      const expected = `FOR i ← 0 TO 4
+  OUTPUT i
+NEXT i`;
+      expect(result.code).toBe(expected);
     });
 
     it('should convert simple while loop', () => {
@@ -90,8 +102,12 @@ while i < 5:
 
       const result = converter.convert(pythonCode);
       
-      expect(result.code).toBeDefined();
-      expect(result.code.length).toBeGreaterThan(0);
+      const expected = `i ← 0
+WHILE i < 5 DO
+  OUTPUT i
+  i ← i + 1
+ENDWHILE`;
+      expect(result.code).toBe(expected);
     });
 
     it('should convert simple list', () => {
@@ -100,8 +116,12 @@ first = numbers[0]`;
 
       const result = converter.convert(pythonCode);
       
-      expect(result.code).toBeDefined();
-      expect(result.code.length).toBeGreaterThan(0);
+      const expected = `DECLARE numbers : ARRAY[1:3] OF INTEGER
+numbers[1] ← 1
+numbers[2] ← 2
+numbers[3] ← 3
+first ← numbers[1]`;
+      expect(result.code).toBe(expected);
     });
 
     it('should convert string operations', () => {
@@ -110,8 +130,9 @@ greeting = "Hello " + name`;
 
       const result = converter.convert(pythonCode);
       
-      expect(result.code).toBeDefined();
-      expect(result.code.length).toBeGreaterThan(0);
+      const expected = `name ← "Alice"
+greeting ← "Hello " + name`;
+      expect(result.code).toBe(expected);
     });
   });
 

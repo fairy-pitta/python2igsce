@@ -13,16 +13,11 @@ describe('Data Structures Tests', () => {
       const pythonCode = 'numbers = [10, 20, 30]'; // Simple list of integers
       const result = await converter.convert(pythonCode);
       // Converter needs to infer type (INTEGER) and size (3). Pseudocode arrays are 1-indexed.
-      // DECLARE numbers : ARRAY[1:3] OF INTEGER
-      // numbers[1] ← 10
-      // numbers[2] ← 20
-      // numbers[3] ← 30
-      const expected_decl = 'DECLARE numbers : ARRAY[1:3] OF INTEGER';
-      const expected_assign1 = 'numbers[1] ← 10';
-      const expected_assign3 = 'numbers[3] ← 30';
-      expect(result.code).toContain(expected_decl);
-      expect(result.code).toContain(expected_assign1);
-      expect(result.code).toContain(expected_assign3);
+      const expected = `DECLARE numbers : ARRAY[1:3] OF INTEGER
+numbers[1] ← 10
+numbers[2] ← 20
+numbers[3] ← 30`;
+      expect(result.code).toBe(expected);
     });
 
     it('should convert array declaration for an empty list (requires type annotation or default)', async () => {
@@ -44,22 +39,31 @@ describe('Data Structures Tests', () => {
       // Expectation depends on how the converter handles empty list declarations for fixed-size arrays.
       // It might default to a common size like 10 or require explicit sizing.
       // For this test, let's assume it can declare it with 0 elements if type is known.
-      expect(typedResult.code).toContain('DECLARE items : ARRAY[1:100] OF STRING');
+      const expected = 'DECLARE items : ARRAY[1:100] OF STRING';
+      expect(typedResult.code).toBe(expected);
     });
 
     it('should convert array element access (0-indexed Python to 1-indexed Pseudocode)', async () => {
       const pythonCode = 'my_array = [5, 10, 15]\nfirst_val = my_array[0]\nsecond_val = my_array[1]';
       const result = await converter.convert(pythonCode);
-      expect(result.code).toContain('DECLARE my_array : ARRAY[1:3] OF INTEGER');
-      expect(result.code).toContain('first_val ← my_array[1]');
-      expect(result.code).toContain('second_val ← my_array[2]');
+      const expected = `DECLARE my_array : ARRAY[1:3] OF INTEGER
+my_array[1] ← 5
+my_array[2] ← 10
+my_array[3] ← 15
+first_val ← my_array[1]
+second_val ← my_array[2]`;
+      expect(result.code).toBe(expected);
     });
 
     it('should convert array element assignment', async () => {
       const pythonCode = 'data = [0, 0, 0]\ndata[1] = 100'; // Python data[1] is Pseudocode data[2]
       const result = await converter.convert(pythonCode);
-      expect(result.code).toContain('DECLARE data : ARRAY[1:3] OF INTEGER');
-      expect(result.code).toContain('data[2] ← 100');
+      const expected = `DECLARE data : ARRAY[1:3] OF INTEGER
+data[1] ← 0
+data[2] ← 0
+data[3] ← 0
+data[2] ← 100`;
+      expect(result.code).toBe(expected);
     });
 
     it('should handle iterating through an array (e.g., using FOR loop)', async () => {
@@ -82,10 +86,7 @@ NEXT i`;
       // The exact output for loop translation might vary based on converter's sophistication.
       // For example, it might introduce a temporary variable for the length.
       // This test assumes a fairly direct translation of Python's `for ... in ...` for lists.
-      expect(result.code).toContain('DECLARE scores : ARRAY[1:3] OF INTEGER');
-      expect(result.code).toContain('FOR i ← 1 TO 3'); // or similar if length is calculated
-      expect(result.code).toContain('OUTPUT scores[i]');
-      expect(result.code).toContain('NEXT i');
+      expect(result.code).toBe(expected);
     });
   });
 
@@ -100,19 +101,16 @@ NEXT i`;
 
 student1 = Student("Alice", 17)`;
       const result = await converter.convert(pythonCode);
-      const expected_type_def = 
+      const expected = 
 `TYPE StudentRecord
   DECLARE name : STRING
   DECLARE age : INTEGER
-ENDTYPE`;
-      const expected_var_decl = 'DECLARE student1 : StudentRecord';
-      const expected_assign_name = 'student1.name ← "Alice"';
-      const expected_assign_age = 'student1.age ← 17';
+ENDTYPE
 
-      expect(result.code).toContain(expected_type_def);
-      expect(result.code).toContain(expected_var_decl);
-      expect(result.code).toContain(expected_assign_name);
-      expect(result.code).toContain(expected_assign_age);
+DECLARE student1 : StudentRecord
+student1.name ← "Alice"
+student1.age ← 17`;
+      expect(result.code).toBe(expected);
     });
 
     it('should handle record field access', async () => {
@@ -131,7 +129,17 @@ student_name = student1.name`;
 student1 = Student("Bob", 18)
 student_name = student1.name`;
       const result = await converter.convert(fullPythonCode);
-      expect(result.code).toContain('student_name ← student1.name');
+      const expected = 
+`TYPE StudentRecord
+  DECLARE name : STRING
+  DECLARE age : INTEGER
+ENDTYPE
+
+DECLARE student1 : StudentRecord
+student1.name ← "Bob"
+student1.age ← 18
+student_name ← student1.name`;
+      expect(result.code).toBe(expected);
     });
 
     it('should handle record field assignment', async () => {
@@ -146,7 +154,17 @@ student_name = student1.name`;
 student1 = Student("Carol", 20)
 student1.age = 21`;
       const result = await converter.convert(fullPythonCode);
-      expect(result.code).toContain('student1.age ← 21');
+      const expected = 
+`TYPE StudentRecord
+  DECLARE name : STRING
+  DECLARE age : INTEGER
+ENDTYPE
+
+DECLARE student1 : StudentRecord
+student1.name ← "Carol"
+student1.age ← 20
+student1.age ← 21`;
+      expect(result.code).toBe(expected);
     });
 
     // Arrays of Records
@@ -184,20 +202,19 @@ path = [Point(1, 2), Point(3, 4)]
 first_point_x = path[0].x`;
       const result = await converter.convert(pythonForArrayOfRecords);
 
-      const expected_type_def = 
+      const expected = 
 `TYPE PointRecord
   DECLARE x : INTEGER
   DECLARE y : INTEGER
-ENDTYPE`; // Assuming 'Point' class maps to 'PointRecord'
-      const expected_array_decl = 'DECLARE path : ARRAY[1:2] OF PointRecord';
-      
-      expect(result.code).toContain(expected_type_def);
-      expect(result.code).toContain(expected_array_decl);
-      expect(result.code).toContain('path[1].x ← 1');
-      expect(result.code).toContain('path[1].y ← 2');
-      expect(result.code).toContain('path[2].x ← 3');
-      expect(result.code).toContain('path[2].y ← 4');
-      expect(result.code).toContain('first_point_x ← path[1].x');
+ENDTYPE
+
+DECLARE path : ARRAY[1:2] OF PointRecord
+path[1].x ← 1
+path[1].y ← 2
+path[2].x ← 3
+path[2].y ← 4
+first_point_x ← path[1].x`;
+      expect(result.code).toBe(expected);
     });
   });
 });

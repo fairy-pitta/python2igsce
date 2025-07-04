@@ -60,9 +60,9 @@ describe('Syntax Tests - Basic Constructs', () => {
     it('should convert input with a prompt', async () => {
       const pythonCode = 'name = input("Enter your name: ")';
       const result = await converter.convert(pythonCode);
-      // Pythonのinput()はプロンプトを標準出力に出してから入力を待つので、OUTPUTとINPUTに分かれる
-      expect(result.code).toContain('OUTPUT "Enter your name: "');
-      expect(result.code).toContain('INPUT name');
+      // Pythonのinput()はプロンプトを標準出力に出してから入力を待つので、OUTPUTとINPUTが同じ行に出力される
+      const expected = 'OUTPUT "Enter your name: " INPUT name';
+      expect(result.code).toBe(expected);
     });
   });
 
@@ -71,8 +71,8 @@ describe('Syntax Tests - Basic Constructs', () => {
     it('should convert single-line comments', async () => {
       const pythonCode = '# This is a comment\nx = 1';
       const result = await converter.convert(pythonCode);
-      expect(result.code).toContain('// This is a comment');
-      expect(result.code).toContain('x ← 1');
+      const expected = '// This is a comment\nx ← 1';
+      expect(result.code).toBe(expected);
     });
 
     it('should place comments correctly relative to code', async () => {
@@ -105,20 +105,15 @@ describe('Syntax Tests - Basic Constructs', () => {
     it('should handle comparison operators', async () => {
       const pythonCode = 'is_equal = (a == b)\nis_not_equal = (a != b)\nis_greater = (a > b)\nis_less = (a < b)\nis_greater_equal = (a >= b)\nis_less_equal = (a <= b)';
       const result = await converter.convert(pythonCode);
-      expect(result.code).toContain('is_equal ← (a = b)');
-      expect(result.code).toContain('is_not_equal ← (a ≠ b)');
-      expect(result.code).toContain('is_greater ← (a > b)');
-      expect(result.code).toContain('is_less ← (a < b)');
-      expect(result.code).toContain('is_greater_equal ← (a ≥ b)');
-      expect(result.code).toContain('is_less_equal ← (a ≤ b)');
+      const expected = 'is_equal ← (a = b)\nis_not_equal ← (a ≠ b)\nis_greater ← (a > b)\nis_less ← (a < b)\nis_greater_equal ← (a ≥ b)\nis_less_equal ← (a ≤ b)';
+      expect(result.code).toBe(expected);
     });
 
     it('should handle logical operators AND, OR, NOT', async () => {
       const pythonCode = 'res_and = (p and q)\nres_or = (p or q)\nres_not = (not p)';
       const result = await converter.convert(pythonCode);
-      expect(result.code).toContain('res_and ← (p AND q)');
-      expect(result.code).toContain('res_or ← (p OR q)');
-      expect(result.code).toContain('res_not ← (NOT p)');
+      const expected = 'res_and ← (p AND q)\nres_or ← (p OR q)\nres_not ← (NOT p)';
+      expect(result.code).toBe(expected);
     });
 
     it('should handle string concatenation', async () => {

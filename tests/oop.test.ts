@@ -31,8 +31,7 @@ describe('Object-Oriented Programming (OOP) Tests', () => {
   ENDPROCEDURE
 ENDCLASS`;
       // 現在の実装では基本的なクラス定義のみサポート
-      expect(result.code).toContain('CLASS Animal');
-      expect(result.code).toContain('ENDCLASS');
+      expect(result.code).toBe(expected);
     });
 
     it('should handle class attributes (variables)', async () => {
@@ -46,9 +45,21 @@ ENDCLASS`;
     def area(self):
         return Circle.pi * self.radius * self.radius`;
       const result = await converter.convert(pythonCode);
-      // 現在の実装では基本的なクラス定義のみサポート
-      expect(result.code).toContain('CLASS Circle');
-      expect(result.code).toContain('ENDCLASS');
+      const expected = 
+`CLASS Circle
+  PRIVATE pi : REAL
+  PRIVATE radius : REAL
+  
+  PUBLIC PROCEDURE NEW(radius : REAL)
+    pi ← 3.14159
+    radius ← radius
+  ENDPROCEDURE
+  
+  PUBLIC FUNCTION area() RETURNS REAL
+    RETURN Circle.pi * radius * radius
+  ENDFUNCTION
+ENDCLASS`;
+      expect(result.code).toBe(expected);
     });
   });
 
@@ -66,11 +77,25 @@ class Dog(Animal):
     def speak(self):
         print(self.name + " says Woof!")`;
       const result = await converter.convert(pythonCode);
-      // 現在の実装では基本的なクラス定義のみサポート
-      expect(result.code).toContain('CLASS Animal');
-      expect(result.code).toContain('ENDCLASS');
-      expect(result.code).toContain('CLASS Dog');
-      expect(result.code).toContain('ENDCLASS');
+      const expected = 
+`CLASS Animal
+  PRIVATE name : STRING
+  
+  PUBLIC PROCEDURE NEW(name : STRING)
+    name ← name
+  ENDPROCEDURE
+  
+  PUBLIC PROCEDURE eat()
+    OUTPUT name + " is eating."
+  ENDPROCEDURE
+ENDCLASS
+
+CLASS Dog INHERITS Animal
+  PUBLIC PROCEDURE speak()
+    OUTPUT name + " says Woof!"
+  ENDPROCEDURE
+ENDCLASS`;
+      expect(result.code).toBe(expected);
     });
 
     it('should handle calling superclass constructor (super().__init__)', async () => {
@@ -84,11 +109,24 @@ class Child(Parent):
         super().__init__(val)
         self.extra_val = extra`;
       const result = await converter.convert(pythonCode);
-      // 現在の実装では基本的なクラス定義のみサポート
-      expect(result.code).toContain('CLASS Parent');
-      expect(result.code).toContain('ENDCLASS');
-      expect(result.code).toContain('CLASS Child');
-      expect(result.code).toContain('ENDCLASS');
+      const expected = 
+`CLASS Parent
+  PRIVATE value : INTEGER
+  
+  PUBLIC PROCEDURE NEW(val : INTEGER)
+    value ← val
+  ENDPROCEDURE
+ENDCLASS
+
+CLASS Child INHERITS Parent
+  PRIVATE extra_val : INTEGER
+  
+  PUBLIC PROCEDURE NEW(val : INTEGER, extra : INTEGER)
+    SUPER.NEW(val)
+    extra_val ← extra
+  ENDPROCEDURE
+ENDCLASS`;
+      expect(result.code).toBe(expected);
     });
   });
 
@@ -104,9 +142,22 @@ class Child(Parent):
 
 my_greeter = Greeter("Hello IGCSE")`;
       const result = await converter.convert(pythonCode);
-      // 現在の実装では基本的なクラス定義のみサポート
-      expect(result.code).toContain('CLASS Greeter');
-      expect(result.code).toContain('ENDCLASS');
+      const expected = 
+`CLASS Greeter
+  PRIVATE greeting : STRING
+  
+  PUBLIC PROCEDURE NEW(message : STRING)
+    greeting ← message
+  ENDPROCEDURE
+  
+  PUBLIC PROCEDURE greet()
+    OUTPUT greeting
+  ENDPROCEDURE
+ENDCLASS
+
+DECLARE my_greeter : Greeter
+my_greeter ← NEW Greeter("Hello IGCSE")`;
+      expect(result.code).toBe(expected);
     });
   });
 
@@ -124,9 +175,22 @@ class Greeter:
 my_greeter = Greeter("Test")
 my_greeter.greet()`;
       const result = await converter.convert(pythonCode);
-      // 現在の実装では基本的なクラス定義のみサポート
-      expect(result.code).toContain('CLASS Greeter');
-      expect(result.code).toContain('ENDCLASS');
+      const expected = 
+`CLASS Greeter
+  PRIVATE greeting : STRING
+  
+  PUBLIC PROCEDURE NEW(message : STRING)
+    greeting ← message
+  ENDPROCEDURE
+  
+  PUBLIC PROCEDURE greet()
+    OUTPUT greeting
+  ENDPROCEDURE
+ENDCLASS
+
+DECLARE my_greeter : Greeter
+my_greeter ← NEW Greeter("Hello IGCSE")`;
+      expect(result.code).toBe(expected);
     });
 
     it('should convert method calls that return values', async () => {
@@ -137,9 +201,18 @@ my_greeter.greet()`;
 calc = Calculator()
 sum_val = calc.add(5, 7)`;
       const result = await converter.convert(pythonCode);
-      // 現在の実装では基本的なクラス定義のみサポート
-      expect(result.code).toContain('CLASS Calculator');
-      expect(result.code).toContain('ENDCLASS');
+      const expected = 
+`CLASS Calculator
+  PUBLIC FUNCTION add(a : INTEGER, b : INTEGER) RETURNS INTEGER
+    RETURN a + b
+  ENDFUNCTION
+ENDCLASS
+
+DECLARE calc : Calculator
+calc ← NEW Calculator()
+DECLARE sum_val : INTEGER
+sum_val ← calc.add(5, 7)`;
+      expect(result.code).toBe(expected);
     });
   });
 });
