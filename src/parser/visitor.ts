@@ -793,6 +793,24 @@ export class PythonASTVisitor extends BaseParser {
       };
     }
     
+    // メソッド呼び出しの検出（例: text.upper()）
+    const methodCallMatch = trimmed.match(/^(.+)\.([a-zA-Z_][a-zA-Z0-9_]*)\((.*)\)$/);
+    if (methodCallMatch) {
+      const [, objectExpr, methodName, argsStr] = methodCallMatch;
+      const args = this.parseArguments(argsStr);
+      
+      return {
+        type: 'Call',
+        func: {
+          type: 'Attribute',
+          value: this.parseSimpleExpression(objectExpr),
+          attr: methodName,
+          ctx: 'Load'
+        },
+        args: args
+      };
+    }
+    
     // 関数呼び出しの検出
     const callMatch = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\((.*)\)$/);
     if (callMatch) {

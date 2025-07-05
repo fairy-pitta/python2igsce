@@ -230,9 +230,8 @@ export abstract class BaseEmitter {
     result = result.replace(/==/g, '=');
     
     // 代入演算子の変換（比較演算子以外の=のみ）
-    // 比較演算子の周りにスペースがある場合は除外
-    result = result.replace(/(?<!\s)=(?!\s)/g, ' ← ');
-    result = result.replace(/^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*/gm, '$1 ← ');
+    // 行の先頭から変数名 = の形式を ← に変換
+    result = result.replace(/^(\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*/gm, '$1$2 ← ');
     
     // 論理演算子の変換
     result = result.replace(/\band\b/gi, 'AND');

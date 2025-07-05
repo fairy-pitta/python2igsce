@@ -418,6 +418,12 @@ export class StatementVisitor extends BaseParser {
     
     // 組み込み関数の変換
     if (func === 'print') {
+      // 引数が1つでf-stringの場合は特別処理
+      if (args.length === 1 && node.args[0].type === 'JoinedStr') {
+        const fstringResult = this.expressionVisitor.visitExpression(node.args[0]);
+        const text = `OUTPUT ${fstringResult}`;
+        return this.createIRNode('output', text);
+      }
       const text = `OUTPUT ${args.join(', ')}`;
       return this.createIRNode('output', text);
     }

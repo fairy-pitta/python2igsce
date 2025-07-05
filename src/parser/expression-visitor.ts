@@ -62,6 +62,8 @@ export class ExpressionVisitor {
         return this.visitListComp(node);
       case 'IfExp':
         return this.visitIfExp(node);
+      case 'JoinedStr':
+        return this.visitJoinedStr(node);
       case 'Expr':
         // 括弧付きの式の処理
         if (node.parenthesized) {
@@ -150,6 +152,35 @@ export class ExpressionVisitor {
   }
 
   private visitCallExpression(node: ASTNode): string {
+    // 文字列メソッド呼び出しの特別処理
+    if (node.func.type === 'Attribute') {
+      const value = this.visitExpression(node.func.value);
+      const method = node.func.attr;
+      const args = node.args.map((arg: ASTNode) => this.visitExpression(arg));
+      
+      // 文字列メソッドをIGCSE Pseudocode関数に変換
+      switch (method) {
+        case 'upper':
+          return `UCASE(${value})`;
+        case 'lower':
+          return `LCASE(${value})`;
+        case 'strip':
+          return `TRIM(${value})`;
+        case 'split':
+          return args.length > 0 ? `SPLIT(${value}, ${args[0]})` : `SPLIT(${value})`;
+        case 'replace':
+          return args.length >= 2 ? `REPLACE(${value}, ${args[0]}, ${args[1]})` : `${value}.${method}(${args.join(', ')})`;
+        case 'find':
+          return args.length > 0 ? `FIND(${value}, ${args[0]})` : `${value}.${method}(${args.join(', ')})`;
+        case 'startswith':
+          return args.length > 0 ? `STARTSWITH(${value}, ${args[0]})` : `${value}.${method}(${args.join(', ')})`;
+        case 'endswith':
+          return args.length > 0 ? `ENDSWITH(${value}, ${args[0]})` : `${value}.${method}(${args.join(', ')})`;
+        default:
+          return `${value}.${method}(${args.join(', ')})`;
+      }
+    }
+    
     const func = this.visitExpression(node.func);
     const args = node.args.map((arg: ASTNode) => this.visitExpression(arg));
     
@@ -192,7 +223,21 @@ export class ExpressionVisitor {
     }
     
     const value = this.visitExpression(node.value);
-    return `${value}.${node.attr}`;
+    
+    // 文字列メソッドをIGCSE Pseudocode関数に変換
+    switch (node.attr) {
+      case 'upper':
+        return `UCASE(${value})`;
+      case 'lower':
+        return `LCASE(${value})`;
+      case 'strip':
+        return `TRIM(${value})`;
+      case 'length':
+      case '__len__':
+        return `LENGTH(${value})`;
+      default:
+        return `${value}.${node.attr}`;
+    }
   }
 
   private visitSubscript(node: ASTNode): string {
@@ -246,6 +291,28 @@ export class ExpressionVisitor {
     const body = this.visitExpression(node.body);
     const orelse = this.visitExpression(node.orelse);
     return `IF ${test} THEN ${body} ELSE ${orelse}`;
+  }
+
+  private visitJoinedStr(node: ASTNode): string {
+    // f-stringの処理
+    const parts: string[] = [];
+    
+    for (const value of node.values) {
+      if (value.type === 'Constant') {
+        // 文字列リテラル部分
+        parts.push(`"${value.value}"`);
+      } else if (value.type === 'FormattedValue') {
+        // {expression}部分
+        const expr = this.visitExpression(value.value);
+        parts.push(expr);
+      } else {
+        // その他の値
+        parts.push(this.visitExpression(value));
+      }
+    }
+    
+    // 文字列連結として出力
+    return parts.join(' & ');
   }
 
   public convertBuiltinFunction(func: string, args: string[]): string | null {
