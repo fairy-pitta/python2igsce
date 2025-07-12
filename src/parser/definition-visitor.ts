@@ -179,7 +179,15 @@ export class DefinitionVisitor extends BaseParser {
     if (args.args) {
       args.args.forEach((arg: any) => {
         const name = arg.arg;
-        const type = this.convertPythonTypeToIGCSE(arg.annotation);
+        // 型注釈がある場合は優先
+        let type = this.convertPythonTypeToIGCSE(arg.annotation);
+        
+        // 型注釈がない場合はデフォルトでINTEGERを推論
+        // （数値演算が多いため、より適切なデフォルト）
+        if (!arg.annotation) {
+          type = 'INTEGER';
+        }
+        
         params.push({ name, type });
       });
     }
@@ -191,7 +199,7 @@ export class DefinitionVisitor extends BaseParser {
    * Python型注釈をIGCSE型に変換
    */
   private convertPythonTypeToIGCSE(annotation: any): IGCSEDataType {
-    if (!annotation) return 'STRING';
+    if (!annotation) return 'INTEGER'; // デフォルトをINTEGERに変更
     
     if (annotation.type === 'Name') {
       switch (annotation.id) {
@@ -199,10 +207,10 @@ export class DefinitionVisitor extends BaseParser {
         case 'str': return 'STRING';
         case 'bool': return 'BOOLEAN';
         case 'float': return 'REAL';
-        default: return 'STRING';
+        default: return 'INTEGER'; // 不明な型もINTEGERをデフォルトに
       }
     }
-    return 'STRING';
+    return 'INTEGER';
   }
 
   /**
@@ -351,11 +359,18 @@ export class DefinitionVisitor extends BaseParser {
       }
     }
     
+    // パラメータの型情報を取得
+    const params = this.extractParameters(node.args);
+    const paramTypes = new Map<string, IGCSEDataType>();
+    params.forEach(param => {
+      paramTypes.set(param.name, param.type);
+    });
+    
     // 簡易的な戻り値型推論（再帰的にReturn文を検索）
     const findReturnType = (statements: ASTNode[]): IGCSEDataType | null => {
       for (const stmt of statements) {
         if (stmt.type === 'Return' && stmt.value) {
-          return this.expressionVisitor.inferTypeFromValue(stmt.value);
+          return this.inferReturnTypeFromExpression(stmt.value, paramTypes);
         }
         // ネストした構造（if文、for文など）も検索
         if (stmt.body && Array.isArray(stmt.body)) {
@@ -371,7 +386,104 @@ export class DefinitionVisitor extends BaseParser {
     };
     
     const returnType = findReturnType(node.body);
-    return returnType || 'STRING';
+    return returnType || 'INTEGER';
+  }
+
+  /**
+   * パラメータ型情報を考慮した戻り値型推論
+   */
+  private inferReturnTypeFromExpression(node: ASTNode, paramTypes: Map<string, IGCSEDataType>): IGCSEDataType {
+    if (!node) return 'INTEGER';
+    
+    switch (node.type) {
+      case 'Constant':
+        if (typeof node.value === 'number') {
+          return Number.isInteger(node.value) ? 'INTEGER' : 'REAL';
+        }
+        if (typeof node.value === 'string') return 'STRING';
+        if (typeof node.value === 'boolean') return 'BOOLEAN';
+        break;
+      case 'Num':
+        return Number.isInteger(node.n) ? 'INTEGER' : 'REAL';
+      case 'Str':
+        return 'STRING';
+      case 'Name':
+        // パラメータの型を参照
+        if (paramTypes.has(node.id)) {
+          return paramTypes.get(node.id)!;
+        }
+        // 数値リテラル
+        if (node.id && /^\d+$/.test(node.id)) {
+          return 'INTEGER';
+        }
+        if (node.id && /^\d+\.\d+$/.test(node.id)) {
+          return 'REAL';
+        }
+        return 'INTEGER';
+      case 'BinOp':
+        // 二項演算の型推論
+        const leftType = this.inferReturnTypeFromExpression(node.left, paramTypes);
+        const rightType = this.inferReturnTypeFromExpression(node.right, paramTypes);
+        
+        // 算術演算子の場合
+        if (['Add', 'Sub', 'Mult', 'Div', 'Mod', 'Pow'].includes(node.op.type)) {
+          // 文字列の連結（+演算子）- 明示的に文字列型の場合のみ
+          if (node.op.type === 'Add' && 
+              ((leftType === 'STRING' && this.isExplicitStringNode(node.left)) || 
+               (rightType === 'STRING' && this.isExplicitStringNode(node.right)))) {
+            return 'STRING';
+          }
+          
+          // 数値型が含まれている場合は数値演算として扱う
+          if ((leftType === 'INTEGER' || leftType === 'REAL') || 
+              (rightType === 'INTEGER' || rightType === 'REAL')) {
+            // 除算の場合はREAL
+            if (node.op.type === 'Div') {
+              return 'REAL';
+            }
+            // 両方がINTEGERの場合はINTEGER
+            if (leftType === 'INTEGER' && rightType === 'INTEGER') {
+              return 'INTEGER';
+            }
+            // どちらかがREALの場合はREAL
+            if (leftType === 'REAL' || rightType === 'REAL') {
+              return 'REAL';
+            }
+            // デフォルトはINTEGER
+            return 'INTEGER';
+          }
+          
+          // デフォルトで算術演算はINTEGERとして推論
+          return 'INTEGER';
+        }
+        
+        // 比較演算子の場合
+        if (['Eq', 'NotEq', 'Lt', 'LtE', 'Gt', 'GtE'].includes(node.op.type)) {
+          return 'BOOLEAN';
+        }
+        
+        return 'INTEGER';
+    }
+    
+    return 'INTEGER';
+  }
+  
+  /**
+   * 明示的な文字列ノードかどうかを判定
+   */
+  private isExplicitStringNode(node: ASTNode): boolean {
+    if (!node) return false;
+    
+    switch (node.type) {
+      case 'Constant':
+        return typeof node.value === 'string';
+      case 'Str':
+        return true;
+      case 'JoinedStr': // f-string
+        return true;
+      default:
+        return false;
+    }
   }
 
   protected override createIRNode(kind: IRKind, text: string, children: IR[] = [], meta?: IRMeta): IR {

@@ -202,7 +202,7 @@ export abstract class BaseEmitter {
     
     // 文字列リテラルを保護
     const stringLiterals: string[] = [];
-    let result = text.replace(/"([^"]*)"/g, (match, content) => {
+    let result = text.replace(/"([^"]*)"/g, (_, content) => {
       const placeholder = `__STRING_${stringLiterals.length}__`;
       stringLiterals.push(content);
       return `"${placeholder}"`;
@@ -214,7 +214,7 @@ export abstract class BaseEmitter {
     }
     
     // 文字列リテラルを復元
-    result = result.replace(/"__STRING_(\d+)__"/g, (match, index) => {
+    result = result.replace(/"__STRING_(\d+)__"/g, (_, index) => {
       return `"${stringLiterals[parseInt(index)]}"`;
     });
     
@@ -237,7 +237,7 @@ export abstract class BaseEmitter {
     
     // 文字列リテラルを保護
     const stringLiterals: string[] = [];
-    result = result.replace(/"([^"]*)"/g, (match, content) => {
+    result = result.replace(/"([^"]*)"/g, (_, content) => {
       const placeholder = `__STRING_${stringLiterals.length}__`;
       stringLiterals.push(content);
       return `"${placeholder}"`;
@@ -281,7 +281,7 @@ export abstract class BaseEmitter {
     result = result.replace(/\binput\(([^)]+)\)/g, 'INPUT($1)');
     
     // 文字列リテラルを復元
-    result = result.replace(/"__STRING_(\d+)__"/g, (match, index) => {
+    result = result.replace(/"__STRING_(\d+)__"/g, (_, index) => {
       return `"${stringLiterals[parseInt(index)]}"`;
     });
     

@@ -81,7 +81,7 @@ export class ExpressionVisitor {
   private parseRawExpression(raw: string): string {
     // 文字列リテラルを一時的に保護
     const stringLiterals: string[] = [];
-    let result = raw.replace(/"([^"]*)"/g, (match, content) => {
+    let result = raw.replace(/"([^"]*)"/g, (_, content) => {
       const placeholder = `__STRING_${stringLiterals.length}__`;
       stringLiterals.push(content);
       return `"${placeholder}"`;
@@ -107,7 +107,7 @@ export class ExpressionVisitor {
       .replace(/\bround\(/g, 'ROUND(');
     
     // 文字列リテラルを復元
-    result = result.replace(/"__STRING_(\d+)__"/g, (match, index) => {
+    result = result.replace(/"__STRING_(\d+)__"/g, (_, index) => {
       return `"${stringLiterals[parseInt(index)]}"`;
     });
     
@@ -455,22 +455,31 @@ export class ExpressionVisitor {
         
         // 算術演算子の場合
         if (['Add', 'Sub', 'Mult', 'Div', 'Mod', 'Pow'].includes(node.op.type)) {
-          // 文字列の連結（+演算子）
-          if (node.op.type === 'Add' && (leftType === 'STRING' || rightType === 'STRING')) {
+          // 文字列の連結（+演算子）- 明示的に文字列型の場合のみ
+          if (node.op.type === 'Add' && 
+              ((leftType === 'STRING' && this.isExplicitStringType(node.left)) || 
+               (rightType === 'STRING' && this.isExplicitStringType(node.right)))) {
             return 'STRING';
           }
-          // 両方が数値型の場合
-          if ((leftType === 'INTEGER' || leftType === 'REAL') && 
+          
+          // 数値型が含まれている場合は数値演算として扱う
+          if ((leftType === 'INTEGER' || leftType === 'REAL') || 
               (rightType === 'INTEGER' || rightType === 'REAL')) {
-            // 除算の場合はREAL、それ以外で両方がINTEGERの場合はINTEGER
+            // 除算の場合はREAL
             if (node.op.type === 'Div') {
               return 'REAL';
-            } else if (leftType === 'INTEGER' && rightType === 'INTEGER') {
+            }
+            // 両方がINTEGERまたは型不明（変数）の場合はINTEGER
+            if ((leftType === 'INTEGER' || leftType === 'STRING') && 
+                (rightType === 'INTEGER' || rightType === 'STRING')) {
               return 'INTEGER';
             } else {
               return 'REAL';
             }
           }
+          
+          // デフォルトで算術演算はINTEGERとして推論（型不明な変数同士の場合）
+          return 'INTEGER';
         }
         
         // 比較演算子の場合
@@ -516,5 +525,23 @@ export class ExpressionVisitor {
    */
   isArrayInitialization(node: ASTNode): boolean {
     return node.type === 'List' || node.type === 'Tuple';
+  }
+
+  /**
+   * 明示的な文字列型かどうかを判定
+   */
+  private isExplicitStringType(node: ASTNode): boolean {
+    if (!node) return false;
+    
+    switch (node.type) {
+      case 'Constant':
+        return typeof node.value === 'string';
+      case 'Str':
+        return true;
+      case 'JoinedStr': // f-string
+        return true;
+      default:
+        return false;
+    }
   }
 }

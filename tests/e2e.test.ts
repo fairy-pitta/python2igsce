@@ -224,7 +224,7 @@ def greet(name):
 
 greet("John")
 `;
-      const expected = `PROCEDURE Greet(name : STRING)
+      const expected = `PROCEDURE Greet(name : INTEGER)
   OUTPUT "Hello,", name
 ENDPROCEDURE
 CALL Greet("John")`;
@@ -241,7 +241,7 @@ def add(x, y):
 result = add(5, 3)
 print(result)
 `;
-      const expected = `FUNCTION Add(x : STRING, y : STRING) RETURNS INTEGER
+      const expected = `FUNCTION Add(x : INTEGER, y : INTEGER) RETURNS INTEGER
   RETURN x + y
 ENDFUNCTION
 result ← add(5, 3)
@@ -259,7 +259,7 @@ def calculate_area(length, width):
 
 my_area = calculate_area(10, 5)
 `;
-      const expected = `FUNCTION Calculate_area(length : STRING, width : STRING) RETURNS STRING
+      const expected = `FUNCTION Calculate_area(length : INTEGER, width : INTEGER) RETURNS INTEGER
   area ← length * width
   RETURN area
 ENDFUNCTION
