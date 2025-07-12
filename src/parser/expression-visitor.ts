@@ -79,8 +79,16 @@ export class ExpressionVisitor {
    * 簡易的な式の解析
    */
   private parseRawExpression(raw: string): string {
+    // 文字列リテラルを一時的に保護
+    const stringLiterals: string[] = [];
+    let result = raw.replace(/"([^"]*)"/g, (match, content) => {
+      const placeholder = `__STRING_${stringLiterals.length}__`;
+      stringLiterals.push(content);
+      return `"${placeholder}"`;
+    });
+    
     // 比較演算子の変換（単語境界を使用）
-    let result = raw
+    result = result
       .replace(/==/g, ' = ')
       .replace(/!=/g, ' ≠ ')
       .replace(/>=/g, ' ≥ ')
@@ -97,6 +105,11 @@ export class ExpressionVisitor {
       .replace(/\bmax\(/g, 'MAX(')
       .replace(/\bmin\(/g, 'MIN(')
       .replace(/\bround\(/g, 'ROUND(');
+    
+    // 文字列リテラルを復元
+    result = result.replace(/"__STRING_(\d+)__"/g, (match, index) => {
+      return `"${stringLiterals[parseInt(index)]}"`;
+    });
     
     return result.trim();
   }

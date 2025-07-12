@@ -200,11 +200,23 @@ export abstract class BaseEmitter {
       'AND', 'OR', 'NOT', 'MOD', 'DIV'
     ];
     
-    let result = text;
+    // 文字列リテラルを保護
+    const stringLiterals: string[] = [];
+    let result = text.replace(/"([^"]*)"/g, (match, content) => {
+      const placeholder = `__STRING_${stringLiterals.length}__`;
+      stringLiterals.push(content);
+      return `"${placeholder}"`;
+    });
+    
     for (const keyword of keywords) {
       const regex = new RegExp(`\\b${keyword.toLowerCase()}\\b`, 'gi');
       result = result.replace(regex, keyword);
     }
+    
+    // 文字列リテラルを復元
+    result = result.replace(/"__STRING_(\d+)__"/g, (match, index) => {
+      return `"${stringLiterals[parseInt(index)]}"`;
+    });
     
     return result;
   }
@@ -221,6 +233,14 @@ export abstract class BaseEmitter {
       const index = commentMatches.length;
       commentMatches.push(match);
       return `__COMMENT_${index}__`;
+    });
+    
+    // 文字列リテラルを保護
+    const stringLiterals: string[] = [];
+    result = result.replace(/"([^"]*)"/g, (match, content) => {
+      const placeholder = `__STRING_${stringLiterals.length}__`;
+      stringLiterals.push(content);
+      return `"${placeholder}"`;
     });
     
     // 比較演算子の変換（代入演算子より先に処理）
@@ -259,6 +279,11 @@ export abstract class BaseEmitter {
     // 通常のinput()関数の変換
     result = result.replace(/\binput\(\)/g, 'INPUT');
     result = result.replace(/\binput\(([^)]+)\)/g, 'INPUT($1)');
+    
+    // 文字列リテラルを復元
+    result = result.replace(/"__STRING_(\d+)__"/g, (match, index) => {
+      return `"${stringLiterals[parseInt(index)]}"`;
+    });
     
     // コメントを復元（#を//に変換、//はそのまま）
     commentMatches.forEach((comment, index) => {
