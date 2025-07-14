@@ -235,7 +235,7 @@ export abstract class BaseEmitter {
       return `__COMMENT_${index}__`;
     });
     
-    // 文字列リテラルを保護
+    // Protect string literals
     const stringLiterals: string[] = [];
     result = result.replace(/"([^"]*)"/g, (_, content) => {
       const placeholder = `__STRING_${stringLiterals.length}__`;
@@ -280,7 +280,7 @@ export abstract class BaseEmitter {
     result = result.replace(/\binput\(\)/g, 'INPUT');
     result = result.replace(/\binput\(([^)]+)\)/g, 'INPUT($1)');
     
-    // 文字列リテラルを復元
+    // Restore string literals
     result = result.replace(/"__STRING_(\d+)__"/g, (_, index) => {
       return `"${stringLiterals[parseInt(index)]}"`;
     });

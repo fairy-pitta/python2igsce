@@ -6,12 +6,12 @@
 export type IGCSEDataType = 
   | 'INTEGER'   // 整数型
   | 'REAL'      // 実数型
-  | 'STRING'    // 文字列型
+  | 'STRING'    // String type
   | 'BOOLEAN'   // 真偽値型
-  | 'CHAR'      // 文字型
+  | 'CHAR'      // Character type
   | 'ARRAY'     // 配列型
   | 'RECORD'    // レコード型
-  | 'ANY';      // 任意の型（型推論できない場合）
+  | 'ANY';      // Any type (when type inference fails)
 
 /**
  * IGCSE Pseudocodeの演算子
@@ -22,7 +22,7 @@ export type IGCSEOperator =
   
   // 比較演算子
   | '='         // 等しい
-  | '≠'         // 等しくない
+  | '≠'         // Not equal
   | '<'         // より小さい
   | '>'         // より大きい
   | '≤'         // 以下
@@ -79,7 +79,7 @@ export type IGCSEKeyword =
   | 'OTHERWISE' // OTHERWISE（CASE文用）
   | 'ENDCASE'   // CASE文終了
   
-  // データ構造
+  // Data structures
   | 'TYPE'      // TYPE定義開始
   | 'ENDTYPE'   // TYPE定義終了
   | 'CLASS'     // CLASS定義開始

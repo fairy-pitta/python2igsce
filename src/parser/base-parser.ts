@@ -141,7 +141,7 @@ export abstract class BaseParser {
    * 現在のループタイプを取得
    */
   protected getCurrentLoopType(): 'while' | 'for' | null {
-    // スコープスタックを逆順で検索して最初に見つかったループスコープを返す
+    // Search scope stack in reverse order and return first found loop scope
     for (let i = this.context.scopeStack.length - 1; i >= 0; i--) {
       const scope = this.context.scopeStack[i];
       if (scope.type === 'while' || scope.type === 'for') {
@@ -196,7 +196,7 @@ export abstract class BaseParser {
    * 変数の検索
    */
   protected findVariable(name: string): VariableInfo | undefined {
-    // 現在のスコープから上位スコープへ順番に検索
+    // Search from current scope to parent scopes in order
     let scope: ScopeInfo | undefined = this.context.currentScope;
     
     while (scope) {
@@ -214,7 +214,7 @@ export abstract class BaseParser {
    * 関数の検索
    */
   protected findFunction(name: string): FunctionInfo | undefined {
-    // 現在のスコープから上位スコープへ順番に検索
+    // Search from current scope to parent scopes in order
     let scope: ScopeInfo | undefined = this.context.currentScope;
     
     while (scope) {

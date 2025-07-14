@@ -28,7 +28,7 @@ export class Converter {
     };
     this.parser = new PythonParser(parserOptions);
     
-    // エミッターの初期化
+    // Initialize emitter
     const emitterOptions: EmitterOptions = {
       format: this.options.outputFormat ?? 'plain',
       indentSize: this.options.indentSize ?? 2,
@@ -188,7 +188,7 @@ export class Converter {
     
     // パーサーオプションの更新（必要に応じて実装）
     
-    // エミッターオプションの更新
+    // Update emitter options
     const emitterOptions: EmitterOptions = {
       format: this.options.outputFormat ?? 'plain',
       indentSize: this.options.indentSize ?? 2,
@@ -223,7 +223,7 @@ export class Converter {
     averageEmitTime: number;
     averageTotalTime: number;
   } {
-    // 実装では統計を追跡する必要がある
+    // Implementation should track statistics
     // 現在は仮の値を返す
     return {
       totalConversions: 0,
@@ -245,7 +245,7 @@ export class Converter {
     const errors: string[] = [];
     const warnings: string[] = [];
     
-    // 基本的な検証
+    // Basic validation
     if (!ir.kind) {
       errors.push('IR node missing kind property');
     }
@@ -256,7 +256,7 @@ export class Converter {
     
 
     
-    // 再帰的な検証
+    // Recursive validation
     for (const child of ir.children || []) {
       const childValidation = this.validateIR(child);
       errors.push(...childValidation.errors);

@@ -26,7 +26,7 @@ export class PythonASTVisitor extends BaseParser {
     this.statementVisitor = new StatementVisitor();
     this.definitionVisitor = new DefinitionVisitor();
     
-    // ビジターにコンテキストを共有
+    // Share context with visitors
     this.statementVisitor.setContext(this.context);
     this.definitionVisitor.setContext(this.context);
   }
@@ -40,18 +40,18 @@ export class PythonASTVisitor extends BaseParser {
     
     try {
       // 実際の実装では、PythonのASTパーサーを使用
-      // ここでは簡易的な実装を提供
+      // Provide simplified implementation here
       const ast = this.parseToAST(source);
       // 2パス処理: まずすべてのクラス定義を事前登録
       this.preRegisterAllClasses(ast.body);
       
-      // クラス定義登録後、ビジターに最新のコンテキストを再共有
+      // Re-share latest context with visitors after class definition registration
       this.statementVisitor.setContext(this.context);
       this.definitionVisitor.setContext(this.context);
       
       const ir = this.visitNode(ast);
       
-      // IRが配列でない場合は、その子要素を返す
+      // Return child elements if IR is not an array
       if (ir.kind === 'compound' && ir.children) {
         return this.createParseResult(ir.children);
       }
@@ -73,8 +73,8 @@ export class PythonASTVisitor extends BaseParser {
    * 簡易的なASTパーサー（実際の実装では外部ライブラリを使用）
    */
   private parseToAST(source: string): ASTNode {
-    // 実際の実装では、python-astやpyodideなどを使用
-    // ここでは簡易的な実装
+    // In actual implementation, use python-ast or pyodide
+    // Simplified implementation here
     const lines = source.split('\n');
     const nodes: ASTNode[] = [];
     const processedLines = new Set<number>();
@@ -129,7 +129,7 @@ export class PythonASTVisitor extends BaseParser {
     const trimmed = line.trim();
     const indent = line.length - line.trimStart().length;
     
-    // 基本的な文ノードを作成
+    // Create basic statement node
     const node = this.parseLineToASTNode(trimmed, startIndex + 1);
     if (!node) {
       return { node: null, nextIndex: startIndex + 1 };
@@ -140,7 +140,7 @@ export class PythonASTVisitor extends BaseParser {
       const bodyNodes: ASTNode[] = [];
       let i = startIndex + 1;
       
-      // 次の行から子ブロックを解析
+      // Parse child block from next line
       while (i < lines.length) {
         const childLine = lines[i];
         const childTrimmed = childLine.trim();
@@ -179,7 +179,7 @@ export class PythonASTVisitor extends BaseParser {
                 continue;
               }
               
-              // インデントが同じかそれより少ない場合、ELSE節終了
+              // End ELSE clause if indent is same or less
               if (elseChildIndent <= indent) {
                 break;
               }
@@ -198,7 +198,7 @@ export class PythonASTVisitor extends BaseParser {
           }
         }
         
-        // インデントが同じかそれより少ない場合、ブロック終了
+        // End block if indent is same or less
         if (childIndent <= indent) {
           break;
         }
@@ -265,7 +265,7 @@ export class PythonASTVisitor extends BaseParser {
       const colonIndex = trimmed.indexOf(': ');
       const equalIndex = trimmed.indexOf(' = ');
       
-      // コロンが等号より前にある場合は型注釈付き代入
+      // Type-annotated assignment if colon comes before equals
       if (colonIndex < equalIndex) {
         const varName = trimmed.substring(0, colonIndex).trim();
         const typeAnnotation = trimmed.substring(colonIndex + 2, equalIndex).trim();
@@ -353,7 +353,7 @@ export class PythonASTVisitor extends BaseParser {
         };
       }
       
-      // 左辺が単純な変数名で、右辺が存在する場合は代入文
+      // Assignment statement if left side is simple variable name and right side exists
       if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(beforeEqual) && afterEqual.length > 0) {
         return this.parseAssignStatement(trimmed, lineNumber);
       }
@@ -438,7 +438,7 @@ export class PythonASTVisitor extends BaseParser {
     const match = line.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*([+\-*/%])=\s*(.+)$/);
     
     if (!match) {
-      // マッチしない場合は通常の式として処理
+      // Process as normal expression if no match
       return {
         type: 'Expr',
         lineno: lineNumber,
@@ -701,7 +701,7 @@ export class PythonASTVisitor extends BaseParser {
           };
         }
         
-        // 文字列の検出
+        // String detection
         if ((elemTrimmed.startsWith('"') && elemTrimmed.endsWith('"')) ||
             (elemTrimmed.startsWith("'") && elemTrimmed.endsWith("'"))) {
           return {
@@ -841,7 +841,7 @@ export class PythonASTVisitor extends BaseParser {
       }
     }
     
-    // 単純な式として処理
+    // Process as simple expression
     return this.parseSimpleExpression(trimmed);
   }
   
@@ -879,7 +879,7 @@ export class PythonASTVisitor extends BaseParser {
       };
     }
     
-    // 文字列リテラル
+    // String literal
     if ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
         (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
       return {
@@ -969,7 +969,7 @@ export class PythonASTVisitor extends BaseParser {
       return createIR('statement', '', []);
     }
 
-    // ビジターにvisitNodeメソッドを設定
+    // Set visitNode method to visitors
     this.statementVisitor.visitNode = this.visitNode.bind(this);
     this.definitionVisitor.visitNode = this.visitNode.bind(this);
 
@@ -1029,7 +1029,7 @@ export class PythonASTVisitor extends BaseParser {
         return this.definitionVisitor.visitClassDef(node);
       
       default:
-        // 未対応のノードタイプの場合、コメントとして出力
+        // Output as comment for unsupported node types
         return this.createIRNode('comment', `// Unsupported node type: ${node.type}`);
     }
   }
@@ -1053,7 +1053,7 @@ export class PythonASTVisitor extends BaseParser {
     const match = line.match(/^def\s+(\w+)\s*\(([^)]*)\)\s*(?:->\s*([^:]+))?:\s*$/);
     
     if (!match) {
-      // マッチしない場合は基本的な関数定義として処理
+      // Process as basic function definition if no match
       return {
         type: 'FunctionDef',
         name: 'unknown_function',
@@ -1066,7 +1066,7 @@ export class PythonASTVisitor extends BaseParser {
     
     const [, funcName, paramsStr, returnType] = match;
     
-    // パラメータの解析
+    // Parse parameters
     const params = this.parseParameters(paramsStr);
     
     return {
@@ -1098,7 +1098,7 @@ export class PythonASTVisitor extends BaseParser {
         return this.parseExpression(trimmed);
       }
       
-      // 文字列リテラルの場合
+      // For string literals
       if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
         return {
           type: 'Str',
@@ -1176,7 +1176,7 @@ export class PythonASTVisitor extends BaseParser {
     return paramsStr.split(',').map(param => {
       const trimmed = param.trim();
       
-      // 型注釈がある場合: "param: type"
+      // With type annotation: "param: type"
       const typeMatch = trimmed.match(/^(\w+)\s*:\s*(.+)$/);
       if (typeMatch) {
         const [, paramName, paramType] = typeMatch;
@@ -1186,7 +1186,7 @@ export class PythonASTVisitor extends BaseParser {
         };
       }
       
-      // 型注釈がない場合
+      // Without type annotation
       return {
         arg: trimmed,
         annotation: null
@@ -1246,14 +1246,14 @@ export class PythonASTVisitor extends BaseParser {
   private registerClassDefinition(node: ASTNode): void {
     const className = node.name;
     
-    // __init__メソッドから属性を抽出
+    // Extract attributes from __init__ method
     const constructor = node.body.find((item: ASTNode) => 
       item.type === 'FunctionDef' && item.name === '__init__'
     );
     
     const attributes: string[] = [];
     if (constructor) {
-      // コンストラクタのパラメータから属性名を取得
+      // Get attribute names from constructor parameters
       if (constructor.args && constructor.args.args) {
         constructor.args.args.forEach((arg: any) => {
           if (arg.arg !== 'self') {

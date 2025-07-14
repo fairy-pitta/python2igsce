@@ -9,7 +9,7 @@ export * from './igcse';
 // パーサー関連の型
 export * from './parser';
 
-// エミッター関連の型
+// Emitter-related types
 export * from './emitter';
 
 // 共通ユーティリティ型

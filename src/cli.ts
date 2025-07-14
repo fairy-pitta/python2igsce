@@ -284,7 +284,7 @@ class CLI {
           const configContent = await fs.readFile(configPath, 'utf-8');
           config = JSON.parse(configContent);
         } catch {
-          // ファイルが存在しない場合は新規作成
+          // Create new file if it doesn't exist
         }
         
         // 値の型変換

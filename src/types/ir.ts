@@ -48,7 +48,7 @@ export type IRKind =
   | 'function'   // FUNCTION定義
   | 'return'     // RETURN文
   
-  // データ構造
+  // Data structures
   | 'array'      // 配列宣言
   | 'array_literal' // 配列リテラル
   | 'type'       // TYPE定義
@@ -57,7 +57,7 @@ export type IRKind =
   // その他
   | 'block'      // 複数のIRノードのグループ化
   | 'case'       // CASE文
-  | 'statement'  // 一般的な文
+  | 'statement'  // General statement
   | 'expression' // 式
   | 'compound'   // 複合文（複数の文をまとめる）
   | 'module';    // モジュール

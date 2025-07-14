@@ -37,7 +37,7 @@ export class PythonParser extends BaseParser {
     // ソースコードの前処理
     const processedSource = this.preprocessSource(source);
     
-    // PythonASTVisitorを使用してASTからIRへ変換
+    // Convert AST to IR using PythonASTVisitor
     const visitor = new PythonASTVisitor();
     const visitorResult = visitor.parse(processedSource);
     
@@ -125,7 +125,7 @@ export class PythonParser extends BaseParser {
     processed = processed.replace(/\r\n/g, '\n');
     processed = processed.replace(/\r/g, '\n');
     
-    // タブをスペースに変換
+    // Convert tabs to spaces
     processed = processed.replace(/\t/g, ' '.repeat(this.options.indentSize));
     
     // 末尾の空白を除去
@@ -166,15 +166,15 @@ export class PythonParser extends BaseParser {
     // 空のノードを除去（ただし、子ノードを持つstatementノードは保持）
     const filteredChildren = optimizedChildren
       .filter(child => {
-        // テキストがあるノードは保持
+        // Keep nodes with text
         if (child.text.trim() !== '') {
           return true;
         }
-        // statementノードで子ノードがある場合は保持
+        // Keep statement nodes with children
         if (child.kind === 'statement' && child.children.length > 0) {
           return true;
         }
-        // assign, input, output, if, for, while等の重要なノードは保持
+        // Keep important nodes like assign, input, output, if, for, while
         if (['assign', 'input', 'output', 'if', 'for', 'while', 'function', 'class'].includes(child.kind)) {
           return true;
         }
@@ -345,7 +345,7 @@ export class PythonParser extends BaseParser {
       for (const [name, variable] of Array.from(scope.variables.entries())) {
         usage.set(name, {
           defined: true,
-          used: false, // 実際の使用状況は別途分析が必要
+          used: false, // Actual usage needs separate analysis
           type: variable.type,
           scope: variable.scope
         });
@@ -371,7 +371,7 @@ export class PythonParser extends BaseParser {
       for (const [name, func] of Array.from(scope.functions.entries())) {
         usage.set(name, {
           defined: true,
-          called: false, // 実際の呼び出し状況は別途分析が必要
+          called: false, // Actual call status needs separate analysis
           parameters: func.parameters,
           returnType: func.returnType
         });
