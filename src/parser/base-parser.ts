@@ -1,4 +1,4 @@
-// パーサーの基本クラス
+// Base parser class
 import { IR, createIR } from '../types/ir';
 import { 
   ParserOptions, 
@@ -13,8 +13,8 @@ import {
 import { IGCSEDataType } from '../types/igcse';
 
 /**
- * パーサーの基本クラス
- * 共通的なパース機能を提供
+ * Base parser class
+ * Provides common parsing functionality
  */
 export abstract class BaseParser {
   protected options: Required<ParserOptions>;
@@ -27,7 +27,7 @@ export abstract class BaseParser {
   }
 
   /**
-   * デフォルトオプションの取得
+   * Get default options
    */
   private getDefaultOptions(options: ParserOptions): Required<ParserOptions> {
     return {
@@ -45,7 +45,7 @@ export abstract class BaseParser {
   }
 
   /**
-   * 初期コンテキストの作成
+   * Create initial context
    */
   private createInitialContext(): ParserContext {
     const globalScope: ScopeInfo = {
@@ -73,12 +73,12 @@ export abstract class BaseParser {
   }
 
   /**
-   * パースの実行（抽象メソッド）
+   * Execute parsing (abstract method)
    */
   abstract parse(source: string): ParseResult;
 
   /**
-   * エラーの追加
+   * Add error
    */
   protected addError(
     message: string,
@@ -95,7 +95,7 @@ export abstract class BaseParser {
   }
 
   /**
-   * 警告の追加
+   * Add warning
    */
   protected addWarning(
     message: string,
@@ -112,7 +112,7 @@ export abstract class BaseParser {
   }
 
   /**
-   * 新しいスコープの開始
+   * Start new scope
    */
   protected enterScope(name: string, type: import('../types/parser').ScopeType): void {
     const newScope: ScopeInfo = {
@@ -128,7 +128,7 @@ export abstract class BaseParser {
   }
 
   /**
-   * スコープの終了
+   * End scope
    */
   protected exitScope(): void {
     if (this.context.scopeStack.length > 1) {
@@ -138,7 +138,7 @@ export abstract class BaseParser {
   }
 
   /**
-   * 現在のループタイプを取得
+   * Get current loop type
    */
   protected getCurrentLoopType(): 'while' | 'for' | null {
     // Search scope stack in reverse order and return first found loop scope
@@ -152,7 +152,7 @@ export abstract class BaseParser {
   }
 
   /**
-   * 変数の登録
+   * Register variable
    */
   protected registerVariable(
     name: string,
@@ -171,7 +171,7 @@ export abstract class BaseParser {
   }
 
   /**
-   * 関数の登録
+   * Register function
    */
   protected registerFunction(
     name: string,
@@ -193,7 +193,7 @@ export abstract class BaseParser {
   }
 
   /**
-   * 変数の検索
+   * Find variable
    */
   protected findVariable(name: string): VariableInfo | undefined {
     // Search from current scope to parent scopes in order

@@ -3,11 +3,11 @@ import { IR } from '../types/ir';
 import { EmitResult, EmitterOptions } from '../types/emitter';
 
 /**
- * エミッターユーティリティクラス
+ * Emitter utility class
  */
 export class EmitterUtils {
   /**
-   * IRツリーの統計情報を取得
+   * Get IR tree statistics
    */
   static getIRStats(ir: IR): {
     totalNodes: number;
@@ -35,7 +35,7 @@ export class EmitterUtils {
       // Count node types
       stats.nodeTypes[node.kind] = (stats.nodeTypes[node.kind] || 0) + 1;
       
-      // 特徴の検出
+      // Feature detection
       if (node.kind === 'comment') {
         stats.hasComments = true;
       }
@@ -54,7 +54,7 @@ export class EmitterUtils {
   }
 
   /**
-   * IRツリーの走査
+   * Traverse IR tree
    */
   static traverseIR(
     ir: IR,
@@ -69,7 +69,7 @@ export class EmitterUtils {
   }
 
   /**
-   * エミット結果の検証
+   * Validate emit result
    */
   static validateEmitResult(result: EmitResult): {
     isValid: boolean;
@@ -88,7 +88,7 @@ export class EmitterUtils {
       issues.push(`${result.errors.length} error(s) occurred during emission`);
     }
 
-    // 統計の検証
+    // Validate statistics
     if (result.stats.linesGenerated === 0) {
       issues.push('No lines were generated');
     }
@@ -101,7 +101,7 @@ export class EmitterUtils {
       suggestions.push('Deep nesting detected - consider refactoring');
     }
 
-    // 警告の確認
+    // Check warnings
     if (result.warnings.length > 0) {
       suggestions.push(`${result.warnings.length} warning(s) - review for potential improvements`);
     }
@@ -114,7 +114,7 @@ export class EmitterUtils {
   }
 
   /**
-   * コードの品質分析
+   * Analyze code quality
    */
   static analyzeCodeQuality(code: string): {
     score: number; // 0-100
@@ -129,16 +129,16 @@ export class EmitterUtils {
     const lines = code.split('\n').filter(line => line.trim());
     const recommendations: string[] = [];
 
-    // 可読性の評価
+    // Evaluate readability
     const readability = this.evaluateReadability(lines, recommendations);
     
-    // 構造の評価
+    // Evaluate structure
     const structure = this.evaluateStructure(lines, recommendations);
     
-    // 一貫性の評価
+    // Evaluate consistency
     const consistency = this.evaluateConsistency(lines, recommendations);
     
-    // 完全性の評価
+    // Evaluate completeness
     const completeness = this.evaluateCompleteness(lines, recommendations);
 
     const score = Math.round((readability + structure + consistency + completeness) / 4);
@@ -156,19 +156,19 @@ export class EmitterUtils {
   }
 
   /**
-   * 可読性の評価
+   * Evaluate readability
    */
   private static evaluateReadability(lines: string[], recommendations: string[]): number {
     let score = 100;
     
-    // 長すぎる行のチェック
+    // Check for lines that are too long
     const longLines = lines.filter(line => line.length > 80);
     if (longLines.length > 0) {
       score -= Math.min(30, longLines.length * 5);
       recommendations.push(`${longLines.length} line(s) exceed 80 characters`);
     }
 
-    // コメントの存在チェック
+    // Check for presence of comments
     const commentLines = lines.filter(line => line.trim().startsWith('//'));
     const commentRatio = commentLines.length / lines.length;
     if (commentRatio < 0.1) {
@@ -188,12 +188,12 @@ export class EmitterUtils {
   }
 
   /**
-   * 構造の評価
+   * Evaluate structure
    */
   private static evaluateStructure(lines: string[], recommendations: string[]): number {
     let score = 100;
     
-    // インデントの一貫性チェック
+    // Check indentation consistency
     const indentSizes = new Set<number>();
     for (const line of lines) {
       const leadingSpaces = line.length - line.trimStart().length;
@@ -207,7 +207,7 @@ export class EmitterUtils {
       recommendations.push('Inconsistent indentation detected');
     }
 
-    // 制御構造の対応チェック
+    // Check control structure correspondence
     const structureBalance = this.checkStructureBalance(lines);
     if (!structureBalance.balanced) {
       score -= 30;
@@ -218,7 +218,7 @@ export class EmitterUtils {
   }
 
   /**
-   * 一貫性の評価
+   * Evaluate consistency
    */
   private static evaluateConsistency(lines: string[], recommendations: string[]): number {
     let score = 100;
@@ -241,7 +241,7 @@ export class EmitterUtils {
       recommendations.push('Inconsistent keyword capitalization');
     }
 
-    // 演算子の一貫性
+    // Operator consistency
     const hasArrowAssign = lines.some(line => line.includes('←'));
     const hasEqualsAssign = lines.some(line => line.includes('=') && !line.includes('=='));
     
@@ -254,7 +254,7 @@ export class EmitterUtils {
   }
 
   /**
-   * 完全性の評価
+   * Evaluate completeness
    */
   private static evaluateCompleteness(lines: string[], recommendations: string[]): number {
     let score = 100;
@@ -278,7 +278,7 @@ export class EmitterUtils {
   }
 
   /**
-   * 制御構造のバランスチェック
+   * Check control structure balance
    */
   private static checkStructureBalance(lines: string[]): {
     balanced: boolean;
@@ -323,28 +323,28 @@ export class EmitterUtils {
   }
 
   /**
-   * コードの複雑度計算
+   * Calculate code complexity
    */
   static calculateComplexity(ir: IR): {
     cyclomaticComplexity: number;
     cognitiveComplexity: number;
     nestingDepth: number;
   } {
-    let cyclomaticComplexity = 1; // 基本パス
+    let cyclomaticComplexity = 1; // Basic path
     let cognitiveComplexity = 0;
     let maxNestingDepth = 0;
     
     this.traverseIR(ir, (node, depth) => {
       maxNestingDepth = Math.max(maxNestingDepth, depth);
       
-      // サイクロマティック複雑度
+      // Cyclomatic complexity
       if (['if', 'for', 'while', 'case'].includes(node.kind)) {
         cyclomaticComplexity++;
       }
       
-      // 認知的複雑度
+      // Cognitive complexity
       if (['if', 'for', 'while'].includes(node.kind)) {
-        cognitiveComplexity += 1 + depth; // ネストによる重み付け
+        cognitiveComplexity += 1 + depth; // Weighting by nesting
       }
     });
     
