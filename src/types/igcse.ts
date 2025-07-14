@@ -1,98 +1,98 @@
-// IGCSE Pseudocode特有の型定義
+// IGCSE Pseudocode specific type definitions
 
 /**
- * IGCSE Pseudocodeでサポートされるデータ型
+ * Data types supported by IGCSE Pseudocode
  */
 export type IGCSEDataType = 
-  | 'INTEGER'   // 整数型
-  | 'REAL'      // 実数型
+  | 'INTEGER'   // Integer type
+  | 'REAL'      // Real number type
   | 'STRING'    // String type
-  | 'BOOLEAN'   // 真偽値型
+  | 'BOOLEAN'   // Boolean type
   | 'CHAR'      // Character type
-  | 'ARRAY'     // 配列型
-  | 'RECORD'    // レコード型
+  | 'ARRAY'     // Array type
+  | 'RECORD'    // Record type
   | 'ANY';      // Any type (when type inference fails)
 
 /**
- * IGCSE Pseudocodeの演算子
+ * IGCSE Pseudocode operators
  */
 export type IGCSEOperator = 
-  // 代入演算子
-  | '←'         // 代入
+  // Assignment operator
+  | '←'         // Assignment
   
-  // 比較演算子
-  | '='         // 等しい
+  // Comparison operators
+  | '='         // Equal
   | '≠'         // Not equal
-  | '<'         // より小さい
-  | '>'         // より大きい
-  | '≤'         // 以下
-  | '≥'         // 以上
+  | '<'         // Less than
+  | '>'         // Greater than
+  | '≤'         // Less than or equal
+  | '≥'         // Greater than or equal
   
-  // 論理演算子
-  | 'AND'       // 論理積
-  | 'OR'        // 論理和
-  | 'NOT'       // 論理否定
+  // Logical operators
+  | 'AND'       // Logical AND
+  | 'OR'        // Logical OR
+  | 'NOT'       // Logical NOT
   
-  // 算術演算子
-  | '+'         // 加算
-  | '-'         // 減算
-  | '*'         // 乗算
-  | '/'         // 除算
-  | 'MOD'       // 剰余
-  | 'DIV';      // 整数除算
+  // Arithmetic operators
+  | '+'         // Addition
+  | '-'         // Subtraction
+  | '*'         // Multiplication
+  | '/'         // Division
+  | 'MOD'       // Modulo
+  | 'DIV';      // Integer division
 
 /**
- * IGCSE Pseudocodeのキーワード
+ * IGCSE Pseudocode keywords
  */
 export type IGCSEKeyword = 
-  // 条件文
-  | 'IF'        // IF文開始
+  // Conditional statements
+  | 'IF'        // IF statement start
   | 'THEN'      // THEN
-  | 'ELSE'      // ELSE文
-  | 'ENDIF'     // IF文終了
+  | 'ELSE'      // ELSE statement
+  | 'ENDIF'     // IF statement end
   
-  // ループ文
-  | 'FOR'       // FOR文開始
-  | 'TO'        // TO（FOR文用）
-  | 'STEP'      // STEP（FOR文用）
-  | 'NEXT'      // FOR文終了
-  | 'WHILE'     // WHILE文開始
-  | 'ENDWHILE'  // WHILE文終了
-  | 'REPEAT'    // REPEAT文開始
-  | 'UNTIL'     // REPEAT文終了
+  // Loop statements
+  | 'FOR'       // FOR statement start
+  | 'TO'        // TO (for FOR statement)
+  | 'STEP'      // STEP (for FOR statement)
+  | 'NEXT'      // FOR statement end
+  | 'WHILE'     // WHILE statement start
+  | 'ENDWHILE'  // WHILE statement end
+  | 'REPEAT'    // REPEAT statement start
+  | 'UNTIL'     // REPEAT statement end
   
-  // 関数・プロシージャ
-  | 'PROCEDURE' // プロシージャ開始
-  | 'ENDPROCEDURE' // プロシージャ終了
-  | 'FUNCTION'  // 関数開始
-  | 'RETURNS'   // 戻り値型指定
-  | 'ENDFUNCTION' // 関数終了
-  | 'RETURN'    // 戻り値
+  // Functions and procedures
+  | 'PROCEDURE' // Procedure start
+  | 'ENDPROCEDURE' // Procedure end
+  | 'FUNCTION'  // Function start
+  | 'RETURNS'   // Return type specification
+  | 'ENDFUNCTION' // Function end
+  | 'RETURN'    // Return value
   
-  // 入出力
-  | 'INPUT'     // 入力
-  | 'OUTPUT'    // 出力
+  // Input/Output
+  | 'INPUT'     // Input
+  | 'OUTPUT'    // Output
   
-  // 選択文
-  | 'CASE'      // CASE文開始
-  | 'OF'        // OF（CASE文用）
-  | 'OTHERWISE' // OTHERWISE（CASE文用）
-  | 'ENDCASE'   // CASE文終了
+  // Selection statements
+  | 'CASE'      // CASE statement start
+  | 'OF'        // OF (for CASE statement)
+  | 'OTHERWISE' // OTHERWISE (for CASE statement)
+  | 'ENDCASE'   // CASE statement end
   
   // Data structures
-  | 'TYPE'      // TYPE定義開始
-  | 'ENDTYPE'   // TYPE定義終了
-  | 'CLASS'     // CLASS定義開始
-  | 'ENDCLASS'  // CLASS定義終了
-  | 'DECLARE'   // 変数宣言
+  | 'TYPE'      // TYPE definition start
+  | 'ENDTYPE'   // TYPE definition end
+  | 'CLASS'     // CLASS definition start
+  | 'ENDCLASS'  // CLASS definition end
+  | 'DECLARE'   // Variable declaration
   
-  // その他
-  | 'CONSTANT'  // 定数
-  | 'ARRAY'     // 配列
-  | 'RECORD';   // レコード
+  // Others
+  | 'CONSTANT'  // Constant
+  | 'ARRAY'     // Array
+  | 'RECORD';   // Record
 
 /**
- * Python演算子からIGCSE演算子へのマッピング
+ * Mapping from Python operators to IGCSE operators
  */
 export const PYTHON_TO_IGCSE_OPERATORS: Record<string, IGCSEOperator> = {
   '=': '←',
@@ -114,7 +114,7 @@ export const PYTHON_TO_IGCSE_OPERATORS: Record<string, IGCSEOperator> = {
 };
 
 /**
- * Python型からIGCSE型へのマッピング
+ * Mapping from Python types to IGCSE types
  */
 export const PYTHON_TO_IGCSE_TYPES: Record<string, IGCSEDataType> = {
   'int': 'INTEGER',
@@ -126,7 +126,7 @@ export const PYTHON_TO_IGCSE_TYPES: Record<string, IGCSEDataType> = {
 };
 
 /**
- * IGCSE Pseudocodeの予約語チェック
+ * Check IGCSE Pseudocode reserved words
  */
 export function isIGCSEKeyword(word: string): boolean {
   const keywords: IGCSEKeyword[] = [
@@ -143,21 +143,21 @@ export function isIGCSEKeyword(word: string): boolean {
 }
 
 /**
- * Python演算子をIGCSE演算子に変換
+ * Convert Python operator to IGCSE operator
  */
 export function convertOperator(pythonOp: string): IGCSEOperator {
   return PYTHON_TO_IGCSE_OPERATORS[pythonOp] || pythonOp as IGCSEOperator;
 }
 
 /**
- * Python型をIGCSE型に変換
+ * Convert Python type to IGCSE type
  */
 export function convertDataType(pythonType: string): IGCSEDataType {
   return PYTHON_TO_IGCSE_TYPES[pythonType] || 'STRING';
 }
 
 /**
- * 型推論のヘルパー関数
+ * Helper function for type inference
  */
 export function inferDataType(value: any): IGCSEDataType {
   if (typeof value === 'number') {
@@ -175,5 +175,5 @@ export function inferDataType(value: any): IGCSEDataType {
   if (typeof value === 'object' && value !== null) {
     return 'RECORD';
   }
-  return 'STRING'; // デフォルト
+  return 'STRING'; // Default
 }

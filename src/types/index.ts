@@ -1,92 +1,92 @@
-// 型定義のエクスポート
+// Type definition exports
 
-// IR関連の型
+// IR-related types
 export * from './ir';
 
-// IGCSE Pseudocode関連の型
+// IGCSE Pseudocode-related types
 export * from './igcse';
 
-// パーサー関連の型
+// Parser-related types
 export * from './parser';
 
 // Emitter-related types
 export * from './emitter';
 
-// 共通ユーティリティ型
+// Common utility types
 export interface ConversionOptions {
-  /** パーサーオプション */
+  /** Parser options */
   parser?: import('./parser').ParserOptions;
-  /** エミッターオプション */
+  /** Emitter options */
   emitter?: import('./emitter').EmitterOptions;
-  /** デバッグモード */
+  /** Debug mode */
   debug?: boolean;
-  /** 出力ファイル名 */
+  /** Output file name */
   outputFile?: string;
-  /** 厳格モード */
+  /** Strict mode */
   strictMode?: boolean;
-  /** コメントを含める */
+  /** Include comments */
   includeComments?: boolean;
-  /** 空白を保持 */
+  /** Preserve whitespace */
   preserveWhitespace?: boolean;
-  /** 最大エラー数 */
+  /** Maximum error count */
   maxErrors?: number;
-  /** タイムアウト */
+  /** Timeout */
   timeout?: number;
-  /** 出力フォーマット */
+  /** Output format */
   outputFormat?: 'plain' | 'markdown';
-  /** インデントサイズ */
+  /** Indent size */
   indentSize?: number;
-  /** インデントタイプ */
+  /** Indent type */
   indentType?: 'spaces' | 'tabs';
-  /** 行末文字 */
+  /** Line ending */
   lineEnding?: '\n' | '\r\n';
-  /** 最大行長 */
+  /** Maximum line length */
   maxLineLength?: number;
-  /** 美化 */
+  /** Beautify */
   beautify?: boolean;
-  /** 行番号を含める */
+  /** Include line numbers */
   includeLineNumbers?: boolean;
-  /** キーワードを大文字にする */
+  /** Uppercase keywords */
   uppercaseKeywords?: boolean;
-  /** 演算子の周りにスペース */
+  /** Space around operators */
   spaceAroundOperators?: boolean;
-  /** カンマの後にスペース */
+  /** Space after commas */
   spaceAfterCommas?: boolean;
 }
 
 export interface ConversionResult {
-  /** 変換されたコード */
+  /** Converted code */
   code: string;
-  /** パース結果 */
+  /** Parse result */
   parseResult: import('./parser').ParseResult;
-  /** エミット結果 */
+  /** Emit result */
   emitResult: import('./emitter').EmitResult;
-  /** 変換統計 */
+  /** Conversion statistics */
   stats: ConversionStats;
-  /** パースされたAST（デバッグ用） */
+  /** Parsed AST (for debugging) */
   ast?: any;
-  /** 中間表現（IR）ツリー */
+  /** Intermediate representation (IR) tree */
   ir?: import('./ir').IR[];
 }
 
 export interface ConversionStats {
-  /** 入力行数 */
+  /** Input line count */
   inputLines: number;
-  /** 出力行数 */
+  /** Output line count */
   outputLines: number;
-  /** 変換時間（ミリ秒） */
+  /** Conversion time (milliseconds) */
   conversionTime: number;
-  /** パース時間（ミリ秒） */
+  /** Parse time (milliseconds) */
   parseTime: number;
-  /** エミット時間（ミリ秒） */
+  /** Emit time (milliseconds) */
   emitTime: number;
-  /** エラー数 */
+  /** Error count */
   errorCount: number;
-  /** 警告数 */
+  /** Warning count */
   warningCount: number;
 }
 
-// バージョン情報
+// Version information
 export const VERSION = '1.0.0';
 export const SUPPORTED_PYTHON_VERSION = '3.x';
 export const IGCSE_SPEC_VERSION = '2024';
