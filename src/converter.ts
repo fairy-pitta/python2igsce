@@ -18,7 +18,7 @@ export class Converter {
   constructor(options: Partial<ConversionOptions> = {}) {
     this.options = this.mergeDefaultOptions(options);
     
-    // パーサーの初期化
+    // Initialize parser
     const parserOptions: ParserOptions = {
       strictMode: this.options.strictMode ?? false,
       includeComments: this.options.includeComments ?? true,
@@ -28,7 +28,7 @@ export class Converter {
     };
     this.parser = new PythonParser(parserOptions);
     
-    // Initialize emitter
+    // Initialize emitters
     const emitterOptions: EmitterOptions = {
       format: this.options.outputFormat ?? 'plain',
       indentSize: this.options.indentSize ?? 2,
@@ -50,13 +50,13 @@ export class Converter {
   }
 
   /**
-   * Python コードを IGCSE Pseudocode に変換
+   * Convert Python code to IGCSE Pseudocode
    */
   convert(pythonCode: string): ConversionResult {
     const startTime = Date.now();
     
     try {
-      // パース処理
+      // Parse process
       const parseResult = this.parser.parse(pythonCode);
       
       if (parseResult.errors.length > 0 && this.options.strictMode) {
@@ -68,12 +68,12 @@ export class Converter {
         );
       }
       
-      // エミット処理
+      // Emit process
       const emitter = this.options.outputFormat === 'markdown' 
         ? this.markdownEmitter 
         : this.textEmitter;
       
-      // すべてのIRノードを処理するため、compound IRを作成
+      // Create compound IR to process all IR nodes
       const compoundIR: IR = {
         kind: 'compound',
         text: '',
@@ -82,7 +82,7 @@ export class Converter {
       
       const emitResult = emitter.emit(compoundIR);
       
-      // 結果の作成
+      // Create result
       const endTime = Date.now();
       const stats = this.createConversionStats(
         parseResult,
@@ -113,7 +113,7 @@ export class Converter {
   }
 
   /**
-   * バッチ変換（複数ファイル）
+   * Batch conversion (multiple files)
    */
   async convertBatch(files: Array<{ name: string; content: string }>): Promise<Array<{
     name: string;
@@ -181,12 +181,12 @@ export class Converter {
   }
 
   /**
-   * 変換オプションの更新
+   * Update conversion options
    */
   updateOptions(newOptions: Partial<ConversionOptions>): void {
     this.options = this.mergeDefaultOptions({ ...this.options, ...newOptions });
     
-    // パーサーオプションの更新（必要に応じて実装）
+    // Update parser options (implement as needed)
     
     // Update emitter options
     const emitterOptions: EmitterOptions = {
@@ -207,14 +207,14 @@ export class Converter {
   }
 
   /**
-   * 現在のオプションを取得
+   * Get current options
    */
   getOptions(): ConversionOptions {
     return { ...this.options };
   }
 
   /**
-   * 変換統計の取得
+   * Get conversion statistics
    */
   getStats(): {
     totalConversions: number;
@@ -224,7 +224,7 @@ export class Converter {
     averageTotalTime: number;
   } {
     // Implementation should track statistics
-    // 現在は仮の値を返す
+    // Currently returns dummy values
     return {
       totalConversions: 0,
       successfulConversions: 0,
@@ -235,7 +235,7 @@ export class Converter {
   }
 
   /**
-   * IRの検証
+   * Validate IR
    */
   validateIR(ir: IR): {
     isValid: boolean;
@@ -271,7 +271,7 @@ export class Converter {
   }
 
   /**
-   * デフォルトオプションとのマージ
+   * Merge with default options
    */
   private mergeDefaultOptions(options: Partial<ConversionOptions>): ConversionOptions {
     const defaults: ConversionOptions = {
@@ -296,7 +296,7 @@ export class Converter {
   }
 
   /**
-   * エラー結果の作成
+   * Create error result
    */
   private createErrorResult(
     message: string,
@@ -359,7 +359,7 @@ export class Converter {
   }
 
   /**
-   * 変換統計の作成
+   * Create conversion statistics
    */
   private createConversionStats(
     parseResult: ParseResult,
@@ -380,7 +380,7 @@ export class Converter {
 }
 
 /**
- * 便利な関数：簡単な変換
+ * Utility function: Simple conversion
  */
 export async function convertPythonToIGCSE(
   pythonCode: string,
@@ -391,7 +391,7 @@ export async function convertPythonToIGCSE(
 }
 
 /**
- * 便利な関数：ファイルからの変換
+ * Utility function: Convert from file
  */
 export async function convertFileToIGCSE(
   filePath: string,
@@ -403,7 +403,7 @@ export async function convertFileToIGCSE(
 }
 
 /**
- * 便利な関数：複数ファイルの変換
+ * Utility function: Convert multiple files
  */
 export async function convertFilesToIGCSE(
   filePaths: string[],

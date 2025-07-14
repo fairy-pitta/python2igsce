@@ -4,7 +4,7 @@ import { EmitResult, EmitterOptions, MarkdownConfig } from '../types/emitter';
 import { TextEmitter } from './text-emitter';
 
 /**
- * Markdown形式でIGCSE Pseudocodeを出力するエミッター
+ * Emitter that outputs IGCSE Pseudocode in Markdown format
  */
 export class MarkdownEmitter extends TextEmitter {
   private markdownConfig: MarkdownConfig;
@@ -25,7 +25,7 @@ export class MarkdownEmitter extends TextEmitter {
   }
 
   /**
-   * IRをMarkdown形式に変換
+   * Convert IR to Markdown format
    */
   override emit(ir: IR): EmitResult {
     this.startEmitting();
@@ -34,26 +34,26 @@ export class MarkdownEmitter extends TextEmitter {
     this.debug('Starting Markdown emission...');
     
     try {
-      // Markdownヘッダーの出力
+      // Output Markdown header
       this.emitMarkdownHeader();
       
-      // 目次の生成（オプション）
+      // Generate table of contents (optional)
       if (this.markdownConfig.generateToc) {
         this.emitTableOfContents(ir);
       }
       
-      // 説明文の追加（オプション）
+      // Add description (optional)
       if (this.markdownConfig.includeDescription) {
         this.emitDescription();
       }
       
-      // コードブロックの開始
+      // Start code block
       this.emitCodeBlockStart();
       
-      // IRの処理
+      // Process IR
       this.emitNode(ir);
       
-      // コードブロックの終了
+      // End code block
       this.emitCodeBlockEnd();
       
       // Add footer
@@ -74,7 +74,7 @@ export class MarkdownEmitter extends TextEmitter {
   }
 
   /**
-   * Markdownヘッダーの出力
+   * Output Markdown header
    */
   private emitMarkdownHeader(): void {
     const headingPrefix = '#'.repeat(this.markdownConfig.headingLevel);
@@ -90,7 +90,7 @@ export class MarkdownEmitter extends TextEmitter {
   }
 
   /**
-   * 目次の生成
+   * Generate table of contents
    */
   private emitTableOfContents(ir: IR): void {
     const headingPrefix = '#'.repeat(this.markdownConfig.headingLevel + 1);
@@ -107,7 +107,7 @@ export class MarkdownEmitter extends TextEmitter {
   }
 
   /**
-   * 目次エントリの生成
+   * Generate table of contents entries
    */
   private generateTocEntries(ir: IR, level: number = 0): string[] {
     const entries: string[] = [];
@@ -127,7 +127,7 @@ export class MarkdownEmitter extends TextEmitter {
   }
 
   /**
-   * 説明文の出力
+   * Output description
    */
   private emitDescription(): void {
     const headingPrefix = '#'.repeat(this.markdownConfig.headingLevel + 1);
@@ -148,7 +148,7 @@ export class MarkdownEmitter extends TextEmitter {
   }
 
   /**
-   * コードブロックの開始
+   * Start code block
    */
   private emitCodeBlockStart(): void {
     const headingPrefix = '#'.repeat(this.markdownConfig.headingLevel + 1);
@@ -159,7 +159,7 @@ export class MarkdownEmitter extends TextEmitter {
   }
 
   /**
-   * コードブロックの終了
+   * End code block
    */
   private emitCodeBlockEnd(): void {
     this.emitLine('```', false);
@@ -167,7 +167,7 @@ export class MarkdownEmitter extends TextEmitter {
   }
 
   /**
-   * Markdownフッターの出力
+   * Output Markdown footer
    */
   private emitMarkdownFooter(): void {
     if (!this.options.includeComments) return;
@@ -188,14 +188,14 @@ export class MarkdownEmitter extends TextEmitter {
   }
 
   /**
-   * 関数/プロシージャのアンカーリンク付きヘッダー
+   * Function/procedure header with anchor link
    */
   protected override emitProcedure(node: IR): void {
     const name = node.meta?.name || 'Unknown';
     const anchor = name.toLowerCase().replace(/\s+/g, '-');
     const headingPrefix = '#'.repeat(this.markdownConfig.headingLevel + 2);
     
-    // 関数/プロシージャのヘッダー
+    // Function/procedure header
     this.emitLine(`${headingPrefix} ${name} {#${anchor}}`, false);
     this.emitBlankLine();
     
@@ -208,16 +208,16 @@ export class MarkdownEmitter extends TextEmitter {
       this.emitBlankLine();
     }
     
-    // 戻り値情報
+    // Return value information
     if (node.meta?.returnType) {
       this.emitLine(`**Returns:** ${node.meta.returnType}`, false);
       this.emitBlankLine();
     }
     
-    // コードブロック
+    // Code block
     this.emitLine(`\`\`\`${this.markdownConfig.codeBlockLanguage}`, false);
     
-    // 実際のプロシージャコード
+    // Actual procedure code
     super.emitProcedure(node);
     
     this.emitLine('```', false);
@@ -225,21 +225,21 @@ export class MarkdownEmitter extends TextEmitter {
   }
 
   /**
-   * 関数の出力（プロシージャと同様）
+   * Output function (same as procedure)
    */
   protected override emitFunction(node: IR): void {
     this.emitProcedure(node);
   }
 
   /**
-   * インラインコード用のフォーマット
+   * Format for inline code
    */
   protected formatInlineCode(text: string): string {
     return `\`${text}\``;
   }
 
   /**
-   * 強調テキストの追加
+   * Add emphasized text
    */
   protected emitEmphasis(text: string, type: 'bold' | 'italic' = 'bold'): void {
     const marker = type === 'bold' ? '**' : '*';
@@ -247,7 +247,7 @@ export class MarkdownEmitter extends TextEmitter {
   }
 
   /**
-   * リストアイテムの出力
+   * Output list item
    */
   protected emitListItem(text: string, level: number = 0): void {
     const indent = '  '.repeat(level);
@@ -255,21 +255,21 @@ export class MarkdownEmitter extends TextEmitter {
   }
 
   /**
-   * 水平線の出力
+   * Output horizontal rule
    */
   protected emitHorizontalRule(): void {
     this.emitLine('---', false);
   }
 
   /**
-   * リンクの出力
+   * Output link
    */
   protected emitLink(text: string, url: string): void {
     this.emitLine(`[${text}](${url})`, false);
   }
 
   /**
-   * 画像の出力
+   * Output image
    */
   protected emitImage(altText: string, url: string, title?: string): void {
     const titleAttr = title ? ` "${title}"` : '';
@@ -277,10 +277,10 @@ export class MarkdownEmitter extends TextEmitter {
   }
 
   /**
-   * テーブルの出力
+   * Output table
    */
   protected emitTable(headers: string[], rows: string[][]): void {
-    // ヘッダー行
+    // Header row
     this.emitLine(`| ${headers.join(' | ')} |`, false);
     
     // Separator line
@@ -296,7 +296,7 @@ export class MarkdownEmitter extends TextEmitter {
   }
 
   /**
-   * 引用ブロックの出力
+   * Output blockquote
    */
   protected emitBlockquote(text: string): void {
     const lines = text.split('\n');
@@ -307,7 +307,7 @@ export class MarkdownEmitter extends TextEmitter {
   }
 
   /**
-   * Markdown設定の更新
+   * Update Markdown configuration
    */
   updateMarkdownConfig(config: Partial<MarkdownConfig>): void {
     this.markdownConfig = { ...this.markdownConfig, ...config };

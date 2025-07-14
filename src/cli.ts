@@ -8,7 +8,7 @@ import { convertPythonToIGCSE } from './converter';
 import { ConversionOptions, VERSION } from './types';
 
 /**
- * CLI アプリケーション
+ * CLI Application
  */
 class CLI {
   private program: Command;
@@ -19,7 +19,7 @@ class CLI {
   }
 
   /**
-   * コマンドの設定
+   * Setup commands
    */
   private setupCommands(): void {
     this.program
@@ -27,7 +27,7 @@ class CLI {
       .description('Convert Python code to IGCSE Pseudocode')
       .version(VERSION);
 
-    // メインの変換コマンド
+    // Main conversion command
     this.program
       .command('convert')
       .description('Convert Python file(s) to IGCSE Pseudocode')
@@ -52,7 +52,7 @@ class CLI {
       .option('--verbose', 'Verbose output')
       .action(this.handleConvert.bind(this));
 
-    // バッチ変換コマンド
+    // Batch conversion command
     this.program
       .command('batch')
       .description('Convert multiple Python files')
@@ -64,7 +64,7 @@ class CLI {
       .option('--verbose', 'Verbose output')
       .action(this.handleBatch.bind(this));
 
-    // 検証コマンド
+    // Validation command
     this.program
       .command('validate')
       .description('Validate Python code for IGCSE conversion')
@@ -73,7 +73,7 @@ class CLI {
       .option('--verbose', 'Verbose output')
       .action(this.handleValidate.bind(this));
 
-    // 統計コマンド
+    // Statistics command
     this.program
       .command('stats')
       .description('Show conversion statistics')
@@ -81,7 +81,7 @@ class CLI {
       .option('--detailed', 'Show detailed statistics')
       .action(this.handleStats.bind(this));
 
-    // 設定コマンド
+    // Configuration command
     this.program
       .command('config')
       .description('Manage configuration')
@@ -92,7 +92,7 @@ class CLI {
   }
 
   /**
-   * 変換コマンドの処理
+   * Handle convert command
    */
   private async handleConvert(input: string, options: any): Promise<void> {
     try {
@@ -123,7 +123,7 @@ class CLI {
   }
 
   /**
-   * バッチ変換コマンドの処理
+   * Handle batch conversion command
    */
   private async handleBatch(pattern: string, options: any): Promise<void> {
     try {
@@ -165,7 +165,7 @@ class CLI {
   }
 
   /**
-   * 検証コマンドの処理
+   * Handle validation command
    */
   private async handleValidate(input: string, options: any): Promise<void> {
     try {
@@ -210,7 +210,7 @@ class CLI {
   }
 
   /**
-   * 統計コマンドの処理
+   * Handle statistics command
    */
   private async handleStats(input: string, options: any): Promise<void> {
     try {
@@ -241,7 +241,7 @@ class CLI {
   }
 
   /**
-   * 設定コマンドの処理
+   * Handle configuration command
    */
   private async handleConfig(options: any): Promise<void> {
     const configPath = path.join(process.cwd(), '.python2igcse.json');
@@ -287,7 +287,7 @@ class CLI {
           // Create new file if it doesn't exist
         }
         
-        // 値の型変換
+        // Type conversion for values
         let parsedValue: any = value;
         if (value === 'true') parsedValue = true;
         else if (value === 'false') parsedValue = false;
@@ -300,7 +300,7 @@ class CLI {
         return;
       }
       
-      // デフォルトでヘルプを表示
+      // Display help by default
       console.log('Use --init to create a configuration file');
       console.log('Use --show to display current configuration');
       console.log('Use --set key=value to update configuration');
@@ -312,7 +312,7 @@ class CLI {
   }
 
   /**
-   * 単一ファイルの変換
+   * Convert single file
    */
   private async convertSingleFile(
     inputPath: string,
@@ -344,7 +344,7 @@ class CLI {
   }
 
   /**
-   * ディレクトリの変換
+   * Convert directory
    */
   private async convertDirectory(
     inputDir: string,
@@ -368,7 +368,7 @@ class CLI {
   }
 
   /**
-   * ファイル監視
+   * Watch files
    */
   private async watchFiles(
     inputPath: string,
@@ -397,7 +397,7 @@ class CLI {
       }
     });
     
-    // Ctrl+C で終了
+    // Exit with Ctrl+C
     process.on('SIGINT', () => {
       console.log('\nStopping file watcher...');
       watcher.close();
@@ -406,7 +406,7 @@ class CLI {
   }
 
   /**
-   * Python ファイルの検索
+   * Find Python files
    */
   private async findPythonFiles(dir: string): Promise<string[]> {
     const files: string[] = [];
@@ -426,7 +426,7 @@ class CLI {
   }
 
   /**
-   * 出力ファイル名の生成
+   * Generate output file name
    */
   private getOutputFileName(inputPath: string, format: string): string {
     const ext = format === 'markdown' ? '.md' : '.txt';
@@ -434,7 +434,7 @@ class CLI {
   }
 
   /**
-   * 変換オプションの構築
+   * Build conversion options
    */
   private buildConversionOptions(cliOptions: any): ConversionOptions {
     return {
@@ -457,7 +457,7 @@ class CLI {
   }
 
   /**
-   * 設定ファイルの読み込み
+   * Load configuration file
    */
   private async loadConfig(configPath?: string): Promise<ConversionOptions> {
     const defaultOptions = this.buildConversionOptions({});
@@ -476,7 +476,7 @@ class CLI {
   }
 
   /**
-   * 配列のチャンク分割
+   * Split array into chunks
    */
   private chunkArray<T>(array: T[], chunkSize: number): T[][] {
     const chunks: T[][] = [];
@@ -487,14 +487,14 @@ class CLI {
   }
 
   /**
-   * CLI の実行
+   * Run CLI
    */
   run(): void {
     this.program.parse();
   }
 }
 
-// CLI の実行
+// Run CLI
 if (require.main === module) {
   const cli = new CLI();
   cli.run();

@@ -5,7 +5,7 @@ import { ParseResult } from '../types/parser';
 import { IGCSEDataType } from '../types/igcse';
 
 /**
- * Python ASTノードの基本インターフェース
+ * Basic interface for Python AST nodes
  */
 interface ASTNode {
   type: string;
@@ -15,11 +15,11 @@ interface ASTNode {
 }
 
 /**
- * 文の処理を担当するビジタークラス
+ * Visitor class responsible for processing statements
  */
 export class StatementVisitor extends BaseParser {
   /**
-   * パースの実行（StatementVisitorでは使用しない）
+   * Execute parsing (not used in StatementVisitor)
    */
   parse(_source: string): ParseResult {
     throw new Error('StatementVisitor.parse() should not be called directly');
@@ -33,14 +33,14 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * コンテキストを設定
+   * Set context
    */
   setContext(context: any): void {
     this.context = context;
   }
 
   /**
-   * 代入文の処理
+   * Process assignment statements
    */
   visitAssign(node: ASTNode): IR {
     // 配列初期化の検出を最初に行う
@@ -110,7 +110,7 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * input()関数の代入を処理
+   * Process input() function assignments
    */
   private handleInputAssignment(node: ASTNode): IR {
     const targetNode = node.targets[0];
@@ -167,7 +167,7 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * ネストした関数呼び出しからinput()を見つける
+   * Find input() from nested function calls
    */
   private findInputCall(node: ASTNode): ASTNode | null {
     if (node.type === 'Call' && node.func.type === 'Name' && node.func.id === 'input') {
@@ -186,14 +186,14 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * ノードにinput()呼び出しが含まれているかチェック
+   * Check if node contains input() call
    */
   private containsInputCall(node: ASTNode): boolean {
     return this.findInputCall(node) !== null;
   }
 
   /**
-   * 拡張代入文の処理
+   * Process augmented assignment statements
    */
   visitAugAssign(node: ASTNode): IR {
     const target = this.expressionVisitor.visitExpression(node.target);
@@ -205,7 +205,7 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * 型注釈付き代入文の処理 (items: list[str] = [])
+   * Process annotated assignment statements (items: list[str] = [])
    */
   visitAnnAssign(node: ASTNode): IR {
     const targetName = node.target.id;
@@ -250,7 +250,7 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * IF文の処理
+   * Process IF statements
    */
   visitIf(node: ASTNode): IR {
     const condition = this.expressionVisitor.visitExpression(node.test);
@@ -318,7 +318,7 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * FOR文の処理
+   * Process FOR statements
    */
   visitFor(node: ASTNode): IR {
     const target = this.expressionVisitor.visitExpression(node.target);
@@ -389,7 +389,7 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * WHILE文の処理
+   * Process WHILE statements
    */
   visitWhile(node: ASTNode): IR {
     const condition = this.expressionVisitor.visitExpression(node.test);
@@ -410,7 +410,7 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * 関数呼び出し文の処理
+   * Process function call statements
    */
   visitCall(node: ASTNode): IR {
     const func = this.expressionVisitor.visitExpression(node.func);
@@ -441,7 +441,7 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * RETURN文の処理
+   * Process RETURN statements
    */
   visitReturn(node: ASTNode): IR {
     if (node.value) {
@@ -452,7 +452,7 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * 式文の処理
+   * Process expression statements
    */
   visitExpr(node: ASTNode): IR {
     // 関数呼び出しの場合は特別に処理
@@ -465,35 +465,35 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * コメントの処理
+   * Process comments
    */
   visitComment(node: ASTNode): IR {
     return this.createIRNode('comment', `// ${node.value}`);
   }
 
   /**
-   * PASS文の処理
+   * Process PASS statements
    */
   visitPass(_node: ASTNode): IR {
     return this.createIRNode('comment', '// pass');
   }
 
   /**
-   * BREAK文の処理
+   * Process BREAK statements
    */
   visitBreak(_node: ASTNode): IR {
     return this.createIRNode('break', 'BREAK');
   }
 
   /**
-   * CONTINUE文の処理
+   * Process CONTINUE statements
    */
   visitContinue(_node: ASTNode): IR {
     return this.createIRNode('statement', 'CONTINUE');
   }
 
   /**
-   * IMPORT文の処理
+   * Process IMPORT statements
    */
   visitImport(_node: ASTNode): IR {
     // Output as comment since import is not typically used in IGCSE
@@ -501,7 +501,7 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * TRY文の処理
+   * Process TRY statements
    */
   visitTry(_node: ASTNode): IR {
     // Output as comment since exception handling is not typically used in IGCSE
@@ -509,41 +509,41 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * RAISE文の処理
+   * Process RAISE statements
    */
   visitRaise(_node: ASTNode): IR {
     return this.createIRNode('comment', `// raise statement`);
   }
 
   /**
-   * WITH文の処理
+   * Process WITH statements
    */
   visitWith(_node: ASTNode): IR {
     return this.createIRNode('comment', `// with statement`);
   }
 
   /**
-   * ASSERT文の処理
+   * Process ASSERT statements
    */
   visitAssert(_node: ASTNode): IR {
     return this.createIRNode('comment', `// assert statement`);
   }
 
   /**
-   * GLOBAL文の処理
+   * Process GLOBAL statements
    */
   visitGlobal(_node: ASTNode): IR {
     return this.createIRNode('comment', `// global statement`);
   }
 
   /**
-   * DELETE文の処理
+   * Process DELETE statements
    */
   visitDelete(_node: ASTNode): IR {
     return this.createIRNode('comment', `// delete statement`);
   }
 
-  // ヘルパーメソッド
+  // Helper methods
   private handleRangeFor(node: ASTNode, target: string): IR {
     const args = node.iter.args;
     let startValue = '0';
@@ -810,7 +810,7 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * 配列要素代入の処理 (data[1] = 100)
+   * Process array element assignment (data[1] = 100)
    */
   private handleElementAssign(targetNode: ASTNode, valueNode: ASTNode): IR {
     const arrayName = this.expressionVisitor.visitExpression(targetNode.value);
@@ -845,7 +845,7 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * 属性代入の処理 (obj.field = value)
+   * Process attribute assignment (obj.field = value)
    */
   private handleAttributeAssign(targetNode: ASTNode, valueNode: ASTNode): IR {
     const objectName = this.expressionVisitor.visitExpression(targetNode.value);
@@ -857,7 +857,7 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * インデックスを0ベースから1ベースに変換
+   * Convert index from 0-based to 1-based
    */
   private convertIndexToOneBased(index: string): string {
     // 数値リテラルの場合は+1
@@ -869,7 +869,7 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * 型注釈がリスト型かどうかを判定
+   * Determine if type annotation is list type
    */
   private isListTypeAnnotation(annotation: ASTNode): boolean {
     if (!annotation) return false;
@@ -892,7 +892,7 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * リスト型注釈から要素型を抽出
+   * Extract element type from list type annotation
    */
   private extractListElementType(annotation: ASTNode): string {
     if (annotation.type === 'Subscript' && annotation.slice) {
@@ -905,7 +905,7 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * 型注釈をIGCSE型に変換
+   * Convert type annotation to IGCSE type
    */
   private convertAnnotationToIGCSEType(annotation: ASTNode): string {
     if (!annotation) return 'STRING';
@@ -923,7 +923,7 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * Python型名をIGCSE型に変換
+   * Convert Python type name to IGCSE type
    */
   private convertPythonTypeToIGCSE(typeName: string): string {
     switch (typeName) {
@@ -936,7 +936,7 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * クラス定義から属性名を取得
+   * Get attribute names from class definition
    */
   private getClassAttributes(className: string): string[] {
     // Search for class definition from context
@@ -957,7 +957,7 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * 文字列の最初の文字を大文字にする
+   * Capitalize first letter of string
    */
   private capitalizeFirstLetter(str: string): string {
     if (!str) return str;

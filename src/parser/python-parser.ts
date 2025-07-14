@@ -1,11 +1,11 @@
-// メインのPythonパーサークラス
+// Main Python parser class
 import { BaseParser } from './base-parser';
 import { ParserOptions, ParseResult } from '../types/parser';
 import { IR, countIRNodes } from '../types/ir';
 import { PythonASTVisitor } from './visitor';
 
 /**
- * PythonからIGCSE Pseudocodeへの変換パーサー
+ * Parser for converting Python to IGCSE Pseudocode
  */
 export class PythonParser extends BaseParser {
   constructor(options: ParserOptions = {}) {
@@ -13,7 +13,7 @@ export class PythonParser extends BaseParser {
   }
 
   /**
-   * Pythonソースコードをパースしてイルに変換
+   * Parse Python source code and convert to IR
    */
   override parse(source: string): ParseResult {
     this.resetContext();
@@ -22,19 +22,19 @@ export class PythonParser extends BaseParser {
     
     const result = this.parseToIR(preprocessedSource);
     
-    // 統計情報の更新
+    // Update statistics
     result.stats.parseTime = Date.now() - this.context.startTime;
     
     return result;
   }
 
   /**
-   * IRへのパース処理
+   * Parse to IR
    */
   private parseToIR(source: string): ParseResult {
     this.context.startTime = Date.now();
     
-    // ソースコードの前処理
+    // Preprocess source code
     const processedSource = this.preprocessSource(source);
     
     // Convert AST to IR using PythonASTVisitor
@@ -61,14 +61,14 @@ export class PythonParser extends BaseParser {
   }
 
   /**
-   * ソースコードの前処理
+   * Preprocess source code
    */
   private preprocessSource(source: string): string {
     return this.preprocess(source);
   }
 
   /**
-   * IRから関数数をカウント
+   * Count functions from IR
    */
   private countFunctionsFromIR(ir: IR): number {
     let count = 0;
@@ -84,7 +84,7 @@ export class PythonParser extends BaseParser {
   }
 
   /**
-   * IRからクラス数をカウント
+   * Count classes from IR
    */
   private countClassesFromIR(ir: IR): number {
     let count = 0;
@@ -100,7 +100,7 @@ export class PythonParser extends BaseParser {
   }
 
   /**
-   * IRから変数数をカウント
+   * Count variables from IR
    */
   private countVariablesFromIR(ir: IR): number {
     let count = 0;
@@ -116,24 +116,24 @@ export class PythonParser extends BaseParser {
   }
 
   /**
-   * ソースコードの前処理（内部実装）
+   * Preprocess source code (internal implementation)
    */
   private preprocess(source: string): string {
     let processed = source;
     
-    // 空行の正規化
+    // Normalize empty lines
     processed = processed.replace(/\r\n/g, '\n');
     processed = processed.replace(/\r/g, '\n');
     
     // Convert tabs to spaces
     processed = processed.replace(/\t/g, ' '.repeat(this.options.indentSize));
     
-    // 末尾の空白を除去
+    // Remove trailing whitespace
     processed = processed.split('\n')
       .map(line => line.trimEnd())
       .join('\n');
     
-    // 連続する空行を1つにまとめる
+    // Merge consecutive empty lines into one
     processed = processed.replace(/\n\s*\n\s*\n/g, '\n\n');
     
     this.debug(`Preprocessed ${source.split('\n').length} lines`);
@@ -142,14 +142,14 @@ export class PythonParser extends BaseParser {
   }
 
   /**
-   * IRの後処理
+   * Post-process IR
    */
   /*
   private postprocess(ir: IR): IR {
-    // IRの最適化
+    // Optimize IR
     const optimized = this.optimizeIR(ir);
     
-    // 検証
+    // Validation
     this.validateIR(optimized);
     
     return optimized;
@@ -157,13 +157,13 @@ export class PythonParser extends BaseParser {
   */
 
   /**
-   * IRの最適化
+   * Optimize IR
    */
   private optimizeIR(ir: IR): IR {
-    // 子ノードを再帰的に最適化
+    // Recursively optimize child nodes
     const optimizedChildren = ir.children.map(child => this.optimizeIR(child));
     
-    // 空のノードを除去（ただし、子ノードを持つstatementノードは保持）
+    // Remove empty nodes (but preserve statement nodes with children)
     const filteredChildren = optimizedChildren
       .filter(child => {
         // Keep nodes with text
@@ -178,11 +178,11 @@ export class PythonParser extends BaseParser {
         if (['assign', 'input', 'output', 'if', 'for', 'while', 'function', 'class'].includes(child.kind)) {
           return true;
         }
-        // その他の空のノードは除去
+        // Remove other empty nodes
         return false;
       });
     
-    // 連続するコメントをまとめる
+    // Merge consecutive comments
     const mergedChildren = this.mergeConsecutiveComments(filteredChildren);
     
     return {
@@ -192,7 +192,7 @@ export class PythonParser extends BaseParser {
   }
 
   /**
-   * 連続するコメントをまとめる
+   * Merge consecutive comments
    */
   private mergeConsecutiveComments(children: IR[]): IR[] {
     const result: IR[] = [];
@@ -202,12 +202,12 @@ export class PythonParser extends BaseParser {
       if (child.kind === 'comment') {
         currentCommentGroup.push(child);
       } else {
-        // コメントグループを処理
+        // Process comment groups
         if (currentCommentGroup.length > 0) {
           if (currentCommentGroup.length === 1) {
             result.push(currentCommentGroup[0]);
           } else {
-            // 複数のコメントを1つにまとめる
+            // Merge multiple comments into one
             const mergedText = currentCommentGroup
               .map(comment => comment.text)
               .join('\n');
@@ -223,7 +223,7 @@ export class PythonParser extends BaseParser {
       }
     }
     
-    // 最後のコメントグループを処理
+    // Process last comment group
     if (currentCommentGroup.length > 0) {
       if (currentCommentGroup.length === 1) {
         result.push(currentCommentGroup[0]);
@@ -242,7 +242,7 @@ export class PythonParser extends BaseParser {
   }
 
   /**
-   * IRの検証（一時的に無効化）
+   * Validate IR (temporarily disabled)
    */
   /*
   private validateIR(ir: IR): void {
@@ -250,7 +250,7 @@ export class PythonParser extends BaseParser {
   }
 
   private validateNode(node: IR): void {
-    // 必須フィールドの検証
+    // Validate required fields
     if (!node.kind) {
       this.addError('IR node missing kind', 'validation_error');
     }
@@ -259,7 +259,7 @@ export class PythonParser extends BaseParser {
       this.addError('IR node missing text', 'validation_error');
     }
     
-    // 子ノードの検証
+    // Validate child nodes
     if (node.children) {
       for (const child of node.children) {
         this.validateNode(child);
