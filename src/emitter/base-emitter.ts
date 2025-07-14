@@ -1,4 +1,4 @@
-// エミッターの基本クラス
+// Base class for emitters
 import { IR } from '../types/ir';
 import {
   EmitterOptions,
@@ -13,8 +13,8 @@ import {
 } from '../types/emitter';
 
 /**
- * エミッターの基本クラス
- * IRからテキストへの変換機能を提供
+ * Base class for emitters
+ * Provides IR to text conversion functionality
  */
 export abstract class BaseEmitter {
   protected options: EmitterOptions;
@@ -27,7 +27,7 @@ export abstract class BaseEmitter {
   }
 
   /**
-   * 初期コンテキストの作成
+   * Create initial context
    */
   private createInitialContext(): EmitContext {
     return {
@@ -41,12 +41,12 @@ export abstract class BaseEmitter {
   }
 
   /**
-   * エミットの実行（抽象メソッド）
+   * Execute emit (abstract method)
    */
   abstract emit(ir: IR): EmitResult;
 
   /**
-   * エラーの追加
+   * Add error
    */
   protected addError(
     message: string,
@@ -62,7 +62,7 @@ export abstract class BaseEmitter {
   }
 
   /**
-   * 警告の追加
+   * Add warning
    */
   protected addWarning(
     message: string,
@@ -78,7 +78,7 @@ export abstract class BaseEmitter {
   }
 
   /**
-   * インデントレベルの増加
+   * Increase indent level
    */
   protected increaseIndent(): void {
     this.context.indent = createIndentInfo(
@@ -89,7 +89,7 @@ export abstract class BaseEmitter {
   }
 
   /**
-   * インデントレベルの減少
+   * Decrease indent level
    */
   protected decreaseIndent(): void {
     if (this.context.indent.level > 0) {
@@ -102,12 +102,12 @@ export abstract class BaseEmitter {
   }
 
   /**
-   * 行の出力
+   * Output line
    */
   protected emitLine(text: string, indent: boolean = true): void {
     const indentedText = indent ? this.context.indent.string + text : text;
     
-    // 行長チェック
+    // Line length check
     if (this.options.maxLineLength && indentedText.length > this.options.maxLineLength) {
       this.addWarning(
         `Line exceeds maximum length (${indentedText.length} > ${this.options.maxLineLength})`,
@@ -115,7 +115,7 @@ export abstract class BaseEmitter {
       );
     }
     
-    // 行番号付きの出力
+    // Output with line numbers
     if (this.options.includeLineNumbers) {
       const lineNumber = this.context.currentLine.toString().padStart(3, ' ');
       this.context.output.push(`${lineNumber}: ${indentedText}`);
@@ -127,7 +127,7 @@ export abstract class BaseEmitter {
   }
 
   /**
-   * 空行の出力
+   * Output empty line
    */
   protected emitBlankLine(): void {
     this.context.output.push('');
@@ -135,7 +135,7 @@ export abstract class BaseEmitter {
   }
 
   /**
-   * コメントの出力
+   * Output comment
    */
   protected emitComment(text: string): void {
     if (this.options.includeComments) {
@@ -144,12 +144,12 @@ export abstract class BaseEmitter {
   }
 
   /**
-   * IRノードの処理（抽象メソッド）
+   * Process IR node (abstract method)
    */
   protected abstract emitNode(node: IR): void;
 
   /**
-   * 子ノードの処理
+   * Process child nodes
    */
   protected emitChildren(node: IR): void {
     for (const child of node.children) {
@@ -158,25 +158,25 @@ export abstract class BaseEmitter {
   }
 
   /**
-   * テキストのフォーマット
+   * Format text
    */
   protected formatText(text: string): string {
     let formatted = text;
     
-    // 演算子の変換（Python → IGCSE）
+    // Convert operators (Python → IGCSE)
     formatted = this.convertOperators(formatted);
     
-    // キーワードの大文字化
+    // Capitalize keywords
     if (this.context.formatter.uppercaseKeywords) {
       formatted = this.uppercaseKeywords(formatted);
     }
     
-    // 演算子周りのスペース
+    // Space around operators
     if (this.context.formatter.spaceAroundOperators) {
       formatted = this.addSpaceAroundOperators(formatted);
     }
     
-    // カンマ後のスペース（文字列リテラル内は除外）
+    // Space after comma (excluding inside string literals)
     if (this.context.formatter.spaceAfterComma) {
       formatted = this.addSpaceAfterCommaOutsideStrings(formatted);
     }
@@ -185,7 +185,7 @@ export abstract class BaseEmitter {
   }
 
   /**
-   * キーワードの大文字化
+   * Capitalize keywords
    */
   private uppercaseKeywords(text: string): string {
     const keywords = [
@@ -200,7 +200,7 @@ export abstract class BaseEmitter {
       'AND', 'OR', 'NOT', 'MOD', 'DIV'
     ];
     
-    // 文字列リテラルを保護
+    // Protect string literals
     const stringLiterals: string[] = [];
     let result = text.replace(/"([^"]*)"/g, (_, content) => {
       const placeholder = `__STRING_${stringLiterals.length}__`;
@@ -213,7 +213,7 @@ export abstract class BaseEmitter {
       result = result.replace(regex, keyword);
     }
     
-    // 文字列リテラルを復元
+    // Restore string literals
     result = result.replace(/"__STRING_(\d+)__"/g, (_, index) => {
       return `"${stringLiterals[parseInt(index)]}"`;
     });
@@ -222,12 +222,12 @@ export abstract class BaseEmitter {
   }
 
   /**
-   * 演算子の変換（Python → IGCSE）
+   * Convert operators (Python → IGCSE)
    */
   private convertOperators(text: string): string {
     let result = text;
     
-    // コメント部分を保護（Pythonの#コメントとIGCSEの//コメントを一時的に置き換え）
+    // Protect comment sections (temporarily replace Python # comments and IGCSE // comments)
     const commentMatches: string[] = [];
     result = result.replace(/(#.*$|\/\/.*$)/gm, (match) => {
       const index = commentMatches.length;
@@ -243,40 +243,40 @@ export abstract class BaseEmitter {
       return `"${placeholder}"`;
     });
     
-    // 比較演算子の変換（代入演算子より先に処理）
+    // Convert comparison operators (process before assignment operators)
     result = result.replace(/!=/g, '≠');
     result = result.replace(/<=/g, '≤');
     result = result.replace(/>=/g, '≥');
     result = result.replace(/==/g, '=');
     
-    // 代入演算子の変換（比較演算子以外の=のみ）
-    // 行の先頭から変数名 = の形式を ← に変換
+    // Convert assignment operators (only = that are not comparison operators)
+    // Convert variable = format from line start to ←
     result = result.replace(/^(\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*/gm, '$1$2 ← ');
     
-    // 論理演算子の変換
+    // Convert logical operators
     result = result.replace(/\band\b/gi, 'AND');
     result = result.replace(/\bor\b/gi, 'OR');
     result = result.replace(/\bnot\b/gi, 'NOT');
     
-    // 文字列連結の変換（文字列リテラルが含まれる行の+を&に変換）
+    // Convert string concatenation (convert + to & on lines containing string literals)
     const lines = result.split('\n');
     result = lines.map(line => {
-      // 文字列リテラル（"または'で囲まれた部分）が含まれる行かチェック
+      // Check if line contains string literals (parts enclosed in " or ')
       if (/["']/.test(line)) {
-        // 文字列連結の+を&に変換
+        // Convert + for string concatenation to &
         return line.replace(/\s*\+\s*/g, ' & ');
       }
       return line;
     }).join('\n');
     
-    // 算術演算子の変換（コメント以外の//のみ）
+    // Convert arithmetic operators (only // that are not comments)
     result = result.replace(/\s*%\s*/g, ' MOD ');
     result = result.replace(/\s*\/\/\s*/g, ' DIV ');
     
-    // input()関数の変換（代入文の場合は特別処理）
+    // Convert input() function (special handling for assignment statements)
     result = result.replace(/(\w+)\s*←\s*input\(\)/g, 'INPUT $1');
     result = result.replace(/(\w+)\s*←\s*input\(([^)]+)\)/g, 'OUTPUT $2\nINPUT $1');
-    // 通常のinput()関数の変換
+    // Convert regular input() function
     result = result.replace(/\binput\(\)/g, 'INPUT');
     result = result.replace(/\binput\(([^)]+)\)/g, 'INPUT($1)');
     
@@ -285,7 +285,7 @@ export abstract class BaseEmitter {
       return `"${stringLiterals[parseInt(index)]}"`;
     });
     
-    // コメントを復元（#を//に変換、//はそのまま）
+    // Restore comments (convert # to //, leave // as is)
     commentMatches.forEach((comment, index) => {
       const convertedComment = comment.startsWith('#') ? comment.replace(/^#/, '//') : comment;
       result = result.replace(`__COMMENT_${index}__`, convertedComment);
@@ -295,33 +295,33 @@ export abstract class BaseEmitter {
   }
 
   /**
-   * 演算子周りのスペース追加
+   * Add space around operators
    */
   private addSpaceAroundOperators(text: string): string {
     const operators = ['←', '=', '≠', '<', '>', '≤', '≥', '+', '-', '*', '/', 'MOD', 'DIV'];
     
     let result = text;
     for (const op of operators) {
-      // 既にスペースがある場合は処理しない
+      // Don't process if space already exists
       const regex = new RegExp(`(?<!\\s)${this.escapeRegex(op)}(?!\\s)`, 'g');
       result = result.replace(regex, ` ${op} `);
     }
     
-    // 重複するスペースを除去
+    // Remove duplicate spaces
     result = result.replace(/\s+/g, ' ');
     
     return result;
   }
 
   /**
-   * 正規表現用のエスケープ
+   * Escape for regular expressions
    */
   private escapeRegex(text: string): string {
     return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   /**
-   * 文字列リテラル外のカンマの後にスペースを追加
+   * Add space after commas outside string literals
    */
   private addSpaceAfterCommaOutsideStrings(text: string): string {
     let result = '';
@@ -332,7 +332,7 @@ export abstract class BaseEmitter {
       const char = text[i];
       const prevChar = i > 0 ? text[i - 1] : '';
       
-      // 文字列の開始/終了を検出
+      // Detect string start/end
       if ((char === '"' || char === "'") && prevChar !== '\\') {
         if (!inString) {
           inString = true;
@@ -345,7 +345,7 @@ export abstract class BaseEmitter {
       
       result += char;
       
-      // 文字列外のカンマの後にスペースを追加
+      // Add space after commas outside strings
       if (!inString && char === ',' && i + 1 < text.length && text[i + 1] !== ' ') {
         result += ' ';
       }
@@ -355,7 +355,7 @@ export abstract class BaseEmitter {
   }
 
   /**
-   * エミット結果の作成
+   * Create emit result
    */
   protected createEmitResult(): EmitResult {
     const endTime = Date.now();
@@ -371,12 +371,12 @@ export abstract class BaseEmitter {
       warnings: [...this.context.warnings],
       stats: {
         linesGenerated,
-        lineCount: linesGenerated, // テスト用エイリアス
+        lineCount: linesGenerated, // Alias for testing
         charactersGenerated,
-        characterCount: charactersGenerated, // テスト用エイリアス
-        nodesProcessed: 0, // 実装時に設定
+        characterCount: charactersGenerated, // Alias for testing
+        nodesProcessed: 0, // Set during implementation
         emitTime,
-        processingTime: emitTime, // テスト用エイリアス
+        processingTime: emitTime, // Alias for testing
         maxNestingDepth: this.context.indent.level,
         maxLineLength: Math.max(...this.context.output.map(line => line.length))
       }
@@ -384,28 +384,28 @@ export abstract class BaseEmitter {
   }
 
   /**
-   * エミットの開始時刻を記録
+   * Record emit start time
    */
   protected startEmitting(): void {
     this.startTime = Date.now();
   }
 
   /**
-   * デバッグ情報の出力
+   * Output debug information
    */
   protected debug(_message: string): void {
     // Debug logging disabled
   }
 
   /**
-   * コンテキストのリセット
+   * Reset context
    */
   protected resetContext(): void {
     this.context = this.createInitialContext();
   }
 
   /**
-   * 長い行の折り返し
+   * Wrap long lines
    */
   protected wrapLongLine(text: string, maxLength?: number): string[] {
     const limit = maxLength || this.options.maxLineLength || 80;
@@ -437,14 +437,14 @@ export abstract class BaseEmitter {
   }
 
   /**
-   * 設定の更新
+   * Update options
    */
   updateOptions(options: Partial<EmitterOptions>): void {
     this.options = { ...this.options, ...options };
   }
 
   /**
-   * フォーマッター設定の更新
+   * Update formatter configuration
    */
   updateFormatterConfig(config: Partial<FormatterConfig>): void {
     this.context.formatter = { ...this.context.formatter, ...config };

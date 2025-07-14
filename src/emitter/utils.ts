@@ -1,4 +1,4 @@
-// エミッターユーティリティ
+// Emitter utilities
 import { IR } from '../types/ir';
 import { EmitResult, EmitterOptions } from '../types/emitter';
 
@@ -32,7 +32,7 @@ export class EmitterUtils {
       stats.totalNodes++;
       stats.maxDepth = Math.max(stats.maxDepth, depth);
       
-      // ノード種別のカウント
+      // Count node types
       stats.nodeTypes[node.kind] = (stats.nodeTypes[node.kind] || 0) + 1;
       
       // 特徴の検出
@@ -79,7 +79,7 @@ export class EmitterUtils {
     const issues: string[] = [];
     const suggestions: string[] = [];
 
-    // 基本的な検証
+    // Basic validation
     if (!result.code) {
       issues.push('Generated code is empty');
     }
@@ -176,7 +176,7 @@ export class EmitterUtils {
       recommendations.push('Consider adding more comments for clarity');
     }
 
-    // 空行の適切な使用
+    // Proper use of blank lines
     const blankLineCount = lines.filter(line => line.trim() === '').length;
     const blankLineRatio = blankLineCount / lines.length;
     if (blankLineRatio < 0.05) {
@@ -223,7 +223,7 @@ export class EmitterUtils {
   private static evaluateConsistency(lines: string[], recommendations: string[]): number {
     let score = 100;
     
-    // キーワードの大文字小文字の一貫性
+    // Keyword case consistency
     const keywords = ['IF', 'THEN', 'ELSE', 'ENDIF', 'FOR', 'WHILE', 'PROCEDURE', 'FUNCTION'];
     const inconsistentKeywords = new Set<string>();
     
@@ -259,7 +259,7 @@ export class EmitterUtils {
   private static evaluateCompleteness(lines: string[], recommendations: string[]): number {
     let score = 100;
     
-    // 基本的な構文要素の存在チェック
+    // Check for basic syntax elements
     const hasVariables = lines.some(line => line.includes('←'));
     const hasOutput = lines.some(line => line.includes('OUTPUT'));
     const hasInput = lines.some(line => line.includes('INPUT'));

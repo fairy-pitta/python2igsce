@@ -1,4 +1,4 @@
-// エミッター関連の型定義
+// Type definitions for emitters
 import { IR } from './ir';
 
 /**
@@ -80,8 +80,8 @@ export interface EmitWarning {
  * エミットエラーの種類
  */
 export type EmitErrorType = 
-  | 'invalid_ir'          // 無効なIR
-  | 'unsupported_node'    // サポートされていないノード
+  | 'invalid_ir'          // Invalid IR
+  | 'unsupported_node'    // Unsupported node
   | 'formatting_error'    // フォーマットエラー
   | 'output_error'        // 出力エラー
   | 'validation_error';   // 検証エラー
@@ -92,8 +92,8 @@ export type EmitErrorType =
 export type EmitWarningType = 
   | 'long_line'           // 長い行
   | 'deep_nesting'        // 深いネスト
-  | 'complex_expression'  // 複雑な式
-  | 'style_issue';        // スタイルの問題
+  | 'complex_expression'  // Complex expression
+  | 'style_issue';        // Style issue
 
 /**
  * エミット統計

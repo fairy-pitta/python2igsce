@@ -1,4 +1,4 @@
-// Markdownエミッター
+// Markdown emitter
 import { IR } from '../types/ir';
 import { EmitResult, EmitterOptions, MarkdownConfig } from '../types/emitter';
 import { TextEmitter } from './text-emitter';
@@ -56,7 +56,7 @@ export class MarkdownEmitter extends TextEmitter {
       // コードブロックの終了
       this.emitCodeBlockEnd();
       
-      // フッターの追加
+      // Add footer
       this.emitMarkdownFooter();
       
       const result = this.createEmitResult();
@@ -199,7 +199,7 @@ export class MarkdownEmitter extends TextEmitter {
     this.emitLine(`${headingPrefix} ${name} {#${anchor}}`, false);
     this.emitBlankLine();
     
-    // パラメータ情報
+    // Parameter information
     if (node.meta?.params && node.meta.params.length > 0) {
       this.emitLine('**Parameters:**', false);
       for (const param of node.meta.params) {
@@ -283,11 +283,11 @@ export class MarkdownEmitter extends TextEmitter {
     // ヘッダー行
     this.emitLine(`| ${headers.join(' | ')} |`, false);
     
-    // セパレーター行
+    // Separator line
     const separator = headers.map(() => '---').join(' | ');
     this.emitLine(`| ${separator} |`, false);
     
-    // データ行
+    // Data row
     for (const row of rows) {
       this.emitLine(`| ${row.join(' | ')} |`, false);
     }

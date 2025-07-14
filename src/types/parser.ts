@@ -79,7 +79,7 @@ export type ParseErrorType =
   | 'syntax_error'        // 構文エラー
   | 'type_error'          // 型エラー
   | 'name_error'          // 名前エラー
-  | 'unsupported_feature' // サポートされていない機能
+  | 'unsupported_feature' // Unsupported feature
   | 'conversion_error'    // 変換エラー
   | 'validation_error';   // 検証エラー
 
@@ -91,7 +91,7 @@ export type ParseWarningType =
   | 'implicit_conversion' // 暗黙的変換
   | 'deprecated_syntax'   // 非推奨構文
   | 'performance_hint'    // パフォーマンスヒント
-  | 'style_suggestion';   // スタイル提案
+  | 'style_suggestion';   // Style suggestion
 
 /**
  * パース統計

@@ -1,4 +1,4 @@
-// エミッターファクトリー
+// Emitter factory
 import { BaseEmitter } from './base-emitter';
 import { TextEmitter } from './text-emitter';
 import { MarkdownEmitter } from './markdown-emitter';
