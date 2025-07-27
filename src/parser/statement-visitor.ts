@@ -393,6 +393,15 @@ export class StatementVisitor extends BaseParser {
    */
   visitWhile(node: ASTNode): IR {
     const condition = this.expressionVisitor.visitExpression(node.test);
+    
+    // while True + break パターンを REPEAT-UNTIL に変換
+    if (condition === 'TRUE' || condition === 'True' || condition.toUpperCase() === 'TRUE') {
+      const repeatUntilResult = this.tryConvertToRepeatUntil(node);
+      if (repeatUntilResult) {
+        return repeatUntilResult;
+      }
+    }
+    
     const whileText = `WHILE ${condition}`;
     
     this.enterScope('while', 'block');
@@ -407,6 +416,72 @@ export class StatementVisitor extends BaseParser {
     bodyChildren.push(endwhileIR);
     
     return this.createIRNode('while', whileText, bodyChildren);
+  }
+
+  /**
+   * while True + break パターンを REPEAT-UNTIL に変換を試行
+   */
+  private tryConvertToRepeatUntil(node: ASTNode): IR | null {
+    // bodyの最後のIF文でbreakがあるかチェック
+    const body = node.body;
+    if (body.length === 0) return null;
+    
+    // continue文がある場合は変換しない
+    const hasContinue = this.hasStatementType(body, 'Continue');
+    if (hasContinue) return null;
+    
+    // 最後の文がIF文でbreakを含むかチェック
+    const lastStatement = body[body.length - 1];
+    if (lastStatement.type === 'If' && 
+        lastStatement.body && 
+        lastStatement.body.length === 1 && 
+        lastStatement.body[0].type === 'Break' && 
+        (!lastStatement.orelse || lastStatement.orelse.length === 0)) {
+      
+      // REPEAT-UNTIL構造に変換
+      const condition = this.expressionVisitor.visitExpression(lastStatement.test);
+      
+      this.enterScope('repeat', 'block');
+      this.increaseIndent();
+      
+      // breakのIF文以外の文を処理
+      const repeatBodyChildren = body.slice(0, -1).map((child: ASTNode) => 
+        this.visitNode ? this.visitNode(child) : this.createIRNode('comment', '// Unprocessed node')
+      );
+      
+      this.decreaseIndent();
+      this.exitScope();
+      
+      const untilIR = this.createIRNode('until', `UNTIL ${condition}`);
+      repeatBodyChildren.push(untilIR);
+      
+      return this.createIRNode('repeat', 'REPEAT', repeatBodyChildren);
+    }
+    
+    return null;
+  }
+
+  /**
+   * 指定された文の種類がbody内に存在するかチェック
+   */
+  private hasStatementType(body: ASTNode[], statementType: string): boolean {
+    for (const stmt of body) {
+      if (stmt.type === statementType) {
+        return true;
+      }
+      // ネストされた構造もチェック
+      if (stmt.body && Array.isArray(stmt.body)) {
+        if (this.hasStatementType(stmt.body, statementType)) {
+          return true;
+        }
+      }
+      if (stmt.orelse && Array.isArray(stmt.orelse)) {
+        if (this.hasStatementType(stmt.orelse, statementType)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   /**

@@ -141,13 +141,13 @@ else:
 `;
       const expected = `IF x > y THEN
   IF x > z THEN
+    OUTPUT "x is largest"
+  ELSE
+    OUTPUT "z is largest"
   ENDIF
-  OUTPUT "x is largest"
 ELSE
-  OUTPUT "z is largest"
-ENDIF
-ELSE
-OUTPUT "y might be largest"`;
+  OUTPUT "y might be largest"
+ENDIF`;
       
       const result = convertPython(python);
       expect(result.trim()).toBe(expected);
