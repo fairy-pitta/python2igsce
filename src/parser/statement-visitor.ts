@@ -410,11 +410,82 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
+   * 配列サイズを取得
+   */
+  private getArraySize(arrayName: string): number | null {
+    if (this.context.arrayInfo && this.context.arrayInfo[arrayName]) {
+      return this.context.arrayInfo[arrayName].size;
+    }
+    return null;
+  }
+
+  /**
+   * 配列サイズを設定
+   */
+  private setArraySize(arrayName: string, size: number): void {
+    if (!this.context.arrayInfo) {
+      this.context.arrayInfo = {};
+    }
+    if (!this.context.arrayInfo[arrayName]) {
+      this.context.arrayInfo[arrayName] = { 
+        size: 0, 
+        elementType: 'STRING', 
+        currentIndex: 0 
+      };
+    }
+    this.context.arrayInfo[arrayName].size = size;
+  }
+
+  /**
    * 関数呼び出し文の処理
    */
   visitCall(node: ASTNode): IR {
+    // 属性メソッド呼び出しの場合（obj.method()）
+    if (node.func.type === 'Attribute') {
+      const objectName = this.expressionVisitor.visitExpression(node.func.value);
+      const methodName = node.func.attr;
+      const args = node.args.map((arg: ASTNode) => this.expressionVisitor.visitExpression(arg));
+      
+      // appendメソッドの特別処理
+      if (methodName === 'append') {
+        if (args.length > 0) {
+          // 配列サイズを更新
+          const currentSize = this.getArraySize(objectName) || 0;
+          const newSize = currentSize + 1;
+          this.setArraySize(objectName, newSize);
+          
+          // 配列要素への代入として処理
+          const text = `${objectName}[${newSize}] ← ${args[0]}`;
+          return this.createIRNode('assign', text);
+        }
+        return this.createIRNode('comment', `// ${objectName}.append() with no arguments`);
+      }
+      
+      // その他の属性メソッド呼び出し
+      const text = `${objectName}.${methodName}(${args.join(', ')})`;
+      return this.createIRNode('statement', text);
+    }
+    
     const func = this.expressionVisitor.visitExpression(node.func);
     const args = node.args.map((arg: ASTNode) => this.expressionVisitor.visitExpression(arg));
+    
+    // funcがappendメソッド呼び出しの場合を検出
+    if (func.includes('.append(')) {
+      const match = func.match(/^(.+)\.append\((.+)\)$/);
+      if (match) {
+        const objectName = match[1];
+        const argValue = match[2];
+        
+        // 配列サイズを更新
+        const currentSize = this.getArraySize(objectName) || 0;
+        const newSize = currentSize + 1;
+        this.setArraySize(objectName, newSize);
+        
+        // 配列要素への代入として処理
+        const text = `${objectName}[${newSize}] ← ${argValue}`;
+        return this.createIRNode('assign', text);
+      }
+    }
     
     // 組み込み関数の変換
     if (func === 'print') {

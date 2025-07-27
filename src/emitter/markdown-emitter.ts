@@ -27,7 +27,7 @@ export class MarkdownEmitter extends TextEmitter {
   /**
    * IRをMarkdown形式に変換
    */
-  override emit(ir: IR): EmitResult {
+  override emit(ir: IR | IR[]): EmitResult {
     this.startEmitting();
     this.resetContext();
     
@@ -39,7 +39,13 @@ export class MarkdownEmitter extends TextEmitter {
       
       // 目次の生成（オプション）
       if (this.markdownConfig.generateToc) {
-        this.emitTableOfContents(ir);
+        if (Array.isArray(ir)) {
+          for (const node of ir) {
+            this.emitTableOfContents(node);
+          }
+        } else {
+          this.emitTableOfContents(ir);
+        }
       }
       
       // 説明文の追加（オプション）
@@ -51,7 +57,13 @@ export class MarkdownEmitter extends TextEmitter {
       this.emitCodeBlockStart();
       
       // IRの処理
-      this.emitNode(ir);
+      if (Array.isArray(ir)) {
+        for (const node of ir) {
+          this.emitNode(node);
+        }
+      } else {
+        this.emitNode(ir);
+      }
       
       // コードブロックの終了
       this.emitCodeBlockEnd();

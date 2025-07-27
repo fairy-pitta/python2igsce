@@ -16,7 +16,7 @@ export class TextEmitter extends BaseEmitter {
   /**
    * IRをプレーンテキストに変換
    */
-  emit(ir: IR): EmitResult {
+  emit(ir: IR | IR[]): EmitResult {
     this.startEmitting();
     this.resetContext();
     this.nodesProcessed = 0;
@@ -24,7 +24,14 @@ export class TextEmitter extends BaseEmitter {
     this.debug('Starting text emission...');
     
     try {
-      this.emitNode(ir);
+      // IRが配列の場合は各要素を処理
+      if (Array.isArray(ir)) {
+        for (const node of ir) {
+          this.emitNode(node);
+        }
+      } else {
+        this.emitNode(ir);
+      }
       
       const result = this.createEmitResult();
       result.stats.nodesProcessed = this.nodesProcessed;

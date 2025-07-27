@@ -191,6 +191,10 @@ export class ExpressionVisitor {
           return args.length > 0 ? `STARTSWITH(${value}, ${args[0]})` : `${value}.${method}(${args.join(', ')})`;
         case 'endswith':
           return args.length > 0 ? `ENDSWITH(${value}, ${args[0]})` : `${value}.${method}(${args.join(', ')})`;
+        case 'append':
+          // appendメソッドは式ではなく文として処理されるべき
+          // ここでは一時的な識別子を返し、statement-visitorで処理される
+          return `${value}.append(${args.join(', ')})`;
         default:
           return `${value}.${method}(${args.join(', ')})`;
       }

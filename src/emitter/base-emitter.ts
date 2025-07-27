@@ -43,7 +43,7 @@ export abstract class BaseEmitter {
   /**
    * エミットの実行（抽象メソッド）
    */
-  abstract emit(ir: IR): EmitResult;
+  abstract emit(ir: IR | IR[]): EmitResult;
 
   /**
    * エラーの追加
@@ -152,8 +152,10 @@ export abstract class BaseEmitter {
    * 子ノードの処理
    */
   protected emitChildren(node: IR): void {
-    for (const child of node.children) {
-      this.emitNode(child);
+    if (node.children && Array.isArray(node.children)) {
+      for (const child of node.children) {
+        this.emitNode(child);
+      }
     }
   }
 
