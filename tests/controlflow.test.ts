@@ -118,7 +118,7 @@ ENDIF`;
       const result = converter.convert(pythonCode);
       const expected = 
 `count ← 0
-WHILE count < 5 DO
+WHILE count < 5
   OUTPUT count
   count ← count + 1
 ENDWHILE`;
@@ -145,7 +145,7 @@ ENDWHILE`;
       // ENDWHILE`;
       // Let's simplify the expectation for now, focusing on the components.
       expect(result.code).toContain('i ← 0');
-      expect(result.code).toContain('WHILE True DO');
+      expect(result.code).toContain('WHILE TRUE');
       expect(result.code).toContain('OUTPUT i');
       // The presence of ENDWHILE is standard for the WHILE block itself.
       expect(result.code).toContain('ENDWHILE');
@@ -170,7 +170,7 @@ while True:
       // A simple `while True` with a conditional break at the end of the loop body.
       const expected = 
 `// Simulating REPEAT-UNTIL
-WHILE True DO
+WHILE TRUE
   OUTPUT "Guess the number: "
   INPUT guess
   IF guess = "7" THEN

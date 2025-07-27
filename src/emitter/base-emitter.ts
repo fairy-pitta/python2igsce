@@ -158,53 +158,58 @@ export abstract class BaseEmitter {
   }
 
   /**
-   * テキストのフォーマット
+   * テキストのフォーマット（Python → IGCSE）
    */
   protected formatText(text: string): string {
-    let formatted = text;
+    let result = text;
     
-    // 演算子の変換（Python → IGCSE）
-    formatted = this.convertOperators(formatted);
+    // 演算子の変換
+    result = this.convertOperators(result);
     
     // キーワードの大文字化
-    if (this.context.formatter.uppercaseKeywords) {
-      formatted = this.uppercaseKeywords(formatted);
-    }
+    result = this.uppercaseKeywords(result);
     
-    // 演算子周りのスペース
-    if (this.context.formatter.spaceAroundOperators) {
-      formatted = this.addSpaceAroundOperators(formatted);
-    }
-    
-    // カンマ後のスペース（文字列リテラル内は除外）
-    if (this.context.formatter.spaceAfterComma) {
-      formatted = this.addSpaceAfterCommaOutsideStrings(formatted);
-    }
-    
-    return formatted;
+    return result;
   }
 
   /**
-   * キーワードの大文字化
+   * キーワードの大文字化（文字列リテラル外のみ）
    */
   private uppercaseKeywords(text: string): string {
+    let result = text;
+    
+    // 文字列リテラルを一時的に保護
+    const stringLiterals: string[] = [];
+    result = result.replace(/(["'])((?:\\.|(?!\1)[^\\])*)\1/g, (match) => {
+      const index = stringLiterals.length;
+      stringLiterals.push(match);
+      return `__STRING_${index}__`;
+    });
+    
+    // IGCSEキーワードの大文字化（文字列リテラル外のみ）
     const keywords = [
-      'IF', 'THEN', 'ELSE', 'ENDIF',
-      'FOR', 'TO', 'STEP', 'NEXT',
-      'WHILE', 'ENDWHILE', 'REPEAT', 'UNTIL',
-      'PROCEDURE', 'ENDPROCEDURE', 'FUNCTION', 'ENDFUNCTION',
-      'RETURN', 'INPUT', 'OUTPUT',
-      'CASE', 'OF', 'OTHERWISE', 'ENDCASE',
-      'TYPE', 'ENDTYPE', 'CLASS', 'ENDCLASS',
-      'DECLARE', 'CONSTANT', 'ARRAY', 'RECORD',
-      'AND', 'OR', 'NOT', 'MOD', 'DIV'
+      'if', 'then', 'else', 'endif', 'elseif',
+      'for', 'to', 'step', 'next', 'while', 'endwhile',
+      'repeat', 'until', 'do',
+      'procedure', 'endprocedure', 'function', 'endfunction', 'return',
+      'declare', 'constant', 'array', 'of', 'type',
+      'input', 'output', 'read', 'write',
+      'and', 'or', 'not',
+      'true', 'false', 'null',
+      'case', 'of', 'otherwise', 'endcase',
+      'class', 'endclass', 'new', 'super', 'this',
+      'public', 'private', 'inherits'
     ];
     
-    let result = text;
-    for (const keyword of keywords) {
-      const regex = new RegExp(`\\b${keyword.toLowerCase()}\\b`, 'gi');
-      result = result.replace(regex, keyword);
-    }
+    keywords.forEach(keyword => {
+      const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
+      result = result.replace(regex, keyword.toUpperCase());
+    });
+    
+    // 文字列リテラルを復元
+    stringLiterals.forEach((literal, index) => {
+      result = result.replace(`__STRING_${index}__`, literal);
+    });
     
     return result;
   }
@@ -223,6 +228,14 @@ export abstract class BaseEmitter {
       return `__COMMENT_${index}__`;
     });
     
+    // 文字列リテラルを一時的に保護
+    const stringLiterals: string[] = [];
+    result = result.replace(/(["'])((?:\\.|(?!\1)[^\\])*)\1/g, (match) => {
+      const index = stringLiterals.length;
+      stringLiterals.push(match);
+      return `__STRING_${index}__`;
+    });
+    
     // 比較演算子の変換（代入演算子より先に処理）
     result = result.replace(/!=/g, '≠');
     result = result.replace(/<=/g, '≤');
@@ -233,98 +246,39 @@ export abstract class BaseEmitter {
     // 行の先頭から変数名 = の形式を ← に変換
     result = result.replace(/^(\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*/gm, '$1$2 ← ');
     
-    // 論理演算子の変換
-    result = result.replace(/\band\b/gi, 'AND');
-    result = result.replace(/\bor\b/gi, 'OR');
-    result = result.replace(/\bnot\b/gi, 'NOT');
+    // 論理演算子の変換（単語境界を使用）
+    result = result.replace(/\band\b/g, ' AND ');
+    result = result.replace(/\bor\b/g, ' OR ');
+    result = result.replace(/\bnot\b/g, 'NOT ');
+    
+    // 文字列リテラルを復元
+    stringLiterals.forEach((literal, index) => {
+      result = result.replace(`__STRING_${index}__`, literal);
+    });
     
     // 文字列連結の変換（文字列リテラルが含まれる行の+を&に変換）
     const lines = result.split('\n');
     result = lines.map(line => {
       // 文字列リテラル（"または'で囲まれた部分）が含まれる行かチェック
       if (/["']/.test(line)) {
-        // 文字列連結の+を&に変換
+        // 文字列連結の+を&に変換（スペースの調整も行う）
         return line.replace(/\s*\+\s*/g, ' & ');
       }
       return line;
     }).join('\n');
     
-    // 算術演算子の変換（コメント以外の//のみ）
-    result = result.replace(/\s*%\s*/g, ' MOD ');
-    result = result.replace(/\s*\/\/\s*/g, ' DIV ');
+    // 余分なスペースを削除（演算子周りの重複スペースを修正）
+    result = result.replace(/\s{2,}/g, ' ');
     
-    // input()関数の変換（代入文の場合は特別処理）
-    result = result.replace(/(\w+)\s*←\s*input\(\)/g, 'INPUT $1');
-    result = result.replace(/(\w+)\s*←\s*input\(([^)]+)\)/g, 'OUTPUT $2\nINPUT $1');
-    // 通常のinput()関数の変換
-    result = result.replace(/\binput\(\)/g, 'INPUT');
-    result = result.replace(/\binput\(([^)]+)\)/g, 'INPUT($1)');
-    
-    // コメントを復元（#を//に変換、//はそのまま）
+    // コメントを復元（Pythonの#コメントをIGCSEの//コメントに変換）
     commentMatches.forEach((comment, index) => {
-      const convertedComment = comment.startsWith('#') ? comment.replace(/^#/, '//') : comment;
+      let convertedComment = comment;
+      // Pythonの#コメントをIGCSEの//コメントに変換
+      if (comment.startsWith('#')) {
+        convertedComment = comment.replace(/^#/, '//');
+      }
       result = result.replace(`__COMMENT_${index}__`, convertedComment);
     });
-    
-    return result;
-  }
-
-  /**
-   * 演算子周りのスペース追加
-   */
-  private addSpaceAroundOperators(text: string): string {
-    const operators = ['←', '=', '≠', '<', '>', '≤', '≥', '+', '-', '*', '/', 'MOD', 'DIV'];
-    
-    let result = text;
-    for (const op of operators) {
-      // 既にスペースがある場合は処理しない
-      const regex = new RegExp(`(?<!\\s)${this.escapeRegex(op)}(?!\\s)`, 'g');
-      result = result.replace(regex, ` ${op} `);
-    }
-    
-    // 重複するスペースを除去
-    result = result.replace(/\s+/g, ' ');
-    
-    return result;
-  }
-
-  /**
-   * 正規表現用のエスケープ
-   */
-  private escapeRegex(text: string): string {
-    return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  }
-
-  /**
-   * 文字列リテラル外のカンマの後にスペースを追加
-   */
-  private addSpaceAfterCommaOutsideStrings(text: string): string {
-    let result = '';
-    let inString = false;
-    let stringChar = '';
-    
-    for (let i = 0; i < text.length; i++) {
-      const char = text[i];
-      const prevChar = i > 0 ? text[i - 1] : '';
-      
-      // 文字列の開始/終了を検出
-      if ((char === '"' || char === "'") && prevChar !== '\\') {
-        if (!inString) {
-          inString = true;
-          stringChar = char;
-        } else if (char === stringChar) {
-          inString = false;
-          stringChar = '';
-        }
-      }
-      
-      result += char;
-      
-      // 文字列外のカンマの後にスペースを追加
-      if (!inString && char === ',' && i + 1 < text.length && text[i + 1] !== ' ') {
-        result += ' ';
-      }
-    }
     
     return result;
   }

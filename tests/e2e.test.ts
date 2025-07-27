@@ -447,7 +447,7 @@ CALL Main()`;
       // Note: This is a complex example, exact formatting may vary
       expect(result).toContain('FUNCTION Add');
       expect(result).toContain('PROCEDURE Main');
-      expect(result).toContain('WHILE True');
+      expect(result).toContain('WHILE TRUE');
       expect(result).toContain('IF num1 < 0 OR num2 < 0 THEN');
     });
 

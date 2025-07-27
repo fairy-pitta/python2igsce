@@ -200,6 +200,7 @@ export class TextEmitter extends BaseEmitter {
       }).join(', '); // エミッター側で安全にスペースを追加
       
       const outputText = `OUTPUT ${formattedArgs}`;
+      // OUTPUT文は直接出力（formatTextを通さない）
       this.emitLine(outputText);
     } else {
       // 従来の処理（後方互換性）
