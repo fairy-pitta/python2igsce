@@ -38,6 +38,8 @@ export interface ParseResult {
   errors: ParseError[];
   /** 警告メッセージ */
   warnings: ParseWarning[];
+  /** パーサーコンテキスト */
+  context?: ParserContext;
   /** パース統計 */
   stats: ParseStats;
 }
@@ -146,6 +148,18 @@ export interface FunctionInfo {
 }
 
 /**
+ * 関数呼び出し情報
+ */
+export interface FunctionCallInfo {
+  /** 関数名 */
+  name: string;
+  /** 引数の型リスト */
+  argumentTypes: IGCSEDataType[];
+  /** 呼び出し回数 */
+  callCount: number;
+}
+
+/**
  * パラメータ情報
  */
 export interface ParameterInfo {
@@ -240,6 +254,8 @@ export interface ParserContext {
   parameterMapping: { [key: string]: string };
   /** クラス定義情報 */
   classDefinitions?: { [key: string]: any };
+  /** 関数呼び出し情報 */
+  functionCalls: Map<string, FunctionCallInfo>;
   /** パース開始時刻 */
   startTime: number;
   /** クラスかどうかを判定するメソッド */

@@ -1,4 +1,5 @@
 import { IR, IRKind, createIR, IRMeta, countIRNodes } from '../types/ir';
+import { IGCSEDataType } from '../types/igcse';
 import { BaseParser } from './base-parser';
 import { StatementVisitor } from './statement-visitor';
 import { DefinitionVisitor } from './definition-visitor';
@@ -36,14 +37,17 @@ export class PythonASTVisitor extends BaseParser {
    */
   parse(source: string): import('../types/parser').ParseResult {
     this.startParsing();
-    this.resetContext();
     
     try {
       // 実際の実装では、PythonのASTパーサーを使用
       // ここでは簡易的な実装を提供
       const ast = this.parseToAST(source);
+      
       // 2パス処理: まずすべてのクラス定義を事前登録
       this.preRegisterAllClasses(ast.body);
+      
+      // 1パス目: 関数呼び出し情報を収集
+      this.collectFunctionCalls(ast);
       
       // クラス定義登録後、ビジターに最新のコンテキストを再共有
       this.statementVisitor.setContext(this.context);
@@ -66,6 +70,84 @@ export class PythonASTVisitor extends BaseParser {
       // エラー時は空のIRを返す
       const emptyIR = createIR('statement', '', []);
       return this.createParseResult([emptyIR]);
+    }
+  }
+
+  /**
+   * 1パス目: 関数呼び出し情報を収集
+   */
+  private collectFunctionCalls(ast: ASTNode): void {
+    if (ast.type === 'Call' && ast.func && ast.func.type === 'Name') {
+      const functionName = ast.func.id;
+      const argumentTypes = ast.args ? ast.args.map((arg: ASTNode) => 
+        this.inferTypeFromValue(arg)
+      ) : [];
+      this.recordFunctionCall(functionName, argumentTypes);
+    }
+    
+    // 子ノードを再帰的に処理
+    if (ast.body && Array.isArray(ast.body)) {
+      ast.body.forEach((child: ASTNode) => this.collectFunctionCalls(child));
+    }
+    if (ast.children && Array.isArray(ast.children)) {
+      ast.children.forEach((child: ASTNode) => this.collectFunctionCalls(child));
+    }
+    if (ast.orelse && Array.isArray(ast.orelse)) {
+      ast.orelse.forEach((child: ASTNode) => this.collectFunctionCalls(child));
+    }
+    if (ast.value) {
+      this.collectFunctionCalls(ast.value);
+    }
+    if (ast.test) {
+      this.collectFunctionCalls(ast.test);
+    }
+    if (ast.iter) {
+      this.collectFunctionCalls(ast.iter);
+    }
+    if (ast.args && Array.isArray(ast.args)) {
+      ast.args.forEach((arg: ASTNode) => this.collectFunctionCalls(arg));
+    }
+    if (ast.targets && Array.isArray(ast.targets)) {
+      ast.targets.forEach((target: ASTNode) => this.collectFunctionCalls(target));
+    }
+  }
+
+  /**
+   * 値から型を推論
+   */
+  private inferTypeFromValue(node: ASTNode): IGCSEDataType {
+    switch (node.type) {
+      case 'Num':
+        return 'INTEGER';
+      case 'Str':
+        return 'STRING';
+      case 'List':
+        return 'ARRAY';
+      case 'Dict':
+        return 'ARRAY';
+      case 'NameConstant':
+        return 'BOOLEAN';
+      case 'Name':
+        return 'STRING'; // デフォルトとしてSTRING
+      default:
+        return 'STRING';
+    }
+  }
+
+  /**
+   * 関数呼び出しを記録
+   */
+  override recordFunctionCall(functionName: string, argumentTypes: IGCSEDataType[]): void {
+    const existingCalls = this.context.functionCalls.get(functionName);
+    if (existingCalls) {
+      existingCalls.argumentTypes.push(...argumentTypes);
+      existingCalls.callCount++;
+    } else {
+      this.context.functionCalls.set(functionName, {
+        name: functionName,
+        argumentTypes: [...argumentTypes],
+        callCount: 1
+      });
     }
   }
 
@@ -1231,11 +1313,7 @@ export class PythonASTVisitor extends BaseParser {
     
     return {
       type: 'Return',
-      value: value ? {
-        type: 'Name',
-        id: value,
-        raw: value
-      } : null,
+      value: value ? this.parseExpression(value) : null,
       lineno: lineNumber
     };
   }

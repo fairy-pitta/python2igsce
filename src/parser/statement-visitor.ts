@@ -85,7 +85,6 @@ export class StatementVisitor extends BaseParser {
         const builtinResult = this.expressionVisitor.convertBuiltinFunction(func, args);
        
        if (!builtinResult && this.isClassInstantiation(node.value)) {
-         console.log('DEBUG: Processing as class instantiation');
          return this.handleClassInstantiation(node);
        }
      }
@@ -544,6 +543,15 @@ export class StatementVisitor extends BaseParser {
     const func = this.expressionVisitor.visitExpression(node.func);
     const args = node.args.map((arg: ASTNode) => this.expressionVisitor.visitExpression(arg));
     
+    // 関数呼び出し情報を記録（引数の型を推論）
+    if (node.func.type === 'Name') {
+      const functionName = node.func.id;
+      const argumentTypes = node.args.map((arg: ASTNode) => 
+        this.expressionVisitor.inferTypeFromValue(arg)
+      );
+      this.recordFunctionCall(functionName, argumentTypes);
+    }
+    
     // funcがappendメソッド呼び出しの場合を検出
     if (func.includes('.append(')) {
       const match = func.match(/^(.+)\.append\((.+)\)$/);
@@ -904,11 +912,8 @@ export class StatementVisitor extends BaseParser {
   private isClassInstantiation(node: ASTNode): boolean {
     // 簡易的な判定: 関数名が大文字で始まる場合はクラスとみなす
     if (node.func.type === 'Name') {
-      const isClass = /^[A-Z]/.test(node.func.id);
-      console.log(`DEBUG: Checking if ${node.func.id} is class: ${isClass}`);
-      return isClass;
+      return /^[A-Z]/.test(node.func.id);
     }
-    console.log('DEBUG: Function type is not Name:', node.func.type);
     return false;
   }
 
@@ -923,22 +928,18 @@ export class StatementVisitor extends BaseParser {
     
     // 変数宣言
     const declareText = `DECLARE ${target} : ${recordTypeName}`;
-    console.log('DEBUG: Adding declaration:', declareText);
     children.push(this.createIRNode('statement', declareText));
     
     // クラス定義から属性名を取得
     const classAttributes = this.getClassAttributes(className);
-    console.log('DEBUG: classAttributes:', classAttributes);
     
     // フィールドの代入（引数の順序に基づく）
     for (let i = 0; i < Math.min(args.length, classAttributes.length); i++) {
       const attrName = classAttributes[i];
       const assignText = `${target}.${attrName} ← ${args[i]}`;
-      console.log('DEBUG: Adding assignment:', assignText);
       children.push(this.createIRNode('assign', assignText));
     }
     
-    console.log('DEBUG: Returning block with', children.length, 'children');
     return this.createIRNode('block', '', children);
   }
 

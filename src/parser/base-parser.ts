@@ -63,6 +63,7 @@ export abstract class BaseParser {
       warnings: [],
       arrayInfo: {},
       parameterMapping: {},
+      functionCalls: new Map(),
       startTime: Date.now(),
       isClass: (name: string) => {
         return !!(context.classDefinitions && context.classDefinitions[name] !== undefined);
@@ -343,7 +344,10 @@ export abstract class BaseParser {
    * コンテキストのリセット
    */
   protected resetContext(): void {
+    // 関数呼び出し情報を保持
+    const functionCalls = this.context.functionCalls;
     this.context = this.createInitialContext();
+    this.context.functionCalls = functionCalls;
   }
 
   /**
@@ -358,5 +362,37 @@ export abstract class BaseParser {
    */
   protected getWarnings(): import('../types/parser').ParseWarning[] {
     return this.context.warnings;
+  }
+
+  /**
+   * 関数呼び出し情報の記録
+   */
+  protected recordFunctionCall(name: string, argumentTypes: IGCSEDataType[]): void {
+    const existing = this.context.functionCalls.get(name);
+    if (existing) {
+      existing.callCount++;
+      // 引数の型情報を更新（最新の呼び出しの型を使用）
+      existing.argumentTypes = argumentTypes;
+    } else {
+      this.context.functionCalls.set(name, {
+        name,
+        argumentTypes,
+        callCount: 1
+      });
+    }
+  }
+
+  /**
+   * 関数呼び出し情報の取得
+   */
+  protected getFunctionCallInfo(name: string): import('../types/parser').FunctionCallInfo | undefined {
+    return this.context.functionCalls.get(name);
+  }
+
+  /**
+   * 全ての関数呼び出し情報の取得
+   */
+  public getAllFunctionCalls(): Map<string, import('../types/parser').FunctionCallInfo> {
+    return this.context.functionCalls;
   }
 }

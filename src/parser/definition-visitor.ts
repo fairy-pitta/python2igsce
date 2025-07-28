@@ -44,19 +44,8 @@ export class DefinitionVisitor extends BaseParser {
    */
   visitFunctionDef(node: ASTNode): IR {
     const funcName = this.capitalizeFirstLetter(node.name);
-    const params = this.extractParameters(node.args);
+    const params = this.extractParameters(node.args, node.name);
     const paramText = params.map(p => `${p.name} : ${p.type}`).join(', ');
-    
-    // 戻り値の型を推論
-    const hasReturn = this.hasReturnStatement(node.body);
-    const returnType = hasReturn ? this.inferReturnType(node) : null;
-    
-    let funcText: string;
-    if (returnType) {
-      funcText = `FUNCTION ${funcName}(${paramText}) RETURNS ${returnType}`;
-    } else {
-      funcText = `PROCEDURE ${funcName}(${paramText})`;
-    }
     
     // 関数スコープに入る
     this.enterScope(funcName, 'function');
@@ -67,10 +56,21 @@ export class DefinitionVisitor extends BaseParser {
       this.registerVariable(param.name, param.type, node.lineno);
     });
     
-    // 関数本体を処理
+    // 関数本体を処理（関数呼び出し情報を収集するため）
     const bodyChildren = node.body.map((child: ASTNode) => 
       this.visitNode ? this.visitNode(child) : this.createIRNode('comment', '// Unprocessed node')
     );
+    
+    // 関数本体処理後に戻り値の型を推論
+    const hasReturn = this.hasReturnStatement(node.body);
+    const returnType = hasReturn ? this.inferReturnType(node, params) : null;
+    
+    let funcText: string;
+    if (returnType) {
+      funcText = `FUNCTION ${funcName}(${paramText}) RETURNS ${returnType}`;
+    } else {
+      funcText = `PROCEDURE ${funcName}(${paramText})`;
+    }
     
     this.decreaseIndent();
     this.exitScope();
@@ -173,13 +173,22 @@ export class DefinitionVisitor extends BaseParser {
   /**
    * 関数パラメータの抽出
    */
-  private extractParameters(args: any): ParameterInfo[] {
+  private extractParameters(args: any, functionName?: string): ParameterInfo[] {
     const params: ParameterInfo[] = [];
     
     if (args.args) {
-      args.args.forEach((arg: any) => {
+      args.args.forEach((arg: any, index: number) => {
         const name = arg.arg;
-        const type = this.convertPythonTypeToIGCSE(arg.annotation);
+        let type = this.convertPythonTypeToIGCSE(arg.annotation);
+        
+        // 型注釈がない場合、関数呼び出し情報から型を推論
+        if (type === 'STRING' && !arg.annotation && functionName) {
+          const callInfo = this.getFunctionCallInfo(functionName);
+          if (callInfo && callInfo.argumentTypes[index]) {
+            type = callInfo.argumentTypes[index];
+          }
+        }
+        
         params.push({ name, type });
       });
     }
@@ -339,7 +348,7 @@ export class DefinitionVisitor extends BaseParser {
   /**
    * 戻り値の型を推論
    */
-  private inferReturnType(node: ASTNode): IGCSEDataType {
+  private inferReturnType(node: ASTNode, params?: ParameterInfo[]): IGCSEDataType {
     // Python型ヒントがある場合は優先
     if (node.returns && node.returns.id) {
       switch (node.returns.id) {
@@ -351,11 +360,31 @@ export class DefinitionVisitor extends BaseParser {
       }
     }
     
+    // 関数呼び出し情報から引数の型を取得
+    const functionCallInfo = this.context.functionCalls?.get(node.name);
+    const argumentTypes = functionCallInfo?.argumentTypes || [];
+    
     // 簡易的な戻り値型推論（再帰的にReturn文を検索）
     const findReturnType = (statements: ASTNode[]): IGCSEDataType | null => {
       for (const stmt of statements) {
         if (stmt.type === 'Return' && stmt.value) {
-          return this.expressionVisitor.inferTypeFromValue(stmt.value);
+          // 戻り値が引数の演算の場合、関数呼び出し情報と引数の型を考慮
+          if (stmt.value.type === 'BinOp') {
+            const leftType = this.getOperandTypeWithCallInfo(stmt.value.left, params, argumentTypes);
+            const rightType = this.getOperandTypeWithCallInfo(stmt.value.right, params, argumentTypes);
+            
+            // 両方の引数が同じ型の場合、その型を返す
+            if (leftType && rightType && leftType === rightType) {
+              return leftType;
+            }
+            // 一方がINTEGERの場合、INTEGERを優先
+            if (leftType === 'INTEGER' || rightType === 'INTEGER') {
+              return 'INTEGER';
+            }
+          }
+          
+          const inferredType = this.expressionVisitor.inferTypeFromValue(stmt.value);
+          return inferredType;
         }
         // ネストした構造（if文、for文など）も検索
         if (stmt.body && Array.isArray(stmt.body)) {
@@ -372,6 +401,32 @@ export class DefinitionVisitor extends BaseParser {
     
     const returnType = findReturnType(node.body);
     return returnType || 'STRING';
+  }
+
+  /**
+   * 演算子のオペランドの型を取得（関数呼び出し情報を活用）
+   */
+  private getOperandTypeWithCallInfo(operand: ASTNode, params?: ParameterInfo[], argumentTypes?: IGCSEDataType[]): IGCSEDataType | null {
+    if (operand.type === 'Name') {
+      // パラメータ名の場合、まず関数呼び出し情報から型を取得
+      if (params && argumentTypes) {
+        const paramIndex = params.findIndex(p => p.name === operand.id);
+        if (paramIndex >= 0 && paramIndex < argumentTypes.length) {
+          return argumentTypes[paramIndex];
+        }
+      }
+      
+      // 関数呼び出し情報がない場合は、パラメータの型を返す
+      if (params) {
+        const param = params.find(p => p.name === operand.id);
+        if (param) {
+          return param.type;
+        }
+      }
+    }
+    
+    // その他の場合は通常の型推論
+    return this.expressionVisitor.inferTypeFromValue(operand);
   }
 
   protected override createIRNode(kind: IRKind, text: string, children: IR[] = [], meta?: IRMeta): IR {

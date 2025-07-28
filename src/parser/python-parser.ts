@@ -41,12 +41,19 @@ export class PythonParser extends BaseParser {
     const visitor = new PythonASTVisitor();
     const visitorResult = visitor.parse(processedSource);
     
+    // visitorから関数呼び出し情報を取得
+    const visitorFunctionCalls = visitor.getAllFunctionCalls();
+    for (const [name, info] of visitorFunctionCalls) {
+      this.context.functionCalls.set(name, info);
+    }
+    
     const parseTime = Date.now() - this.context.startTime;
     
     const result: ParseResult = {
        ir: visitorResult.ir,
        errors: [...this.context.errors, ...visitorResult.errors],
        warnings: [...this.context.warnings, ...visitorResult.warnings],
+       context: this.context,
        stats: {
          parseTime,
          linesProcessed: processedSource.split('\n').length,
