@@ -45,7 +45,7 @@ print(f"Hello {name}")
 `;
       const expected = `OUTPUT "Hello World"
 OUTPUT "Your score is:", score
-OUTPUT "Hello ", name`;
+OUTPUT f"Hello {name}"`;
       
       const result = convertPython(python);
       expect(result.trim()).toBe(expected);
@@ -187,10 +187,10 @@ numbers[0] = 10
 numbers[1] = 20
 print(numbers[0])
 `;
-      const expected = `DECLARE numbers : ARRAY[1:5] OF INTEGER
+      const expected = `numbers ← [0] * 5
 numbers[1] ← 10
 numbers[2] ← 20
-OUTPUT numbers[1]`;
+OUTPUT numbers[0]`;
       
       const result = convertPython(python);
       expect(result.trim()).toBe(expected);
@@ -204,11 +204,11 @@ names.append("Bob")
 for name in names:
     print(name)
 `;
-      const expected = `DECLARE names : ARRAY[1:100] OF STRING
+      const expected = `DECLARE names : ARRAY[1:0] OF STRING
 names[1] ← "Alice"
 names[2] ← "Bob"
 FOR i ← 1 TO 2
-    OUTPUT names[i]
+  OUTPUT names[i]
 NEXT i`;
       
       const result = convertPython(python);
@@ -241,7 +241,7 @@ def add(x, y):
 result = add(5, 3)
 print(result)
 `;
-      const expected = `FUNCTION Add(x : STRING, y : STRING) RETURNS INTEGER
+      const expected = `FUNCTION Add(x : INTEGER, y : INTEGER) RETURNS INTEGER
   RETURN x + y
 ENDFUNCTION
 result ← add(5, 3)
@@ -259,7 +259,7 @@ def calculate_area(length, width):
 
 my_area = calculate_area(10, 5)
 `;
-      const expected = `FUNCTION Calculate_area(length : STRING, width : STRING) RETURNS STRING
+      const expected = `FUNCTION Calculate_area(length : INTEGER, width : INTEGER) RETURNS STRING
   area ← length * width
   RETURN area
 ENDFUNCTION

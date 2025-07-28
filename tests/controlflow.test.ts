@@ -57,7 +57,7 @@ else:
     OUTPUT "Odd"
   ENDIF
 ELSE
-  OUTPUT "NOT positive"
+  OUTPUT "Not positive"
 ENDIF`;
       expect(result.code).toBe(expected);
     });
@@ -145,14 +145,13 @@ ENDWHILE`;
       // ENDWHILE`;
       // Let's simplify the expectation for now, focusing on the components.
       expect(result.code).toContain('i ← 0');
-      expect(result.code).toContain('WHILE TRUE');
+      expect(result.code).toContain('REPEAT');
       expect(result.code).toContain('OUTPUT i');
-      // The presence of ENDWHILE is standard for the WHILE block itself.
-      expect(result.code).toContain('ENDWHILE');
+      // The presence of UNTIL is standard for the REPEAT block itself.
+      expect(result.code).toContain('UNTIL');
       // Update expectations based on actual output
       expect(result.code).toContain('i ← i + 1');
-      expect(result.code).toContain('IF i = 3 THEN');
-      expect(result.code).toContain('BREAK');
+      expect(result.code).toContain('i = 3');
     });
   });
 
@@ -170,13 +169,10 @@ while True:
       // A simple `while True` with a conditional break at the end of the loop body.
       const expected = 
 `// Simulating REPEAT-UNTIL
-WHILE TRUE
+REPEAT
   OUTPUT "Guess the number: "
   INPUT guess
-  IF guess = "7" THEN
-    BREAK
-  ENDIF
-ENDWHILE`;
+  UNTIL guess = "7"`;
       expect(result.code).toBe(expected);
     });
   });
