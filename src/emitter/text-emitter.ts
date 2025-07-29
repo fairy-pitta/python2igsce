@@ -509,7 +509,16 @@ export class TextEmitter extends BaseEmitter {
     this.emitLine(text);
     
     this.increaseIndent();
-    this.emitChildren(node);
+    // 子ノードを処理するが、ENDCASEは元のインデントレベルで出力
+    for (const child of node.children) {
+      if (child.kind === 'statement' && child.text.trim() === 'ENDCASE') {
+        this.decreaseIndent();
+        this.emitNode(child);
+        this.increaseIndent();
+      } else {
+        this.emitNode(child);
+      }
+    }
     this.decreaseIndent();
   }
 

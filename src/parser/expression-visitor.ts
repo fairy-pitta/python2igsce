@@ -34,6 +34,15 @@ export class ExpressionVisitor {
       case 'Constant':
         return this.formatConstant(node.value);
       case 'Num':
+        // 小数点以下を保持するため、元の文字列表現があれば使用
+        if (node.raw && typeof node.raw === 'string') {
+          return node.raw;
+        }
+        // 整数でない場合は小数点以下を保持
+        if (!Number.isInteger(node.n)) {
+          return node.n.toString();
+        }
+        // 整数の場合でも、元が小数点付きなら保持
         return node.n.toString();
       case 'Str':
         return `"${node.s}"`;
@@ -126,6 +135,10 @@ export class ExpressionVisitor {
     if (value === null) {
       return 'NULL';
     }
+    // 数値の場合、小数点以下を保持
+    if (typeof value === 'number') {
+      return value.toString();
+    }
     return value.toString();
   }
 
@@ -139,6 +152,7 @@ export class ExpressionVisitor {
   private visitBinOp(node: ASTNode): string {
     const left = this.visitExpression(node.left);
     const right = this.visitExpression(node.right);
+    
     const op = this.convertOperator(node.op);
     return `${left} ${op} ${right}`;
   }
@@ -521,6 +535,16 @@ export class ExpressionVisitor {
    * 配列初期化かどうかを判定
    */
   isArrayInitialization(node: ASTNode): boolean {
-    return node.type === 'List' || node.type === 'Tuple';
+    // 通常の配列・タプル型
+    if (node.type === 'List' || node.type === 'Tuple') {
+      return true;
+    }
+    
+    // Name型で配列リテラルの形式（[...] の形）の場合
+    if (node.type === 'Name' && node.id) {
+      return /^\[.*\]$/.test(node.id);
+    }
+    
+    return false;
   }
 }

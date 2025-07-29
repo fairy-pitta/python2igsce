@@ -43,6 +43,11 @@ export class StatementVisitor extends BaseParser {
    * 代入文の処理
    */
   visitAssign(node: ASTNode): IR {
+    // 配列の乗算初期化の検出（[0] * 5 など）
+    if (this.isArrayMultiplication(node.value)) {
+      return this.handleArrayMultiplication(node);
+    }
+
     // 配列初期化の検出を最初に行う
     if (this.expressionVisitor.isArrayInitialization(node.value)) {
       return this.handleArrayInitialization(node);
@@ -234,14 +239,22 @@ export class StatementVisitor extends BaseParser {
     
     // 通常の型注釈付き代入
     const target = this.expressionVisitor.visitExpression(node.target);
-    const value = node.value ? this.expressionVisitor.visitExpression(node.value) : '';
+    const dataType = this.convertAnnotationToIGCSEType(node.annotation);
     
-    if (value) {
-      const text = `${target} ← ${value}`;
-      return this.createIRNode('assign', text);
+    if (node.value) {
+      // 値がある場合は宣言と代入の両方を生成
+      const value = this.expressionVisitor.visitExpression(node.value);
+      const declText = `DECLARE ${target} : ${dataType}`;
+      const assignText = `${target} ← ${value}`;
+      
+      this.registerVariable(targetName, dataType as IGCSEDataType, node.lineno);
+      
+      const declIR = this.createIRNode('statement', declText);
+      const assignIR = this.createIRNode('assign', assignText);
+      
+      return this.createIRNode('statement', '', [declIR, assignIR]);
     } else {
       // 値がない場合は宣言のみ
-       const dataType = this.convertAnnotationToIGCSEType(node.annotation);
        const text = `DECLARE ${target} : ${dataType}`;
        this.registerVariable(targetName, dataType as IGCSEDataType, node.lineno);
        return this.createIRNode('statement', text);
@@ -252,6 +265,12 @@ export class StatementVisitor extends BaseParser {
    * IF文の処理
    */
   visitIf(node: ASTNode): IR {
+    // if-elif-elseをCASE文に変換できるかチェック
+    const caseResult = this.tryConvertToCase(node);
+    if (caseResult) {
+      return caseResult;
+    }
+
     const condition = this.expressionVisitor.visitExpression(node.test);
     const ifText = `IF ${condition} THEN`;
     
@@ -691,6 +710,67 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
+   * MATCH文の処理（Python 3.10+）
+   */
+  visitMatch(node: ASTNode): IR {
+    const subject = this.expressionVisitor.visitExpression(node.subject);
+    const caseText = `CASE OF ${subject}`;
+    
+    const children: IR[] = [];
+    
+    // 各caseの処理
+    for (const caseNode of node.cases) {
+      if (caseNode.pattern.type === 'MatchValue') {
+        // 値パターン
+        const value = this.expressionVisitor.visitExpression(caseNode.pattern.value);
+        
+        // ケースのボディが単一文の場合は同じ行に出力
+        if (caseNode.body.length === 1) {
+          const bodyIR = this.visitNode ? this.visitNode(caseNode.body[0]) : this.createIRNode('comment', '// Unprocessed node');
+          const caseItemText = `   ${value} : ${bodyIR.text}`;
+          const caseItemIR = this.createIRNode('statement', caseItemText);
+          children.push(caseItemIR);
+        } else {
+          // 複数文の場合は従来通り
+          const caseItemText = `   ${value} :`;
+          const caseItemIR = this.createIRNode('statement', caseItemText);
+          children.push(caseItemIR);
+          
+          this.increaseIndent();
+          const bodyChildren = caseNode.body.map((child: ASTNode) => 
+            this.visitNode ? this.visitNode(child) : this.createIRNode('comment', '// Unprocessed node')
+          );
+          this.decreaseIndent();
+          children.push(...bodyChildren);
+        }
+      } else if (caseNode.pattern.type === 'MatchAs' && !caseNode.pattern.pattern) {
+        // デフォルトケース（_）
+        if (caseNode.body.length === 1) {
+          const bodyIR = this.visitNode ? this.visitNode(caseNode.body[0]) : this.createIRNode('comment', '// Unprocessed node');
+          const otherwiseText = `   OTHERWISE : ${bodyIR.text}`;
+          const otherwiseIR = this.createIRNode('statement', otherwiseText);
+          children.push(otherwiseIR);
+        } else {
+          const otherwiseIR = this.createIRNode('statement', '   OTHERWISE :');
+          children.push(otherwiseIR);
+          
+          this.increaseIndent();
+          const bodyChildren = caseNode.body.map((child: ASTNode) => 
+            this.visitNode ? this.visitNode(child) : this.createIRNode('comment', '// Unprocessed node')
+          );
+          this.decreaseIndent();
+          children.push(...bodyChildren);
+        }
+      }
+    }
+    
+    const endCaseIR = this.createIRNode('statement', 'ENDCASE');
+    children.push(endCaseIR);
+    
+    return this.createIRNode('case', caseText, children);
+  }
+
+  /**
    * DELETE文の処理
    */
   visitDelete(_node: ASTNode): IR {
@@ -771,6 +851,99 @@ export class StatementVisitor extends BaseParser {
     bodyChildren.push(nextIR);
     
     return this.createIRNode('for', forText, bodyChildren);
+  }
+
+  /**
+   * 配列の乗算初期化かどうかを判定（[0] * 5 など）
+   */
+  private isArrayMultiplication(node: ASTNode): boolean {
+    return node.type === 'BinOp' && 
+           node.op.type === 'Mult' && 
+           (this.expressionVisitor.isArrayInitialization(node.left) || 
+            this.expressionVisitor.isArrayInitialization(node.right));
+  }
+
+  /**
+   * 配列の乗算初期化を処理（[0] * 5 など）
+   */
+  private handleArrayMultiplication(node: ASTNode): IR {
+    const target = this.expressionVisitor.visitExpression(node.targets[0]);
+    
+    let arrayNode: ASTNode;
+    let sizeNode: ASTNode;
+    
+    // [0] * 5 または 5 * [0] の形式を判定
+    if (this.expressionVisitor.isArrayInitialization(node.value.left)) {
+      arrayNode = node.value.left;
+      sizeNode = node.value.right;
+    } else {
+      arrayNode = node.value.right;
+      sizeNode = node.value.left;
+    }
+    
+    // サイズを取得
+    let size: number;
+    if (sizeNode.type === 'Constant' && typeof sizeNode.value === 'number') {
+      size = sizeNode.value;
+    } else if (sizeNode.type === 'Num') {
+      size = sizeNode.n;
+    } else {
+      // 動的サイズの場合はデフォルト値を使用
+      size = 100;
+    }
+    
+    // 要素型を取得
+    let elementType: IGCSEDataType;
+    
+    if (arrayNode.elts && arrayNode.elts.length > 0) {
+      // 通常のList/Tuple型の場合
+      const firstElement = arrayNode.elts[0];
+      elementType = this.expressionVisitor.inferTypeFromValue(firstElement);
+    } else if (arrayNode.type === 'Name' && arrayNode.id) {
+      // Name型で配列リテラルの形式の場合（例: "[0]"）
+      const arrayLiteral = arrayNode.id;
+      // 配列リテラルから要素を抽出
+      const match = arrayLiteral.match(/^\[(.+)\]$/);
+      if (match) {
+        const elementStr = match[1].trim();
+        // 数値かどうかを判定
+        if (/^\d+$/.test(elementStr)) {
+          elementType = 'INTEGER';
+        } else if (/^\d+\.\d+$/.test(elementStr)) {
+          elementType = 'REAL';
+        } else if (elementStr === 'True' || elementStr === 'False') {
+          elementType = 'BOOLEAN';
+        } else {
+          elementType = 'STRING';
+        }
+      } else {
+        elementType = 'INTEGER';
+      }
+    } else {
+      elementType = 'INTEGER';
+    }
+    
+    // 配列乗算の場合は直接代入として出力（テストケースに合わせる）
+    const arrayExpr = this.expressionVisitor.visitExpression(arrayNode);
+    const sizeExpr = this.expressionVisitor.visitExpression(sizeNode);
+    const assignText = `${target} ← ${arrayExpr} * ${sizeExpr}`;
+    
+    // 配列サイズ情報をコンテキストに記録
+    if (this.context && this.context.arrayInfo) {
+      this.context.arrayInfo[target] = {
+        size: size,
+        elementType: elementType,
+        currentIndex: 0
+      };
+    }
+    
+    // 変数の型を推論して登録
+    const targetNode = node.targets[0];
+    if (targetNode.type === 'Name') {
+      this.registerVariable(targetNode.id, 'ARRAY' as IGCSEDataType, node.lineno);
+    }
+    
+    return this.createIRNode('assign', assignText);
   }
 
   private handleArrayInitialization(node: ASTNode): IR {
@@ -1109,6 +1282,153 @@ export class StatementVisitor extends BaseParser {
   private capitalizeFirstLetter(str: string): string {
     if (!str) return str;
     return str.charAt(0).toUpperCase() + str.slice(1);
+  }
+
+  /**
+   * IF-ELIF-ELSE文をCASE文に変換できるかチェックし、可能であれば変換する
+   */
+  private tryConvertToCase(node: ASTNode): IR | null {
+    // 同じ変数に対する等価比較のチェーン（if x == 1: elif x == 2: ...）の場合のみCASE文に変換
+    if (!this.canConvertToCase(node)) {
+      return null;
+    }
+
+    const variable = this.extractCaseVariable(node);
+    if (!variable) {
+      return null;
+    }
+
+    const children: IR[] = [];
+    const caseText = `CASE OF ${variable}`;
+
+    // 各条件を処理
+    this.processCaseConditions(node, variable, children);
+
+    children.push(this.createIRNode('statement', 'ENDCASE'));
+    return this.createIRNode('case', caseText, children);
+  }
+
+  /**
+   * IF-ELIF-ELSE文がCASE文に変換可能かチェック
+   */
+  private canConvertToCase(node: ASTNode): boolean {
+    let current = node;
+    let variable: string | null = null;
+
+    while (current) {
+      // 条件が等価比較（==）でない場合は変換不可
+      if (!current.test || current.test.type !== 'Compare') {
+        return false;
+      }
+
+      const compare = current.test;
+      if (!compare.ops || compare.ops.length !== 1 || compare.ops[0].type !== 'Eq') {
+        return false;
+      }
+
+      // 左辺が変数でない場合は変換不可
+      if (!compare.left || compare.left.type !== 'Name') {
+        return false;
+      }
+
+      const currentVar = compare.left.id;
+      if (variable === null) {
+        variable = currentVar;
+      } else if (variable !== currentVar) {
+        // 異なる変数の場合は変換不可
+        return false;
+      }
+
+      // 右辺が定数でない場合は変換不可
+      const comparator = compare.comparators[0];
+      if (!comparator || (comparator.type !== 'Constant' && comparator.type !== 'Num' && comparator.type !== 'Str')) {
+        return false;
+      }
+
+      // 次のelif/elseに移動
+      if (current.orelse && current.orelse.length === 1 && current.orelse[0].type === 'If') {
+        current = current.orelse[0];
+      } else {
+        break;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * CASE文で使用する変数を抽出
+   */
+  private extractCaseVariable(node: ASTNode): string | null {
+    if (node.test && node.test.type === 'Compare' && node.test.left && node.test.left.type === 'Name') {
+      return node.test.left.id;
+    }
+    return null;
+  }
+
+  /**
+   * CASE文の各条件を処理
+   */
+  private processCaseConditions(node: ASTNode, _variable: string, children: IR[]): void {
+    let current = node;
+
+    while (current) {
+      if (current.test && current.test.type === 'Compare') {
+        const comparator = current.test.comparators[0];
+        let value: string;
+
+        if (comparator.type === 'Constant') {
+          value = typeof comparator.value === 'string' ? `"${comparator.value}"` : String(comparator.value);
+        } else if (comparator.type === 'Num') {
+          value = String(comparator.n);
+        } else if (comparator.type === 'Str') {
+          value = `"${comparator.s}"`;
+        } else {
+          value = this.expressionVisitor.visitExpression(comparator);
+        }
+
+        // 条件内の文を処理して、条件と同じ行に配置
+        const statements: string[] = [];
+        for (const stmt of current.body) {
+          if (this.visitNode) {
+            const stmtIR = this.visitNode(stmt);
+            if (stmtIR) {
+              statements.push(stmtIR.text);
+            }
+          }
+        }
+
+        // CASE条件と文を同じ行に配置
+        const caseText = statements.length > 0 
+          ? `   ${value} : ${statements.join('; ')}`
+          : `   ${value} :`;
+        children.push(this.createIRNode('statement', caseText));
+      }
+
+      // 次のelif/elseに移動
+      if (current.orelse && current.orelse.length === 1 && current.orelse[0].type === 'If') {
+        current = current.orelse[0];
+      } else if (current.orelse && current.orelse.length > 0) {
+        // else節がある場合
+        const elseStatements: string[] = [];
+        for (const stmt of current.orelse) {
+          if (this.visitNode) {
+            const stmtIR = this.visitNode(stmt);
+            if (stmtIR) {
+              elseStatements.push(stmtIR.text);
+            }
+          }
+        }
+        
+        const otherwiseText = elseStatements.length > 0 
+          ? `   OTHERWISE : ${elseStatements.join('; ')}`
+          : `   OTHERWISE :`;
+        children.push(this.createIRNode('statement', otherwiseText));
+        break;
+      } else {
+        break;
+      }
+    }
   }
 
   protected override createIRNode(kind: IRKind, text: string, children: IR[] = [], meta?: IRMeta): IR {

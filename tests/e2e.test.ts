@@ -486,7 +486,7 @@ OUTPUT "Maximum value is: ", max_value`;
     });
   });
 
-  describe.skip('Array Declarations', () => {
+  describe('Array Declarations', () => {
     it('should convert array initialization', () => {
       const python = `
 numbers = [0] * 5
@@ -515,7 +515,7 @@ value ← numbers[3]`;
     });
   });
 
-  describe.skip('Type Declarations', () => {
+  describe('Type Declarations', () => {
     it('should convert typed variable declarations', () => {
       const python = `
 counter: int = 0
@@ -537,7 +537,7 @@ is_valid ← TRUE`;
     });
   });
 
-  describe.skip('CASE Statements', () => {
+  describe('CASE Statements', () => {
     it('should convert match statement to CASE', () => {
       const python = `
 match direction:

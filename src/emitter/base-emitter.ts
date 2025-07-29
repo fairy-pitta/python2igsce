@@ -264,7 +264,39 @@ export abstract class BaseEmitter {
       // 文字列リテラル（"または'で囲まれた部分）が含まれる行かチェック
       if (/["']/.test(line)) {
         // 文字列連結の+を&に変換（スペースの調整も行う）
-        return line.replace(/\s*\+\s*/g, ' & ');
+        // ただし、数値同士の加算は除外する
+        return line.replace(/\s*\+\s*/g, (match, offset, string) => {
+          // +の前後の文字を確認
+          const before = string.substring(0, offset).trim();
+          const after = string.substring(offset + match.length).trim();
+          
+          // +の直前の単語を取得
+          const beforeMatch = before.match(/([a-zA-Z_][a-zA-Z0-9_]*|\d+(?:\.\d+)?)$/);
+          const beforeToken = beforeMatch ? beforeMatch[1] : '';
+          
+          // +の直後の単語を取得
+          const afterMatch = after.match(/^([a-zA-Z_][a-zA-Z0-9_]*|\d+(?:\.\d+)?)/);
+          const afterToken = afterMatch ? afterMatch[1] : '';
+          
+          // 数値リテラル同士の加算かチェック
+          const beforeIsNumber = /^\d+(\.\d+)?$/.test(beforeToken);
+          const afterIsNumber = /^\d+(\.\d+)?$/.test(afterToken);
+          
+          // 変数名と数値の加算かチェック（y + 1のような場合）
+          const beforeIsVar = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(beforeToken);
+          const afterIsVar = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(afterToken);
+          
+          // 数値同士、変数と数値、変数同士の加算の場合は+のまま
+          if ((beforeIsNumber && afterIsNumber) || 
+              (beforeIsVar && afterIsNumber) ||
+              (beforeIsNumber && afterIsVar) ||
+              (beforeIsVar && afterIsVar)) {
+            return ' + ';
+          }
+          
+          // それ以外（文字列連結）は&に変換
+          return ' & ';
+        });
       }
       return line;
     }).join('\n');

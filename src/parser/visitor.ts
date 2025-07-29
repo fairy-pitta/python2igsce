@@ -118,7 +118,14 @@ export class PythonASTVisitor extends BaseParser {
   private inferTypeFromValue(node: ASTNode): IGCSEDataType {
     switch (node.type) {
       case 'Num':
-        return 'INTEGER';
+        return Number.isInteger(node.n) ? 'INTEGER' : 'REAL';
+      case 'Constant':
+        if (typeof node.value === 'number') {
+          return Number.isInteger(node.value) ? 'INTEGER' : 'REAL';
+        }
+        if (typeof node.value === 'string') return 'STRING';
+        if (typeof node.value === 'boolean') return 'BOOLEAN';
+        return 'STRING';
       case 'Str':
         return 'STRING';
       case 'List':
@@ -296,6 +303,12 @@ export class PythonASTVisitor extends BaseParser {
       // ノードに子ブロックを設定
       if (node.type === 'If' || node.type === 'For' || node.type === 'While' || node.type === 'FunctionDef' || node.type === 'ClassDef') {
         node.body = bodyNodes;
+      } else if (node.type === 'Match') {
+        // match文の場合、case文を cases 配列に設定
+        node.cases = bodyNodes.filter(child => child.type === 'match_case');
+      } else if (node.type === 'match_case') {
+        // case文の場合、子ノードを body に設定
+        node.body = bodyNodes;
       }
       
       return { node, nextIndex: i };
@@ -354,6 +367,29 @@ export class PythonASTVisitor extends BaseParser {
         const value = trimmed.substring(equalIndex + 3).trim();
         
         if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(varName)) {
+          // 型注釈の処理
+          let annotation;
+          if (typeAnnotation.includes('[')) {
+            // 配列型注釈の場合（例: list[str]）
+            annotation = {
+              type: 'Subscript',
+              value: {
+                type: 'Name',
+                id: typeAnnotation.substring(0, typeAnnotation.indexOf('['))
+              },
+              slice: {
+                type: 'Name',
+                id: typeAnnotation.substring(typeAnnotation.indexOf('[') + 1, typeAnnotation.indexOf(']'))
+              }
+            };
+          } else {
+            // 単純な型注釈の場合（例: int, str, float, bool）
+            annotation = {
+              type: 'Name',
+              id: typeAnnotation
+            };
+          }
+          
           return {
             type: 'AnnAssign',
             target: {
@@ -361,17 +397,7 @@ export class PythonASTVisitor extends BaseParser {
               id: varName,
               ctx: 'Store'
             },
-            annotation: {
-              type: 'Subscript',
-              value: {
-                type: 'Name',
-                id: typeAnnotation.includes('[') ? typeAnnotation.substring(0, typeAnnotation.indexOf('[')) : typeAnnotation
-              },
-              slice: typeAnnotation.includes('[') ? {
-                type: 'Name',
-                id: typeAnnotation.substring(typeAnnotation.indexOf('[') + 1, typeAnnotation.indexOf(']'))
-              } : null
-            },
+            annotation: annotation,
             value: value ? this.parseExpression(value) : null,
             lineno: lineNumber
           };
@@ -459,6 +485,16 @@ export class PythonASTVisitor extends BaseParser {
     // return文の検出
     if (trimmed.startsWith('return')) {
       return this.parseReturnStatement(trimmed, lineNumber);
+    }
+    
+    // match文の検出
+    if (trimmed.startsWith('match ')) {
+      return this.parseMatchStatement(trimmed, lineNumber);
+    }
+    
+    // case文の検出
+    if (trimmed.startsWith('case ')) {
+      return this.parseCaseStatement(trimmed, lineNumber);
     }
     
     // break文の検出
@@ -600,19 +636,83 @@ export class PythonASTVisitor extends BaseParser {
     const match = line.match(/^if\s+(.+):\s*$/);
     const condition = match ? match[1] : line.substring(3, line.length - 1);
     
+    // 条件式を解析
+    const testNode = this.parseCondition(condition);
+    
     return {
       type: 'If',
       lineno: lineNumber,
-      test: {
-        type: 'Compare',
-        left: { type: 'Name', id: 'condition' },
-        ops: ['>'],
-        comparators: [{ type: 'Num', n: 0 }],
-        raw: condition
-      },
+      test: testNode,
       body: [],
       orelse: []
     };
+  }
+
+  /**
+   * 条件式を解析
+   */
+  private parseCondition(condition: string): ASTNode {
+    // 等価比較の解析 (variable == value)
+    const eqMatch = condition.match(/^(\w+)\s*==\s*(.+)$/);
+    if (eqMatch) {
+      const [, variable, value] = eqMatch;
+      return {
+        type: 'Compare',
+        left: { type: 'Name', id: variable },
+        ops: [{ type: 'Eq' }],
+        comparators: [this.parseExpression(value.trim())],
+        raw: condition
+      };
+    }
+    
+    // 不等価比較の解析 (variable != value)
+    const neMatch = condition.match(/^(\w+)\s*!=\s*(.+)$/);
+    if (neMatch) {
+      const [, variable, value] = neMatch;
+      return {
+        type: 'Compare',
+        left: { type: 'Name', id: variable },
+        ops: [{ type: 'NotEq' }],
+        comparators: [this.parseExpression(value.trim())],
+        raw: condition
+      };
+    }
+    
+    // その他の比較演算子
+    const compMatch = condition.match(/^(\w+)\s*(<=|>=|<|>)\s*(.+)$/);
+    if (compMatch) {
+      const [, variable, op, value] = compMatch;
+      const opType = this.getComparisonOpType(op);
+      return {
+        type: 'Compare',
+        left: { type: 'Name', id: variable },
+        ops: [{ type: opType }],
+        comparators: [this.parseExpression(value.trim())],
+        raw: condition
+      };
+    }
+    
+    // 単純な変数や式の場合
+    return {
+      type: 'Name',
+      id: condition,
+      raw: condition
+    };
+  }
+
+  /**
+   * 比較演算子の文字列をASTタイプに変換
+   */
+  private getComparisonOpType(op: string): string {
+    switch (op) {
+      case '==': return 'Eq';
+      case '!=': return 'NotEq';
+      case '<': return 'Lt';
+      case '<=': return 'LtE';
+      case '>': return 'Gt';
+      case '>=': return 'GtE';
+      default: return 'Eq';
+    }
   }
 
   private parseForStatement(line: string, lineNumber: number): ASTNode {
@@ -679,6 +779,56 @@ export class PythonASTVisitor extends BaseParser {
       },
       body: [],
       orelse: []
+    };
+  }
+
+  private parseMatchStatement(line: string, lineNumber: number): ASTNode {
+    // "match subject:" の形式を解析
+    const match = line.match(/^match\s+(.+):\s*$/);
+    const subject = match ? match[1] : line.substring(6, line.length - 1);
+    
+    return {
+      type: 'Match',
+      lineno: lineNumber,
+      subject: {
+        type: 'Name',
+        id: subject,
+        ctx: 'Load'
+      },
+      cases: []
+    };
+  }
+
+  private parseCaseStatement(line: string, lineNumber: number): ASTNode {
+    // "case pattern:" の形式を解析
+    const match = line.match(/^case\s+(.+):\s*$/);
+    const pattern = match ? match[1] : line.substring(5, line.length - 1);
+    
+    // ワイルドカードパターン（_）の場合
+    if (pattern === '_') {
+      return {
+        type: 'match_case',
+        lineno: lineNumber,
+        pattern: {
+          type: 'MatchAs',
+          pattern: null,
+          name: null
+        },
+        guard: null,
+        body: []
+      };
+    }
+    
+    // 値パターンの場合
+    return {
+      type: 'match_case',
+      lineno: lineNumber,
+      pattern: {
+        type: 'MatchValue',
+        value: this.parseExpression(pattern)
+      },
+      guard: null,
+      body: []
     };
   }
 
@@ -1002,7 +1152,8 @@ export class PythonASTVisitor extends BaseParser {
     if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
       return {
         type: 'Num',
-        n: parseFloat(trimmed)
+        n: parseFloat(trimmed),
+        raw: trimmed  // 元の文字列表現を保持
       };
     }
     
@@ -1130,6 +1281,8 @@ export class PythonASTVisitor extends BaseParser {
         return this.statementVisitor.visitGlobal(node);
       case 'Delete':
         return this.statementVisitor.visitDelete(node);
+      case 'Match':
+        return this.statementVisitor.visitMatch(node);
       
       // 定義の処理を委譲
       case 'FunctionDef':
