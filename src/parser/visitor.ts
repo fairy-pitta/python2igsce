@@ -1205,7 +1205,10 @@ export class PythonASTVisitor extends BaseParser {
   private parsePrintStatement(line: string, lineNumber: number): ASTNode {
     // "print(...)" の形式を解析
     const match = line.match(/^print\((.*)\)\s*$/);
-    const args = match ? match[1] : '';
+    const argsStr = match ? match[1] : '';
+    
+    // 引数を適切にパースする
+    const args = this.parseArguments(argsStr);
     
     return {
       type: 'Expr',
@@ -1213,11 +1216,7 @@ export class PythonASTVisitor extends BaseParser {
       value: {
         type: 'Call',
         func: { type: 'Name', id: 'print' },
-        args: [{
-          type: 'Str',
-          s: args,
-          raw: args
-        }]
+        args: args
       }
     };
   }
@@ -1356,8 +1355,8 @@ export class PythonASTVisitor extends BaseParser {
     return args.map(arg => {
       const trimmed = arg.trim();
       
-      // 関数呼び出しの場合（括弧を含む）
-      if (trimmed.includes('(') && trimmed.includes(')')) {
+      // 配列アクセス、関数呼び出し、その他の複雑な式の場合はparseExpressionを使用
+      if (trimmed.includes('[') || trimmed.includes('(') || trimmed.includes('.')) {
         return this.parseExpression(trimmed);
       }
       

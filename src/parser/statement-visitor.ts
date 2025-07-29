@@ -923,10 +923,8 @@ export class StatementVisitor extends BaseParser {
       elementType = 'INTEGER';
     }
     
-    // 配列乗算の場合は直接代入として出力（テストケースに合わせる）
-    const arrayExpr = this.expressionVisitor.visitExpression(arrayNode);
-    const sizeExpr = this.expressionVisitor.visitExpression(sizeNode);
-    const assignText = `${target} ← ${arrayExpr} * ${sizeExpr}`;
+    // 配列乗算の場合はDECLARE文を生成
+    const declText = `DECLARE ${target} : ARRAY[1:${size}] OF ${elementType}`;
     
     // 配列サイズ情報をコンテキストに記録
     if (this.context && this.context.arrayInfo) {
@@ -943,7 +941,7 @@ export class StatementVisitor extends BaseParser {
       this.registerVariable(targetNode.id, 'ARRAY' as IGCSEDataType, node.lineno);
     }
     
-    return this.createIRNode('assign', assignText);
+    return this.createIRNode('array', declText);
   }
 
   private handleArrayInitialization(node: ASTNode): IR {

@@ -187,10 +187,10 @@ numbers[0] = 10
 numbers[1] = 20
 print(numbers[0])
 `;
-      const expected = `numbers ← [0] * 5
+      const expected = `DECLARE numbers : ARRAY[1:5] OF INTEGER
 numbers[1] ← 10
 numbers[2] ← 20
-OUTPUT numbers[0]`;
+OUTPUT numbers[1]`;
       
       const result = convertPython(python);
       expect(result.trim()).toBe(expected);
