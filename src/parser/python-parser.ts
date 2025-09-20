@@ -54,7 +54,9 @@ export class PythonParser extends BaseParser {
          functionsFound: Array.isArray(visitorResult.ir) ? visitorResult.ir.reduce((sum, node) => sum + this.countFunctionsFromIR(node), 0) : this.countFunctionsFromIR(visitorResult.ir),
          classesFound: Array.isArray(visitorResult.ir) ? visitorResult.ir.reduce((sum, node) => sum + this.countClassesFromIR(node), 0) : this.countClassesFromIR(visitorResult.ir),
          variablesFound: Array.isArray(visitorResult.ir) ? visitorResult.ir.reduce((sum, node) => sum + this.countVariablesFromIR(node), 0) : this.countVariablesFromIR(visitorResult.ir)
-       }
+       },
+       success: this.context.errors.length === 0 && visitorResult.errors.length === 0,
+       parseTime
      };
     
     return result;

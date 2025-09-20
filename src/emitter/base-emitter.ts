@@ -378,8 +378,11 @@ export abstract class BaseEmitter {
         emitTime,
         processingTime: emitTime, // Alias for testing
         maxNestingDepth: this.context.indent.level,
-        maxLineLength: Math.max(...this.context.output.map(line => line.length))
-      }
+        maxLineLength: Math.max(...this.context.output.map(line => line.length), 0)
+      },
+      success: this.context.errors.length === 0,
+      emitTime,
+      output: code
     };
   }
 

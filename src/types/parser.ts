@@ -22,10 +22,14 @@ export interface ParserOptions {
   indentSize?: number;
   /** Maximum nesting depth */
   maxDepth?: number;
+  /** Maximum nesting depth */
+  maxNestingDepth?: number;
   /** Maximum number of errors */
   maxErrors?: number;
   /** Timeout (milliseconds) */
   timeout?: number;
+  /** Allow experimental syntax */
+  allowExperimentalSyntax?: boolean;
 }
 
 /**
@@ -40,6 +44,10 @@ export interface ParseResult {
   warnings: ParseWarning[];
   /** Parse statistics */
   stats: ParseStats;
+  /** Success flag */
+  success: boolean;
+  /** Parse time */
+  parseTime: number;
 }
 
 /**

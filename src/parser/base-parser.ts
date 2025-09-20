@@ -39,8 +39,10 @@ export abstract class BaseParser {
       preserveWhitespace: options.preserveWhitespace ?? false,
       indentSize: options.indentSize ?? 3,
       maxDepth: options.maxDepth ?? 50,
+      maxNestingDepth: options.maxNestingDepth ?? 50,
       maxErrors: options.maxErrors ?? 100,
-      timeout: options.timeout ?? 30000
+      timeout: options.timeout ?? 30000,
+      allowExperimentalSyntax: options.allowExperimentalSyntax ?? false
     };
   }
 
@@ -290,9 +292,11 @@ export abstract class BaseParser {
         nodesGenerated: ir.reduce((sum, node) => sum + this.countNodes(node), 0),
         parseTime,
         functionsFound: this.countFunctions(),
-        classesFound: 0, // 実装時に設定
+        classesFound: this.context.classDefinitions ? Object.keys(this.context.classDefinitions).length : 0,
         variablesFound: this.countVariables()
-      }
+      },
+      success: this.context.errors.length === 0,
+      parseTime
     };
   }
 

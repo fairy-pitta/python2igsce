@@ -888,6 +888,22 @@ export class PythonASTVisitor extends BaseParser {
       };
     }
     
+    // Check for unclosed string literals
+    if ((trimmed.startsWith('"') && !trimmed.endsWith('"')) ||
+        (trimmed.startsWith("'") && !trimmed.endsWith("'"))) {
+      this.context.errors.push({
+         message: `Unterminated string literal: ${trimmed}`,
+         line: 0,
+         column: 0,
+         type: 'syntax_error',
+         severity: 'error'
+       });
+      return {
+        type: 'Str',
+        s: trimmed
+      };
+    }
+    
     // Numeric literals
     if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
       return {
@@ -1037,9 +1053,12 @@ export class PythonASTVisitor extends BaseParser {
   private visitModule(node: ASTNode): IR {
     const children: IR[] = [];
     
-    for (const child of node.body) {
-      const childIR = this.visitNode(child);
-      children.push(childIR);
+    // Check if node.body exists and is an array
+    if (node.body && Array.isArray(node.body)) {
+      for (const child of node.body) {
+        const childIR = this.visitNode(child);
+        children.push(childIR);
+      }
     }
     
     return this.createIRNode('compound', '', children);
@@ -1288,8 +1307,12 @@ export class PythonASTVisitor extends BaseParser {
    * Pre-register all class definitions (first pass of 2-pass processing)
    */
   private preRegisterAllClasses(nodes: ASTNode[]): void {
+    if (!nodes || !Array.isArray(nodes)) {
+      return;
+    }
+    
     for (const node of nodes) {
-      if (node.type === 'ClassDef') {
+      if (node && node.type === 'ClassDef') {
         this.registerClassDefinition(node);
       }
     }
@@ -1306,18 +1329,21 @@ export class PythonASTVisitor extends BaseParser {
    * Create parse results
    */
   protected override createParseResult(ir: IR[]): import('../types/parser').ParseResult {
+    const parseTime = Date.now() - this.context.startTime;
     return {
       ir,
       errors: this.getErrors(),
       warnings: this.getWarnings(),
       stats: {
-        parseTime: Date.now() - this.context.startTime,
+        parseTime,
         linesProcessed: 0,
         nodesGenerated: ir.reduce((sum, node) => sum + countIRNodes(node), 0),
         functionsFound: 0,
         classesFound: 0,
         variablesFound: 0
-      }
+      },
+      success: this.getErrors().length === 0,
+      parseTime
     };
   }
 }

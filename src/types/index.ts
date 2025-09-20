@@ -52,6 +52,14 @@ export interface ConversionOptions {
   spaceAroundOperators?: boolean;
   /** Space after commas */
   spaceAfterCommas?: boolean;
+  /** Allow experimental syntax */
+  allowExperimentalSyntax?: boolean;
+  /** Maximum nesting depth */
+  maxNestingDepth?: number;
+  /** Parser type */
+  parserType?: string;
+  /** Emitter type */
+  emitterType?: string;
 }
 
 export interface ConversionResult {
@@ -67,6 +75,8 @@ export interface ConversionResult {
   ast?: any;
   /** Intermediate representation (IR) tree */
   ir?: import('./ir').IR[];
+  /** Success flag */
+  success: boolean;
 }
 
 export interface ConversionStats {
@@ -84,6 +94,8 @@ export interface ConversionStats {
   errorCount: number;
   /** Warning count */
   warningCount: number;
+  /** Total time */
+  totalTime: number;
 }
 
 // Version information

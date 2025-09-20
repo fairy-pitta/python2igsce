@@ -59,9 +59,9 @@ export class Converter {
       // Parse process
       const parseResult = this.parser.parse(pythonCode);
       
-      if (parseResult.errors.length > 0 && this.options.strictMode) {
+      if (parseResult.errors.length > 0) {
         return this.createErrorResult(
-          'Parse errors occurred in strict mode',
+          'Parse errors occurred',
           parseResult.errors,
           parseResult.warnings,
           startTime
@@ -97,7 +97,8 @@ export class Converter {
         emitResult,
         stats,
         ast: parseResult.ir,
-        ir: Array.isArray(parseResult.ir) ? parseResult.ir : [parseResult.ir]
+        ir: Array.isArray(parseResult.ir) ? parseResult.ir : [parseResult.ir],
+        success: parseResult.success && emitResult.success
       };
       return result;
       
@@ -115,15 +116,15 @@ export class Converter {
   /**
    * Batch conversion (multiple files)
    */
-  async convertBatch(files: Array<{ name: string; content: string }>): Promise<Array<{
+  convertBatch(files: Array<{ name: string; content: string }>): Array<{
     name: string;
     result: ConversionResult;
-  }>> {
+  }> {
     const results: Array<{ name: string; result: ConversionResult }> = [];
     
     for (const file of files) {
       try {
-        const result = await this.convert(file.content);
+        const result = this.convert(file.content);
         results.push({ name: file.name, result });
       } catch (error) {
         const errorResult: ConversionResult = {
@@ -145,7 +146,9 @@ export class Converter {
                functionsFound: 0,
                classesFound: 0,
                variablesFound: 0
-             }
+             },
+            success: false,
+            parseTime: 0
           },
           emitResult: {
             code: '',
@@ -161,7 +164,10 @@ export class Converter {
               processingTime: 0,
               maxNestingDepth: 0,
               maxLineLength: 0
-            }
+            },
+            success: false,
+            emitTime: 0,
+            output: ''
           },
           stats: {
             parseTime: 0,
@@ -170,8 +176,10 @@ export class Converter {
             inputLines: 0,
             outputLines: 0,
             errorCount: 1,
-            warningCount: 0
-          }
+            warningCount: 0,
+            totalTime: 0
+          },
+          success: false
         };
         results.push({ name: file.name, result: errorResult });
       }
@@ -327,7 +335,9 @@ export class Converter {
           functionsFound: 0,
           classesFound: 0,
           variablesFound: 0
-        }
+        },
+        success: false,
+        parseTime: 0
       },
       emitResult: {
          code: '',
@@ -343,7 +353,10 @@ export class Converter {
             processingTime: 0,
             maxNestingDepth: 0,
             maxLineLength: 0
-          }
+          },
+         success: false,
+         emitTime: 0,
+         output: ''
        },
       stats: {
         parseTime: 0,
@@ -352,8 +365,10 @@ export class Converter {
         inputLines: 0,
         outputLines: 0,
         errorCount: parseErrors.length + 1,
-        warningCount: parseWarnings.length
+        warningCount: parseWarnings.length,
+        totalTime: endTime - startTime
       },
+      success: false,
       ast: undefined
     };
   }
@@ -374,7 +389,8 @@ export class Converter {
       inputLines: parseResult.stats.linesProcessed,
       outputLines: emitResult.stats.linesGenerated,
       errorCount: parseResult.errors.length,
-      warningCount: parseResult.warnings.length
+      warningCount: parseResult.warnings.length,
+      totalTime: endTime - startTime
     };
   }
 }
@@ -393,31 +409,8 @@ export async function convertPythonToIGCSE(
 /**
  * Utility function: Convert from file
  */
-export async function convertFileToIGCSE(
-  filePath: string,
-  options: Partial<ConversionOptions> = {}
-): Promise<ConversionResult> {
-  const fs = await import('fs/promises');
-  const pythonCode = await fs.readFile(filePath, 'utf-8');
-  return convertPythonToIGCSE(pythonCode, options);
-}
+// File conversion functions are available in converter-node.ts for Node.js environments
 
 /**
  * Utility function: Convert multiple files
  */
-export async function convertFilesToIGCSE(
-  filePaths: string[],
-  options: Partial<ConversionOptions> = {}
-): Promise<Array<{ name: string; result: ConversionResult }>> {
-  const converter = new Converter(options);
-  const fs = await import('fs/promises');
-  
-  const files = await Promise.all(
-    filePaths.map(async (filePath) => {
-      const content = await fs.readFile(filePath, 'utf-8');
-      return { name: filePath, content };
-    })
-  );
-  
-  return converter.convertBatch(files);
-}

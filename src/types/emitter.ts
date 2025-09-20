@@ -25,6 +25,10 @@ export interface EmitterOptions {
   includeDebugInfo: boolean;
   /** Beautify options */
   beautify: boolean;
+  /** Uppercase keywords */
+  uppercaseKeywords?: boolean;
+  /** Preserve whitespace */
+  preserveWhitespace?: boolean;
 }
 
 /**
@@ -48,6 +52,12 @@ export interface EmitResult {
   warnings: EmitWarning[];
   /** Output statistics */
   stats: EmitStats;
+  /** Success flag */
+  success: boolean;
+  /** Emit time */
+  emitTime: number;
+  /** Output code */
+  output: string;
 }
 
 /**
