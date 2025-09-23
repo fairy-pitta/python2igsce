@@ -1,27 +1,27 @@
-// エミッターファクトリー
+// Emitter factory
 import { BaseEmitter } from './base-emitter';
 import { TextEmitter } from './text-emitter';
 import { MarkdownEmitter } from './markdown-emitter';
 import { EmitterOptions, OutputFormat, MarkdownConfig } from '../types/emitter';
 
 /**
- * エミッターファクトリーの設定
+ * Emitter factory configuration
  */
 export interface EmitterFactoryOptions {
-  /** 出力フォーマット */
+  /** Output format */
   format: OutputFormat;
-  /** エミッターオプション */
+  /** Emitter options */
   options?: Partial<EmitterOptions>;
-  /** Markdown固有の設定 */
+  /** Markdown-specific configuration */
   markdownConfig?: Partial<MarkdownConfig>;
 }
 
 /**
- * エミッターファクトリークラス
+ * Emitter factory class
  */
 export class EmitterFactory {
   /**
-   * エミッターを作成
+   * Create emitter
    */
   static create(config: EmitterFactoryOptions): BaseEmitter {
     const options = config.options || {};
@@ -43,28 +43,28 @@ export class EmitterFactory {
   }
 
   /**
-   * サポートされているフォーマットの一覧を取得
+   * Get list of supported formats
    */
   static getSupportedFormats(): OutputFormat[] {
     return ['plain', 'markdown'];
   }
 
   /**
-   * フォーマットがサポートされているかチェック
+   * Check if format is supported
    */
   static isSupported(format: OutputFormat): boolean {
     return this.getSupportedFormats().includes(format);
   }
 
   /**
-   * デフォルト設定でエミッターを作成
+   * Create emitter with default settings
    */
   static createDefault(format: OutputFormat = 'plain'): BaseEmitter {
     return this.create({ format });
   }
 
   /**
-   * 美化設定でエミッターを作成
+   * Create emitter with beautified settings
    */
   static createBeautified(format: OutputFormat = 'plain'): BaseEmitter {
     const options: Partial<EmitterOptions> = {
@@ -78,7 +78,7 @@ export class EmitterFactory {
   }
 
   /**
-   * コンパクト設定でエミッターを作成
+   * Create emitter with compact settings
    */
   static createCompact(format: OutputFormat = 'plain'): BaseEmitter {
     const options: Partial<EmitterOptions> = {
@@ -91,7 +91,7 @@ export class EmitterFactory {
   }
 
   /**
-   * デバッグ設定でエミッターを作成
+   * Create emitter with debug settings
    */
   static createDebug(format: OutputFormat = 'plain'): BaseEmitter {
     const options: Partial<EmitterOptions> = {
@@ -106,7 +106,7 @@ export class EmitterFactory {
 }
 
 /**
- * 便利な関数：エミッターを作成
+ * Utility function: Create emitter
  */
 export function createEmitter(
   format: OutputFormat = 'plain',
@@ -116,7 +116,7 @@ export function createEmitter(
 }
 
 /**
- * 便利な関数：プリセット設定でエミッターを作成
+ * Utility function: Create emitter with preset settings
  */
 export function createPresetEmitter(
   preset: 'default' | 'beautified' | 'compact' | 'debug',
@@ -137,7 +137,7 @@ export function createPresetEmitter(
 }
 
 /**
- * フォーマット固有の設定を取得
+ * Get format-specific configuration
  */
 export function getFormatSpecificOptions(format: OutputFormat): {
   recommendedOptions: Partial<EmitterOptions>;

@@ -5,7 +5,7 @@ import { ParseResult } from '../types/parser';
 import { IGCSEDataType } from '../types/igcse';
 
 /**
- * Python ASTノードの基本インターフェース
+ * Basic interface for Python AST nodes
  */
 interface ASTNode {
   type: string;
@@ -15,11 +15,11 @@ interface ASTNode {
 }
 
 /**
- * 文の処理を担当するビジタークラス
+ * Visitor class responsible for processing statements
  */
 export class StatementVisitor extends BaseParser {
   /**
-   * パースの実行（StatementVisitorでは使用しない）
+   * Execute parsing (not used in StatementVisitor)
    */
   parse(_source: string): ParseResult {
     throw new Error('StatementVisitor.parse() should not be called directly');
@@ -33,32 +33,27 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * コンテキストを設定
+   * Set context
    */
   setContext(context: any): void {
     this.context = context;
   }
 
   /**
-   * 代入文の処理
+   * Process assignment statements
    */
   visitAssign(node: ASTNode): IR {
-    // 配列の乗算初期化の検出（[0] * 5 など）
-    if (this.isArrayMultiplication(node.value)) {
-      return this.handleArrayMultiplication(node);
-    }
-
-    // 配列初期化の検出を最初に行う
+    // Detect array initialization first
     if (this.expressionVisitor.isArrayInitialization(node.value)) {
       return this.handleArrayInitialization(node);
     }
 
-    // input()関数の代入を特別に処理（ネストした関数呼び出しも含む）
+    // Handle input() function assignments specially (including nested function calls)
     if (this.containsInputCall(node.value)) {
       return this.handleInputAssignment(node);
     }
 
-    // クラスのインスタンス化を検出
+    // Detect class instantiation
     if (node.value.type === 'Call') {
       if (node.value.func.type === 'Name') {
         const funcName = node.value.func.id;
@@ -71,25 +66,26 @@ export class StatementVisitor extends BaseParser {
 
     const targetNode = node.targets[0];
     
-    // 配列要素代入の処理 (data[1] = 100)
+    // Handle array element assignment (data[1] = 100)
     if (targetNode.type === 'Subscript') {
       return this.handleElementAssign(targetNode, node.value);
     }
     
-    // 属性代入の処理 (obj.field = value)
+    // Handle attribute assignment (obj.field = value)
     if (targetNode.type === 'Attribute') {
       return this.handleAttributeAssign(targetNode, node.value);
     }
 
-    // クラスインスタンス化の場合は、expression-visitorを通さずに直接処理
+    // For class instantiation, process directly without going through expression-visitor
      if (node.value.type === 'Call') {
        const func = this.expressionVisitor.visitExpression(node.value.func);
        const args = node.value.args.map((arg: ASTNode) => this.expressionVisitor.visitExpression(arg));
        
-       // 組み込み関数でない場合はクラスインスタンス化として処理
+       // Process as class instantiation if not a built-in function
         const builtinResult = this.expressionVisitor.convertBuiltinFunction(func, args);
        
        if (!builtinResult && this.isClassInstantiation(node.value)) {
+         console.log('DEBUG: Processing as class instantiation');
          return this.handleClassInstantiation(node);
        }
      }
@@ -99,12 +95,12 @@ export class StatementVisitor extends BaseParser {
     
     let text = `${target} ← ${value}`;
     
-    // インラインコメントがある場合は追加
+    // Add inline comment if present
     if (node.inlineComment) {
       text += ` // ${node.inlineComment}`;
     }
     
-    // 変数の型を推論して登録
+    // Infer and register variable type
     const dataType = this.expressionVisitor.inferTypeFromValue(node.value);
     if (targetNode.type === 'Name') {
       this.registerVariable(targetNode.id, dataType, node.lineno);
@@ -114,16 +110,16 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * input()関数の代入を処理
+   * Process input() function assignments
    */
   private handleInputAssignment(node: ASTNode): IR {
     const targetNode = node.targets[0];
     const target = this.expressionVisitor.visitExpression(targetNode);
     
-    // input()関数を見つける（ネストした関数呼び出しも考慮）
+    // Find input() function (considering nested function calls)
     const inputCall = this.findInputCall(node.value);
     if (!inputCall) {
-      // input()が見つからない場合は通常の代入として処理
+      // Process as normal assignment if input() not found
       const value = this.expressionVisitor.visitExpression(node.value);
       const text = `${target} ← ${value}`;
       return this.createIRNode('assign', text);
@@ -131,18 +127,18 @@ export class StatementVisitor extends BaseParser {
     
     const args = inputCall.args.map((arg: ASTNode) => this.expressionVisitor.visitExpression(arg));
     
-    // プロンプトがある場合は、OUTPUT文とINPUT文の2つのIRノードを作成
+    // Create two IR nodes (OUTPUT and INPUT) when prompt is present
     if (args.length > 0) {
       const outputText = `OUTPUT ${args[0]}`;
       const inputText = `INPUT ${target}`;
       
-      // 複合IRノードを作成（OUTPUT文とINPUT文を含む）
+      // Create compound IR node (containing OUTPUT and INPUT statements)
       const outputIR = this.createIRNode('output', outputText);
       const inputIR = this.createIRNode('input', inputText);
       
-      // 変数の型を推論して登録
+      // Infer and register variable type
       if (targetNode.type === 'Name') {
-        // int(input(...))の場合はINTEGER型として登録
+        // Register as INTEGER type for int(input(...))
         if (node.value.type === 'Call' && node.value.func.type === 'Name' && node.value.func.id === 'int') {
           this.registerVariable(targetNode.id, 'INTEGER', node.lineno);
         } else {
@@ -150,15 +146,15 @@ export class StatementVisitor extends BaseParser {
         }
       }
       
-      // 複合ノードとして返す
+      // Return as compound node
       return this.createIRNode('compound', '', [outputIR, inputIR]);
     } else {
-      // プロンプトがない場合は、INPUT文のみ
+      // Only INPUT statement when no prompt
       const inputText = `INPUT ${target}`;
       
-      // 変数の型を推論して登録
+      // Infer and register variable type
       if (targetNode.type === 'Name') {
-        // int(input(...))の場合はINTEGER型として登録
+        // Register as INTEGER type for int(input(...))
         if (node.value.type === 'Call' && node.value.func.type === 'Name' && node.value.func.id === 'int') {
           this.registerVariable(targetNode.id, 'INTEGER', node.lineno);
         } else {
@@ -171,14 +167,14 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * ネストした関数呼び出しからinput()を見つける
+   * Find input() from nested function calls
    */
   private findInputCall(node: ASTNode): ASTNode | null {
     if (node.type === 'Call' && node.func.type === 'Name' && node.func.id === 'input') {
       return node;
     }
     
-    // ネストした関数呼び出しを再帰的に検索
+    // Recursively search nested function calls
     if (node.type === 'Call' && node.args) {
       for (const arg of node.args) {
         const result = this.findInputCall(arg);
@@ -190,14 +186,14 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * ノードにinput()呼び出しが含まれているかチェック
+   * Check if node contains input() call
    */
   private containsInputCall(node: ASTNode): boolean {
     return this.findInputCall(node) !== null;
   }
 
   /**
-   * 拡張代入文の処理
+   * Process augmented assignment statements
    */
   visitAugAssign(node: ASTNode): IR {
     const target = this.expressionVisitor.visitExpression(node.target);
@@ -209,23 +205,23 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * 型注釈付き代入文の処理 (items: list[str] = [])
+   * Process annotated assignment statements (items: list[str] = [])
    */
   visitAnnAssign(node: ASTNode): IR {
     const targetName = node.target.id;
     
-    // 型注釈から配列型を検出
+    // Detect array type from type annotation
     if (this.isListTypeAnnotation(node.annotation)) {
       const elementType = this.extractListElementType(node.annotation);
       
-      // 空リストの場合はデフォルトサイズの配列宣言を生成
+      // Generate array declaration with default size for empty list
        if (node.value && node.value.type === 'List' && node.value.elts.length === 0) {
          const text = `DECLARE ${targetName} : ARRAY[1:100] OF ${elementType}`;
          this.registerVariable(targetName, 'ARRAY' as IGCSEDataType, node.lineno);
          return this.createIRNode('array', text);
        }
       
-      // 値がある場合は通常の配列初期化として処理
+      // Process as normal array initialization when value is present
        if (node.value) {
           const fakeAssignNode: ASTNode = {
             type: 'Assign',
@@ -237,24 +233,16 @@ export class StatementVisitor extends BaseParser {
         }
     }
     
-    // 通常の型注釈付き代入
+    // Normal annotated assignment
     const target = this.expressionVisitor.visitExpression(node.target);
-    const dataType = this.convertAnnotationToIGCSEType(node.annotation);
+    const value = node.value ? this.expressionVisitor.visitExpression(node.value) : '';
     
-    if (node.value) {
-      // 値がある場合は宣言と代入の両方を生成
-      const value = this.expressionVisitor.visitExpression(node.value);
-      const declText = `DECLARE ${target} : ${dataType}`;
-      const assignText = `${target} ← ${value}`;
-      
-      this.registerVariable(targetName, dataType as IGCSEDataType, node.lineno);
-      
-      const declIR = this.createIRNode('statement', declText);
-      const assignIR = this.createIRNode('assign', assignText);
-      
-      return this.createIRNode('statement', '', [declIR, assignIR]);
+    if (value) {
+      const text = `${target} ← ${value}`;
+      return this.createIRNode('assign', text);
     } else {
-      // 値がない場合は宣言のみ
+      // Declaration only when no value
+       const dataType = this.convertAnnotationToIGCSEType(node.annotation);
        const text = `DECLARE ${target} : ${dataType}`;
        this.registerVariable(targetName, dataType as IGCSEDataType, node.lineno);
        return this.createIRNode('statement', text);
@@ -262,15 +250,9 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * IF文の処理
+   * Process IF statements
    */
   visitIf(node: ASTNode): IR {
-    // if-elif-elseをCASE文に変換できるかチェック
-    const caseResult = this.tryConvertToCase(node);
-    if (caseResult) {
-      return caseResult;
-    }
-
     const condition = this.expressionVisitor.visitExpression(node.test);
     const ifText = `IF ${condition} THEN`;
     
@@ -284,11 +266,11 @@ export class StatementVisitor extends BaseParser {
     
     let children = bodyChildren;
     
-    // ELSE節の処理
+    // Process ELSE clause
     if (node.orelse && node.orelse.length > 0) {
       const firstElse = node.orelse[0];
       
-      // 最初の要素がIF文の場合、ELSE IFとして処理
+      // Process as ELSE IF when first element is IF statement
       if (firstElse.type === 'If') {
         const condition = this.expressionVisitor.visitExpression(firstElse.test);
         const elseIfText = `ELSE IF ${condition} THEN`;
@@ -304,7 +286,7 @@ export class StatementVisitor extends BaseParser {
         
         children = [...bodyChildren, elseIfIR, ...elseIfBodyChildren];
         
-        // 再帰的にELSE IF文のorelse節を処理
+        // Recursively process orelse clause of ELSE IF statement
         if (firstElse.orelse && firstElse.orelse.length > 0) {
           const nestedElseResult = this.visitIf({
             ...firstElse,
@@ -312,13 +294,13 @@ export class StatementVisitor extends BaseParser {
             test: null // testも不要
           } as ASTNode);
           
-          // ネストしたELSE/ELSE IF文の子要素を追加
+          // Add child elements of nested ELSE/ELSE IF statements
           if (nestedElseResult.children) {
             children = [...children, ...nestedElseResult.children];
           }
         }
       } else {
-        // 通常のELSE節
+        // Normal ELSE clause
         const elseIR = this.createIRNode('else', 'ELSE');
         this.enterScope('else', 'block');
         this.increaseIndent();
@@ -336,39 +318,39 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * FOR文の処理
+   * Process FOR statements
    */
   visitFor(node: ASTNode): IR {
     const target = this.expressionVisitor.visitExpression(node.target);
     
-    // range()関数を使用したfor文の処理
+    // Process for statement using range() function
     if (node.iter.type === 'Call' && node.iter.func.id === 'range') {
       return this.handleRangeFor(node, target);
     }
     
-    // 配列やリストの直接反復の場合
+    // Direct iteration over arrays or lists
     if (node.iter.type === 'Name') {
       const arrayName = node.iter.id;
       const indexVar = 'i';
       
-      // 配列のサイズを取得（コンテキストから）
-      let arraySize = '3'; // デフォルトサイズ
+      // Get array size (from context)
+      let arraySize = '3'; // Default size
       
-      // コンテキストから配列サイズを取得
+      // Get array size from context
       if (this.context && this.context.arrayInfo && this.context.arrayInfo[arrayName]) {
         arraySize = this.context.arrayInfo[arrayName].size.toString();
       }
       
-      // FOR i ← 1 TO size の形式
+      // Format: FOR i ← 1 TO size
       const forText = `FOR ${indexVar} ← 1 TO ${arraySize}`;
       
       this.enterScope('for', 'block');
       this.increaseIndent();
       
-      // ボディの処理（target変数を使わずに直接配列要素を参照）
+      // Process body (directly reference array elements without using target variable)
        const bodyChildren = node.body.map((child: ASTNode) => {
-         // print(target) を OUTPUT array[i] に変換
-         // print(target) を OUTPUT array[i] に変換
+         // Convert print(target) to OUTPUT array[i]
+         // Convert print(target) to OUTPUT array[i]
          if (child.type === 'Expr' && child.value.type === 'Call' && 
              child.value.func && child.value.func.type === 'Name' && child.value.func.id === 'print' && 
              child.value.args.length === 1 &&
@@ -388,7 +370,7 @@ export class StatementVisitor extends BaseParser {
       return this.createIRNode('for', forText, bodyChildren);
     }
     
-    // 通常のfor文（その他の反復可能オブジェクト）
+    // Normal for statement (other iterable objects)
     const iterable = this.expressionVisitor.visitExpression(node.iter);
     const forText = `FOR ${target} IN ${iterable}`;
     
@@ -407,20 +389,21 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * WHILE文の処理
+   * Process WHILE statements
    */
   visitWhile(node: ASTNode): IR {
-    const condition = this.expressionVisitor.visitExpression(node.test);
-    
-    // while True + break パターンを REPEAT-UNTIL に変換
-    if (condition === 'TRUE' || condition === 'True' || condition.toUpperCase() === 'TRUE') {
-      const repeatUntilResult = this.tryConvertToRepeatUntil(node);
-      if (repeatUntilResult) {
-        return repeatUntilResult;
-      }
+    // Check if this is a REPEAT-UNTIL pattern:
+    // while True:
+    //     ...
+    //     if condition:
+    //         break
+    if (this.isRepeatUntilPattern(node)) {
+      return this.createRepeatUntilIR(node);
     }
     
-    const whileText = `WHILE ${condition}`;
+    // Regular while loop
+    const condition = this.expressionVisitor.visitExpression(node.test);
+    const whileText = `WHILE ${condition} DO`;
     
     this.enterScope('while', 'block');
     this.increaseIndent();
@@ -435,163 +418,113 @@ export class StatementVisitor extends BaseParser {
     
     return this.createIRNode('while', whileText, bodyChildren);
   }
-
+  
   /**
-   * while True + break パターンを REPEAT-UNTIL に変換を試行
+   * Check if a while loop matches the REPEAT-UNTIL pattern
+   * Pattern: while True with a conditional break at the end
    */
-  private tryConvertToRepeatUntil(node: ASTNode): IR | null {
-    // bodyの最後のIF文でbreakがあるかチェック
-    const body = node.body;
-    if (body.length === 0) return null;
-    
-    // continue文がある場合は変換しない
-    const hasContinue = this.hasStatementType(body, 'Continue');
-    if (hasContinue) return null;
-    
-    // 最後の文がIF文でbreakを含むかチェック
-    const lastStatement = body[body.length - 1];
-    if (lastStatement.type === 'If' && 
-        lastStatement.body && 
-        lastStatement.body.length === 1 && 
-        lastStatement.body[0].type === 'Break' && 
-        (!lastStatement.orelse || lastStatement.orelse.length === 0)) {
-      
-      // REPEAT-UNTIL構造に変換
-      const condition = this.expressionVisitor.visitExpression(lastStatement.test);
-      
-      this.enterScope('repeat', 'block');
-      this.increaseIndent();
-      
-      // breakのIF文以外の文を処理
-      const repeatBodyChildren = body.slice(0, -1).map((child: ASTNode) => 
-        this.visitNode ? this.visitNode(child) : this.createIRNode('comment', '// Unprocessed node')
-      );
-      
-      this.decreaseIndent();
-      this.exitScope();
-      
-      const untilIR = this.createIRNode('until', `UNTIL ${condition}`);
-      repeatBodyChildren.push(untilIR);
-      
-      return this.createIRNode('repeat', 'REPEAT', repeatBodyChildren);
+  private isRepeatUntilPattern(node: ASTNode): boolean {
+    // Check if condition is 'True'
+    // The AST structure might vary, so we check both raw value and type
+    if ((node.test.type === 'Compare' && node.test.raw !== 'True') && 
+        (node.test.type === 'NameConstant' && node.test.value !== true)) {
+      return false;
     }
     
-    return null;
+    // Check if the last statement is an if with break
+    const lastStatement = node.body[node.body.length - 1];
+    if (!lastStatement || lastStatement.type !== 'If') {
+      return false;
+    }
+    
+    // Check if the if body contains a break statement
+    const ifBody = lastStatement.body;
+    if (!ifBody || ifBody.length === 0) {
+      return false;
+    }
+    
+    // Check if the if body contains ONLY a break statement
+    // This is important for the REPEAT-UNTIL pattern
+    if (ifBody.length !== 1 || ifBody[0].type !== 'Break') {
+      return false;
+    }
+    
+    return true;
   }
-
+  
   /**
-   * 指定された文の種類がbody内に存在するかチェック
+   * Create a REPEAT-UNTIL IR from a while True loop with conditional break
    */
-  private hasStatementType(body: ASTNode[], statementType: string): boolean {
-    for (const stmt of body) {
-      if (stmt.type === statementType) {
-        return true;
-      }
-      // ネストされた構造もチェック
-      if (stmt.body && Array.isArray(stmt.body)) {
-        if (this.hasStatementType(stmt.body, statementType)) {
-          return true;
+  private createRepeatUntilIR(node: ASTNode): IR {
+    const repeatText = 'REPEAT';
+    
+    this.enterScope('repeat', 'block');
+    this.increaseIndent();
+    
+    // Process all statements except the last one (which is the if-break)
+    const bodyStatements = node.body.slice(0, -1);
+    
+    // Special handling for input function in the body
+    const bodyChildren: IR[] = [];
+    
+    for (const child of bodyStatements) {
+      // Check if this is an assignment with input() function
+      if (child.type === 'Assign' && 
+          child.value && 
+          child.value.type === 'Call' && 
+          child.value.func && 
+          child.value.func.id === 'input') {
+        
+        // Get the target variable name
+        const target = this.expressionVisitor.visitExpression(child.targets[0]);
+        
+        // Get the input prompt if any
+        const args = child.value.args || [];
+        if (args.length > 0) {
+          // Create OUTPUT statement for the prompt
+          const prompt = this.expressionVisitor.visitExpression(args[0]);
+          const outputIR = this.createIRNode('output', `OUTPUT ${prompt}`);
+          bodyChildren.push(outputIR);
         }
+        
+        // Create INPUT statement
+        const inputIR = this.createIRNode('input', `INPUT ${target}`);
+        bodyChildren.push(inputIR);
+      } else {
+        // Normal statement processing
+        const ir = this.visitNode ? this.visitNode(child) : this.createIRNode('comment', '// Unprocessed node');
+        bodyChildren.push(ir);
       }
-      if (stmt.orelse && Array.isArray(stmt.orelse)) {
-        if (this.hasStatementType(stmt.orelse, statementType)) {
-          return true;
-        }
-      }
     }
-    return false;
+    
+    // Get the condition from the if statement
+    const lastStatement = node.body[node.body.length - 1];
+    
+    // The condition in the if statement is what we need for the UNTIL
+    // In Python: if condition: break
+    // In IGCSE: UNTIL condition
+    const condition = this.expressionVisitor.visitExpression(lastStatement.test);
+    
+    this.decreaseIndent();
+    this.exitScope();
+    
+    // Create UNTIL statement
+    const untilIR = this.createIRNode('until', `UNTIL ${condition}`);
+    bodyChildren.push(untilIR);
+    
+    return this.createIRNode('repeat', repeatText, bodyChildren);
   }
 
   /**
-   * 配列サイズを取得
-   */
-  private getArraySize(arrayName: string): number | null {
-    if (this.context.arrayInfo && this.context.arrayInfo[arrayName]) {
-      return this.context.arrayInfo[arrayName].size;
-    }
-    return null;
-  }
-
-  /**
-   * 配列サイズを設定
-   */
-  private setArraySize(arrayName: string, size: number): void {
-    if (!this.context.arrayInfo) {
-      this.context.arrayInfo = {};
-    }
-    if (!this.context.arrayInfo[arrayName]) {
-      this.context.arrayInfo[arrayName] = { 
-        size: 0, 
-        elementType: 'STRING', 
-        currentIndex: 0 
-      };
-    }
-    this.context.arrayInfo[arrayName].size = size;
-  }
-
-  /**
-   * 関数呼び出し文の処理
+   * Process function call statements
    */
   visitCall(node: ASTNode): IR {
-    // 属性メソッド呼び出しの場合（obj.method()）
-    if (node.func.type === 'Attribute') {
-      const objectName = this.expressionVisitor.visitExpression(node.func.value);
-      const methodName = node.func.attr;
-      const args = node.args.map((arg: ASTNode) => this.expressionVisitor.visitExpression(arg));
-      
-      // appendメソッドの特別処理
-      if (methodName === 'append') {
-        if (args.length > 0) {
-          // 配列サイズを更新
-          const currentSize = this.getArraySize(objectName) || 0;
-          const newSize = currentSize + 1;
-          this.setArraySize(objectName, newSize);
-          
-          // 配列要素への代入として処理
-          const text = `${objectName}[${newSize}] ← ${args[0]}`;
-          return this.createIRNode('assign', text);
-        }
-        return this.createIRNode('comment', `// ${objectName}.append() with no arguments`);
-      }
-      
-      // その他の属性メソッド呼び出し
-      const text = `${objectName}.${methodName}(${args.join(', ')})`;
-      return this.createIRNode('statement', text);
-    }
-    
     const func = this.expressionVisitor.visitExpression(node.func);
     const args = node.args.map((arg: ASTNode) => this.expressionVisitor.visitExpression(arg));
     
-    // 関数呼び出し情報を記録（引数の型を推論）
-    if (node.func.type === 'Name') {
-      const functionName = node.func.id;
-      const argumentTypes = node.args.map((arg: ASTNode) => 
-        this.expressionVisitor.inferTypeFromValue(arg)
-      );
-      this.recordFunctionCall(functionName, argumentTypes);
-    }
-    
-    // funcがappendメソッド呼び出しの場合を検出
-    if (func.includes('.append(')) {
-      const match = func.match(/^(.+)\.append\((.+)\)$/);
-      if (match) {
-        const objectName = match[1];
-        const argValue = match[2];
-        
-        // 配列サイズを更新
-        const currentSize = this.getArraySize(objectName) || 0;
-        const newSize = currentSize + 1;
-        this.setArraySize(objectName, newSize);
-        
-        // 配列要素への代入として処理
-        const text = `${objectName}[${newSize}] ← ${argValue}`;
-        return this.createIRNode('assign', text);
-      }
-    }
-    
-    // 組み込み関数の変換
+    // Convert built-in functions
     if (func === 'print') {
-      // 引数が1つでf-stringの場合は特別処理
+      // Special handling for f-string with single argument
       if (args.length === 1 && node.args[0].type === 'JoinedStr') {
         const fstringResult = this.expressionVisitor.visitExpression(node.args[0]);
         const text = `OUTPUT ${fstringResult}`;
@@ -607,14 +540,14 @@ export class StatementVisitor extends BaseParser {
       return this.createIRNode('input', text);
     }
     
-    // 通常の関数呼び出し（CALLキーワードを追加）
+    // Normal function call (add CALL keyword)
     const capitalizedFunc = this.capitalizeFirstLetter(func);
     const text = `CALL ${capitalizedFunc}(${args.join(', ')})`;
     return this.createIRNode('statement', text);
   }
 
   /**
-   * RETURN文の処理
+   * Process RETURN statements
    */
   visitReturn(node: ASTNode): IR {
     if (node.value) {
@@ -625,10 +558,10 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * 式文の処理
+   * Process expression statements
    */
   visitExpr(node: ASTNode): IR {
-    // 関数呼び出しの場合は特別に処理
+    // Handle function calls specially
     if (node.value && node.value.type === 'Call') {
       return this.visitCall(node.value);
     }
@@ -638,146 +571,85 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * コメントの処理
+   * Process comments
    */
   visitComment(node: ASTNode): IR {
     return this.createIRNode('comment', `// ${node.value}`);
   }
 
   /**
-   * PASS文の処理
+   * Process PASS statements
    */
   visitPass(_node: ASTNode): IR {
     return this.createIRNode('comment', '// pass');
   }
 
   /**
-   * BREAK文の処理
+   * Process BREAK statements
    */
   visitBreak(_node: ASTNode): IR {
     return this.createIRNode('break', 'BREAK');
   }
 
   /**
-   * CONTINUE文の処理
+   * Process CONTINUE statements
    */
   visitContinue(_node: ASTNode): IR {
     return this.createIRNode('statement', 'CONTINUE');
   }
 
   /**
-   * IMPORT文の処理
+   * Process IMPORT statements
    */
   visitImport(_node: ASTNode): IR {
-    // IGCSEでは通常importは使用しないため、コメントとして出力
+    // Output as comment since import is not typically used in IGCSE
     return this.createIRNode('comment', `// import statement`);
   }
 
   /**
-   * TRY文の処理
+   * Process TRY statements
    */
   visitTry(_node: ASTNode): IR {
-    // IGCSEでは例外処理は通常使用しないため、コメントとして出力
+    // Output as comment since exception handling is not typically used in IGCSE
     return this.createIRNode('comment', `// try-except statement`);
   }
 
   /**
-   * RAISE文の処理
+   * Process RAISE statements
    */
   visitRaise(_node: ASTNode): IR {
     return this.createIRNode('comment', `// raise statement`);
   }
 
   /**
-   * WITH文の処理
+   * Process WITH statements
    */
   visitWith(_node: ASTNode): IR {
     return this.createIRNode('comment', `// with statement`);
   }
 
   /**
-   * ASSERT文の処理
+   * Process ASSERT statements
    */
   visitAssert(_node: ASTNode): IR {
     return this.createIRNode('comment', `// assert statement`);
   }
 
   /**
-   * GLOBAL文の処理
+   * Process GLOBAL statements
    */
   visitGlobal(_node: ASTNode): IR {
     return this.createIRNode('comment', `// global statement`);
   }
 
   /**
-   * MATCH文の処理（Python 3.10+）
-   */
-  visitMatch(node: ASTNode): IR {
-    const subject = this.expressionVisitor.visitExpression(node.subject);
-    const caseText = `CASE OF ${subject}`;
-    
-    const children: IR[] = [];
-    
-    // 各caseの処理
-    for (const caseNode of node.cases) {
-      if (caseNode.pattern.type === 'MatchValue') {
-        // 値パターン
-        const value = this.expressionVisitor.visitExpression(caseNode.pattern.value);
-        
-        // ケースのボディが単一文の場合は同じ行に出力
-        if (caseNode.body.length === 1) {
-          const bodyIR = this.visitNode ? this.visitNode(caseNode.body[0]) : this.createIRNode('comment', '// Unprocessed node');
-          const caseItemText = `   ${value} : ${bodyIR.text}`;
-          const caseItemIR = this.createIRNode('statement', caseItemText);
-          children.push(caseItemIR);
-        } else {
-          // 複数文の場合は従来通り
-          const caseItemText = `   ${value} :`;
-          const caseItemIR = this.createIRNode('statement', caseItemText);
-          children.push(caseItemIR);
-          
-          this.increaseIndent();
-          const bodyChildren = caseNode.body.map((child: ASTNode) => 
-            this.visitNode ? this.visitNode(child) : this.createIRNode('comment', '// Unprocessed node')
-          );
-          this.decreaseIndent();
-          children.push(...bodyChildren);
-        }
-      } else if (caseNode.pattern.type === 'MatchAs' && !caseNode.pattern.pattern) {
-        // デフォルトケース（_）
-        if (caseNode.body.length === 1) {
-          const bodyIR = this.visitNode ? this.visitNode(caseNode.body[0]) : this.createIRNode('comment', '// Unprocessed node');
-          const otherwiseText = `   OTHERWISE : ${bodyIR.text}`;
-          const otherwiseIR = this.createIRNode('statement', otherwiseText);
-          children.push(otherwiseIR);
-        } else {
-          const otherwiseIR = this.createIRNode('statement', '   OTHERWISE :');
-          children.push(otherwiseIR);
-          
-          this.increaseIndent();
-          const bodyChildren = caseNode.body.map((child: ASTNode) => 
-            this.visitNode ? this.visitNode(child) : this.createIRNode('comment', '// Unprocessed node')
-          );
-          this.decreaseIndent();
-          children.push(...bodyChildren);
-        }
-      }
-    }
-    
-    const endCaseIR = this.createIRNode('statement', 'ENDCASE');
-    children.push(endCaseIR);
-    
-    return this.createIRNode('case', caseText, children);
-  }
-
-  /**
-   * DELETE文の処理
+   * Process DELETE statements
    */
   visitDelete(_node: ASTNode): IR {
     return this.createIRNode('comment', `// delete statement`);
   }
 
-  // ヘルパーメソッド
+  // Helper methods
   private handleRangeFor(node: ASTNode, target: string): IR {
     const args = node.iter.args;
     let startValue = '0';
@@ -798,10 +670,10 @@ export class StatementVisitor extends BaseParser {
       stepValue = this.expressionVisitor.visitExpression(args[2]);
     }
     
-    // 数値定数の場合は最適化
-    // ステップが1の場合のみ終了値から1を引く
+    // Optimize for numeric constants
+    // Subtract 1 from end value only when step is 1
     if (stepValue === '1') {
-      // LENGTH()関数や他の関数呼び出しの場合は特別な処理
+      // Special handling for LENGTH() function and other function calls
       if (endValue.startsWith('LENGTH(') || endValue.includes('(')) {
         endValue = `${endValue} - 1`;
       } else if (this.expressionVisitor.isNumericConstant(args[args.length - 1])) {
@@ -811,7 +683,7 @@ export class StatementVisitor extends BaseParser {
         endValue = `${endValue} - 1`;
       }
     } else {
-      // ステップが1以外の場合は、最後に到達する値を計算
+      // Calculate the last reachable value when step is not 1
       if (args.length === 3 && 
           this.expressionVisitor.isNumericConstant(args[0]) && 
           this.expressionVisitor.isNumericConstant(args[1]) && 
@@ -820,7 +692,7 @@ export class StatementVisitor extends BaseParser {
         const end = this.expressionVisitor.getNumericValue(args[1]);
         const step = this.expressionVisitor.getNumericValue(args[2]);
         
-        // 最後に到達する値を計算
+        // Calculate the last reachable value
         let lastValue = start;
         if (step > 0) {
           while (lastValue + step < end) {
@@ -853,122 +725,31 @@ export class StatementVisitor extends BaseParser {
     return this.createIRNode('for', forText, bodyChildren);
   }
 
-  /**
-   * 配列の乗算初期化かどうかを判定（[0] * 5 など）
-   */
-  private isArrayMultiplication(node: ASTNode): boolean {
-    return node.type === 'BinOp' && 
-           node.op.type === 'Mult' && 
-           (this.expressionVisitor.isArrayInitialization(node.left) || 
-            this.expressionVisitor.isArrayInitialization(node.right));
-  }
-
-  /**
-   * 配列の乗算初期化を処理（[0] * 5 など）
-   */
-  private handleArrayMultiplication(node: ASTNode): IR {
-    const target = this.expressionVisitor.visitExpression(node.targets[0]);
-    
-    let arrayNode: ASTNode;
-    let sizeNode: ASTNode;
-    
-    // [0] * 5 または 5 * [0] の形式を判定
-    if (this.expressionVisitor.isArrayInitialization(node.value.left)) {
-      arrayNode = node.value.left;
-      sizeNode = node.value.right;
-    } else {
-      arrayNode = node.value.right;
-      sizeNode = node.value.left;
-    }
-    
-    // サイズを取得
-    let size: number;
-    if (sizeNode.type === 'Constant' && typeof sizeNode.value === 'number') {
-      size = sizeNode.value;
-    } else if (sizeNode.type === 'Num') {
-      size = sizeNode.n;
-    } else {
-      // 動的サイズの場合はデフォルト値を使用
-      size = 100;
-    }
-    
-    // 要素型を取得
-    let elementType: IGCSEDataType;
-    
-    if (arrayNode.elts && arrayNode.elts.length > 0) {
-      // 通常のList/Tuple型の場合
-      const firstElement = arrayNode.elts[0];
-      elementType = this.expressionVisitor.inferTypeFromValue(firstElement);
-    } else if (arrayNode.type === 'Name' && arrayNode.id) {
-      // Name型で配列リテラルの形式の場合（例: "[0]"）
-      const arrayLiteral = arrayNode.id;
-      // 配列リテラルから要素を抽出
-      const match = arrayLiteral.match(/^\[(.+)\]$/);
-      if (match) {
-        const elementStr = match[1].trim();
-        // 数値かどうかを判定
-        if (/^\d+$/.test(elementStr)) {
-          elementType = 'INTEGER';
-        } else if (/^\d+\.\d+$/.test(elementStr)) {
-          elementType = 'REAL';
-        } else if (elementStr === 'True' || elementStr === 'False') {
-          elementType = 'BOOLEAN';
-        } else {
-          elementType = 'STRING';
-        }
-      } else {
-        elementType = 'INTEGER';
-      }
-    } else {
-      elementType = 'INTEGER';
-    }
-    
-    // 配列乗算の場合はDECLARE文を生成
-    const declText = `DECLARE ${target} : ARRAY[1:${size}] OF ${elementType}`;
-    
-    // 配列サイズ情報をコンテキストに記録
-    if (this.context && this.context.arrayInfo) {
-      this.context.arrayInfo[target] = {
-        size: size,
-        elementType: elementType,
-        currentIndex: 0
-      };
-    }
-    
-    // 変数の型を推論して登録
-    const targetNode = node.targets[0];
-    if (targetNode.type === 'Name') {
-      this.registerVariable(targetNode.id, 'ARRAY' as IGCSEDataType, node.lineno);
-    }
-    
-    return this.createIRNode('array', declText);
-  }
-
   private handleArrayInitialization(node: ASTNode): IR {
     const target = this.expressionVisitor.visitExpression(node.targets[0]);
     const elements = node.value.elts;
     const size = elements.length;
     
-    // 文字列として分割された要素を再構築してオブジェクト呼び出しを検出
+    // Reconstruct string-split elements to detect object calls
     const reconstructedElements = this.reconstructObjectCalls(elements);
     
-    // オブジェクトの配列かどうかを判定
+    // Determine if it's an array of objects
     const isObjectArray = reconstructedElements.length > 0 && this.isObjectCall(reconstructedElements[0]);
     
     if (isObjectArray) {
-      // オブジェクトの配列の場合
+      // For object arrays
       const firstCall = reconstructedElements[0];
       const className = this.extractClassName(firstCall);
       const recordTypeName = `${className}Record`;
       
       const children: IR[] = [];
       
-      // 配列宣言（実際の要素数を使用）
+      // Array declaration (using actual element count)
       const actualSize = reconstructedElements.length;
       const declText = `DECLARE ${target} : ARRAY[1:${actualSize}] OF ${recordTypeName}`;
       children.push(this.createIRNode('statement', declText));
       
-      // 配列サイズ情報をコンテキストに記録
+      // Record array size information in context
       if (this.context && this.context.arrayInfo) {
         this.context.arrayInfo[target] = {
           size: actualSize,
@@ -977,18 +758,18 @@ export class StatementVisitor extends BaseParser {
         };
       }
       
-      // 各要素の処理
+      // Process each element
       reconstructedElements.forEach((elementStr: string, index: number) => {
         const args = this.extractArguments(elementStr);
-        // クラス定義から実際のフィールド名を取得する必要があるが、
-        // 現在は簡略化してPoint クラスの場合は x, y として処理
+        // Need to get actual field names from class definition, but
+        // Currently simplified to handle Point class as x, y
         if (className === 'Point' && args.length >= 2) {
           children.push(this.createIRNode('assign', `${target}[${index + 1}].x ← ${args[0]}`));
           children.push(this.createIRNode('assign', `${target}[${index + 1}].y ← ${args[1]}`));
         } else {
-           // 他のクラスの場合は汎用的な処理
+           // Generic handling for other classes
            args.forEach((arg: string, argIndex: number) => {
-             const fieldName = `field${argIndex + 1}`; // 仮のフィールド名
+             const fieldName = `field${argIndex + 1}`; // Temporary field name
              children.push(this.createIRNode('assign', `${target}[${index + 1}].${fieldName} ← ${arg}`));
            });
         }
@@ -996,14 +777,14 @@ export class StatementVisitor extends BaseParser {
       
       return this.createIRNode('statement', '', children);
     } else {
-      // 通常の配列の場合
+      // For normal arrays
       const elementType = elements.length > 0 ? this.expressionVisitor.inferTypeFromValue(elements[0]) : 'STRING';
       
-      // 配列宣言
+      // Array declaration
       const declText = `DECLARE ${target} : ARRAY[1:${size}] OF ${elementType}`;
       const declIR = this.createIRNode('array', declText);
       
-      // 配列サイズ情報をコンテキストに記録
+      // Record array size information in context
       if (this.context && this.context.arrayInfo) {
         this.context.arrayInfo[target] = {
           size: size,
@@ -1012,7 +793,7 @@ export class StatementVisitor extends BaseParser {
         };
       }
       
-      // 要素の代入
+      // Element assignment
       const assignments: IR[] = [];
       elements.forEach((element: ASTNode, index: number) => {
         const value = this.expressionVisitor.visitExpression(element);
@@ -1033,13 +814,13 @@ export class StatementVisitor extends BaseParser {
       if (element.type === 'Name' && element.id) {
         const elementStr = element.id;
         
-        // クラス名のパターンを検出 (大文字で始まり、括弧で終わる)
+        // Detect class name pattern (starts with uppercase, ends with parentheses)
         if (/^[A-Z]\w*\(/.test(elementStr)) {
-          // 次の要素と結合してオブジェクト呼び出しを再構築
+          // Combine with next element to reconstruct object call
           let objectCall = elementStr;
           i++;
           
-          // 閉じ括弧が見つかるまで要素を結合
+          // Join elements until closing parenthesis is found
           while (i < elements.length && !objectCall.includes(')')) {
             const nextElement = elements[i];
             if (nextElement.type === 'Name' && nextElement.id) {
@@ -1063,7 +844,7 @@ export class StatementVisitor extends BaseParser {
   }
   
   private isObjectCall(elementStr: string): boolean {
-     // クラス名(引数)のパターンを検出
+     // Detect ClassName(arguments) pattern
      return /^[A-Z]\w*\(.+\)$/.test(elementStr);
    }
    
@@ -1081,10 +862,13 @@ export class StatementVisitor extends BaseParser {
    }
 
   private isClassInstantiation(node: ASTNode): boolean {
-    // 簡易的な判定: 関数名が大文字で始まる場合はクラスとみなす
+    // Simple judgment: treat as class if function name starts with uppercase
     if (node.func.type === 'Name') {
-      return /^[A-Z]/.test(node.func.id);
+      const isClass = /^[A-Z]/.test(node.func.id);
+      console.log(`DEBUG: Checking if ${node.func.id} is class: ${isClass}`);
+      return isClass;
     }
+    console.log('DEBUG: Function type is not Name:', node.func.type);
     return false;
   }
 
@@ -1093,24 +877,28 @@ export class StatementVisitor extends BaseParser {
     const target = this.expressionVisitor.visitExpression(node.targets[0]);
     const args = node.value.args.map((arg: ASTNode) => this.expressionVisitor.visitExpression(arg));
     
-    // レコード型として扱う場合は、変数宣言と各フィールドの代入を生成
+    // When treating as record type, generate variable declaration and field assignments
     const recordTypeName = `${className}Record`;
     const children: IR[] = [];
     
-    // 変数宣言
+    // Variable declaration
     const declareText = `DECLARE ${target} : ${recordTypeName}`;
+    console.log('DEBUG: Adding declaration:', declareText);
     children.push(this.createIRNode('statement', declareText));
     
-    // クラス定義から属性名を取得
+    // Get attribute names from class definition
     const classAttributes = this.getClassAttributes(className);
+    console.log('DEBUG: classAttributes:', classAttributes);
     
-    // フィールドの代入（引数の順序に基づく）
+    // Field assignment (based on argument order)
     for (let i = 0; i < Math.min(args.length, classAttributes.length); i++) {
       const attrName = classAttributes[i];
       const assignText = `${target}.${attrName} ← ${args[i]}`;
+      console.log('DEBUG: Adding assignment:', assignText);
       children.push(this.createIRNode('assign', assignText));
     }
     
+    console.log('DEBUG: Returning block with', children.length, 'children');
     return this.createIRNode('block', '', children);
   }
 
@@ -1128,32 +916,32 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * 配列要素代入の処理 (data[1] = 100)
+   * Process array element assignment (data[1] = 100)
    */
   private handleElementAssign(targetNode: ASTNode, valueNode: ASTNode): IR {
     const arrayName = this.expressionVisitor.visitExpression(targetNode.value);
     const value = this.expressionVisitor.visitExpression(valueNode);
     
-    // インデックスを直接処理してコメントを避ける
+    // Process index directly to avoid comments
     let adjustedIndex: string;
     let sliceNode = targetNode.slice;
     
-    // Indexノードでラップされている場合は中身を取得
+    // Get contents if wrapped in Index node
     if (sliceNode.type === 'Index') {
       sliceNode = sliceNode.value;
     }
     
     if (sliceNode.type === 'Constant' && typeof sliceNode.value === 'number') {
-      // 数値リテラルの場合は+1
+      // For numeric literals, add 1
       adjustedIndex = String(sliceNode.value + 1);
     } else if (sliceNode.type === 'Num') {
-      // 古いPython ASTの数値ノード
+      // Old Python AST numeric node
       adjustedIndex = String(sliceNode.n + 1);
     } else if (sliceNode.type === 'Name') {
-      // 変数の場合は+1を追加
+      // For variables, add +1
       adjustedIndex = `${sliceNode.id} + 1`;
     } else {
-      // その他の場合は式として処理
+      // For other cases, process as expression
       const index = this.expressionVisitor.visitExpression(targetNode.slice);
       adjustedIndex = this.convertIndexToOneBased(index);
     }
@@ -1163,7 +951,7 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * 属性代入の処理 (obj.field = value)
+   * Process attribute assignment (obj.field = value)
    */
   private handleAttributeAssign(targetNode: ASTNode, valueNode: ASTNode): IR {
     const objectName = this.expressionVisitor.visitExpression(targetNode.value);
@@ -1175,31 +963,31 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * インデックスを0ベースから1ベースに変換
+   * Convert index from 0-based to 1-based
    */
   private convertIndexToOneBased(index: string): string {
-    // 数値リテラルの場合は+1
+    // For numeric literals, add 1
     if (/^\d+$/.test(index)) {
       return String(parseInt(index) + 1);
     }
-    // 変数の場合は+1を追加
+    // For variables, add +1
     return `${index} + 1`;
   }
 
   /**
-   * 型注釈がリスト型かどうかを判定
+   * Determine if type annotation is list type
    */
   private isListTypeAnnotation(annotation: ASTNode): boolean {
     if (!annotation) return false;
     
-    // list[type] の形式
+    // list[type] format
     if (annotation.type === 'Subscript' && 
         annotation.value.type === 'Name' && 
         annotation.value.id === 'list') {
       return true;
     }
     
-    // List[type] の形式（typing.List）
+    // List[type] format (typing.List)
     if (annotation.type === 'Subscript' && 
         annotation.value.type === 'Name' && 
         annotation.value.id === 'List') {
@@ -1210,7 +998,7 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * リスト型注釈から要素型を抽出
+   * Extract element type from list type annotation
    */
   private extractListElementType(annotation: ASTNode): string {
     if (annotation.type === 'Subscript' && annotation.slice) {
@@ -1219,11 +1007,11 @@ export class StatementVisitor extends BaseParser {
         return this.convertPythonTypeToIGCSE(elementType.id);
       }
     }
-    return 'STRING'; // デフォルト
+    return 'STRING'; // Default
   }
 
   /**
-   * 型注釈をIGCSE型に変換
+   * Convert type annotation to IGCSE type
    */
   private convertAnnotationToIGCSEType(annotation: ASTNode): string {
     if (!annotation) return 'STRING';
@@ -1241,7 +1029,7 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * Python型名をIGCSE型に変換
+   * Convert Python type name to IGCSE type
    */
   private convertPythonTypeToIGCSE(typeName: string): string {
     switch (typeName) {
@@ -1254,10 +1042,10 @@ export class StatementVisitor extends BaseParser {
   }
 
   /**
-   * クラス定義から属性名を取得
+   * Get attribute names from class definition
    */
   private getClassAttributes(className: string): string[] {
-    // コンテキストからクラス定義を検索
+    // Search for class definition from context
     if (this.context && this.context.classDefinitions) {
       const classDef = this.context.classDefinitions[className];
       if (classDef && classDef.attributes) {
@@ -1265,168 +1053,21 @@ export class StatementVisitor extends BaseParser {
       }
     }
     
-    // デフォルトの属性名（Student クラスの場合）
+    // Default attribute names (for Student class)
     if (className === 'Student') {
       return ['name', 'age'];
     }
     
-    // その他のクラスの場合はデフォルト
+    // Default for other classes
     return ['x', 'y'];
   }
 
   /**
-   * 文字列の最初の文字を大文字にする
+   * Capitalize first letter of string
    */
   private capitalizeFirstLetter(str: string): string {
     if (!str) return str;
     return str.charAt(0).toUpperCase() + str.slice(1);
-  }
-
-  /**
-   * IF-ELIF-ELSE文をCASE文に変換できるかチェックし、可能であれば変換する
-   */
-  private tryConvertToCase(node: ASTNode): IR | null {
-    // 同じ変数に対する等価比較のチェーン（if x == 1: elif x == 2: ...）の場合のみCASE文に変換
-    if (!this.canConvertToCase(node)) {
-      return null;
-    }
-
-    const variable = this.extractCaseVariable(node);
-    if (!variable) {
-      return null;
-    }
-
-    const children: IR[] = [];
-    const caseText = `CASE OF ${variable}`;
-
-    // 各条件を処理
-    this.processCaseConditions(node, variable, children);
-
-    children.push(this.createIRNode('statement', 'ENDCASE'));
-    return this.createIRNode('case', caseText, children);
-  }
-
-  /**
-   * IF-ELIF-ELSE文がCASE文に変換可能かチェック
-   */
-  private canConvertToCase(node: ASTNode): boolean {
-    let current = node;
-    let variable: string | null = null;
-
-    while (current) {
-      // 条件が等価比較（==）でない場合は変換不可
-      if (!current.test || current.test.type !== 'Compare') {
-        return false;
-      }
-
-      const compare = current.test;
-      if (!compare.ops || compare.ops.length !== 1 || compare.ops[0].type !== 'Eq') {
-        return false;
-      }
-
-      // 左辺が変数でない場合は変換不可
-      if (!compare.left || compare.left.type !== 'Name') {
-        return false;
-      }
-
-      const currentVar = compare.left.id;
-      if (variable === null) {
-        variable = currentVar;
-      } else if (variable !== currentVar) {
-        // 異なる変数の場合は変換不可
-        return false;
-      }
-
-      // 右辺が定数でない場合は変換不可
-      const comparator = compare.comparators[0];
-      if (!comparator || (comparator.type !== 'Constant' && comparator.type !== 'Num' && comparator.type !== 'Str')) {
-        return false;
-      }
-
-      // 次のelif/elseに移動
-      if (current.orelse && current.orelse.length === 1 && current.orelse[0].type === 'If') {
-        current = current.orelse[0];
-      } else {
-        break;
-      }
-    }
-
-    return true;
-  }
-
-  /**
-   * CASE文で使用する変数を抽出
-   */
-  private extractCaseVariable(node: ASTNode): string | null {
-    if (node.test && node.test.type === 'Compare' && node.test.left && node.test.left.type === 'Name') {
-      return node.test.left.id;
-    }
-    return null;
-  }
-
-  /**
-   * CASE文の各条件を処理
-   */
-  private processCaseConditions(node: ASTNode, _variable: string, children: IR[]): void {
-    let current = node;
-
-    while (current) {
-      if (current.test && current.test.type === 'Compare') {
-        const comparator = current.test.comparators[0];
-        let value: string;
-
-        if (comparator.type === 'Constant') {
-          value = typeof comparator.value === 'string' ? `"${comparator.value}"` : String(comparator.value);
-        } else if (comparator.type === 'Num') {
-          value = String(comparator.n);
-        } else if (comparator.type === 'Str') {
-          value = `"${comparator.s}"`;
-        } else {
-          value = this.expressionVisitor.visitExpression(comparator);
-        }
-
-        // 条件内の文を処理して、条件と同じ行に配置
-        const statements: string[] = [];
-        for (const stmt of current.body) {
-          if (this.visitNode) {
-            const stmtIR = this.visitNode(stmt);
-            if (stmtIR) {
-              statements.push(stmtIR.text);
-            }
-          }
-        }
-
-        // CASE条件と文を同じ行に配置
-        const caseText = statements.length > 0 
-          ? `   ${value} : ${statements.join('; ')}`
-          : `   ${value} :`;
-        children.push(this.createIRNode('statement', caseText));
-      }
-
-      // 次のelif/elseに移動
-      if (current.orelse && current.orelse.length === 1 && current.orelse[0].type === 'If') {
-        current = current.orelse[0];
-      } else if (current.orelse && current.orelse.length > 0) {
-        // else節がある場合
-        const elseStatements: string[] = [];
-        for (const stmt of current.orelse) {
-          if (this.visitNode) {
-            const stmtIR = this.visitNode(stmt);
-            if (stmtIR) {
-              elseStatements.push(stmtIR.text);
-            }
-          }
-        }
-        
-        const otherwiseText = elseStatements.length > 0 
-          ? `   OTHERWISE : ${elseStatements.join('; ')}`
-          : `   OTHERWISE :`;
-        children.push(this.createIRNode('statement', otherwiseText));
-        break;
-      } else {
-        break;
-      }
-    }
   }
 
   protected override createIRNode(kind: IRKind, text: string, children: IR[] = [], meta?: IRMeta): IR {

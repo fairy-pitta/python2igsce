@@ -5,7 +5,7 @@ import { ExpressionVisitor } from './expression-visitor';
 import { BaseParser } from './base-parser';
 
 /**
- * Python ASTノードの基本インターフェース
+ * Basic interface for Python AST nodes
  */
 interface ASTNode {
   type: string;
@@ -15,11 +15,11 @@ interface ASTNode {
 }
 
 /**
- * 関数とクラス定義の処理を担当するビジタークラス
+ * Visitor class responsible for processing function and class definitions
  */
 export class DefinitionVisitor extends BaseParser {
   /**
-   * パースの実行（DefinitionVisitorでは使用しない）
+   * Execute parsing (not used in DefinitionVisitor)
    */
   parse(_source: string): ParseResult {
     throw new Error('DefinitionVisitor.parse() should not be called directly');
@@ -33,37 +33,23 @@ export class DefinitionVisitor extends BaseParser {
   }
 
   /**
-   * コンテキストを設定
+   * Set context
    */
   setContext(context: any): void {
     this.context = context;
   }
 
   /**
-   * 関数定義の処理
+   * Process function definitions
    */
   visitFunctionDef(node: ASTNode): IR {
     const funcName = this.capitalizeFirstLetter(node.name);
-    const params = this.extractParameters(node.args, node.name);
+    const params = this.extractParameters(node.args);
     const paramText = params.map(p => `${p.name} : ${p.type}`).join(', ');
     
-    // 関数スコープに入る
-    this.enterScope(funcName, 'function');
-    this.increaseIndent();
-    
-    // パラメータを変数として登録
-    params.forEach(param => {
-      this.registerVariable(param.name, param.type, node.lineno);
-    });
-    
-    // 関数本体を処理（関数呼び出し情報を収集するため）
-    const bodyChildren = node.body.map((child: ASTNode) => 
-      this.visitNode ? this.visitNode(child) : this.createIRNode('comment', '// Unprocessed node')
-    );
-    
-    // 関数本体処理後に戻り値の型を推論
+    // Infer return type
     const hasReturn = this.hasReturnStatement(node.body);
-    const returnType = hasReturn ? this.inferReturnType(node, params) : null;
+    const returnType = hasReturn ? this.inferReturnType(node) : null;
     
     let funcText: string;
     if (returnType) {
@@ -72,10 +58,24 @@ export class DefinitionVisitor extends BaseParser {
       funcText = `PROCEDURE ${funcName}(${paramText})`;
     }
     
+    // Enter function scope
+    this.enterScope(funcName, 'function');
+    this.increaseIndent();
+    
+    // Register parameters as variables
+    params.forEach(param => {
+      this.registerVariable(param.name, param.type, node.lineno);
+    });
+    
+    // Process function body
+    const bodyChildren = node.body.map((child: ASTNode) => 
+      this.visitNode ? this.visitNode(child) : this.createIRNode('comment', '// Unprocessed node')
+    );
+    
     this.decreaseIndent();
     this.exitScope();
     
-    // 終了文を追加
+    // Add end statement
     const endText = returnType ? `ENDFUNCTION` : `ENDPROCEDURE`;
     const endIR = this.createIRNode('statement', endText);
     bodyChildren.push(endIR);
@@ -84,38 +84,38 @@ export class DefinitionVisitor extends BaseParser {
   }
 
   /**
-   * クラス定義の処理
+   * Process class definitions
    */
   visitClassDef(node: ASTNode): IR {
     const className = node.name;
     
-    // レコード型として扱うかどうかを判定
+    // Determine whether to treat as record type
     const isRecordType = this.shouldTreatAsRecordType(node);
     
-    // レコード型として扱う場合
+    // If treating as record type
     if (isRecordType) {
       return this.createRecordType(node, className);
     }
     
-    // 通常のクラスとして扱う場合
+    // If treating as regular class
     return this.createClass(node, className);
   }
 
   /**
-   * レコード型の作成
+   * Create record type
    */
   private createRecordType(node: ASTNode, className: string): IR {
     const recordTypeName = `${className}Record`;
     const typeText = `TYPE ${recordTypeName}`;
     
-    // __init__メソッドから属性を抽出
+    // Extract attributes from __init__ method
     const constructor = node.body.find((item: ASTNode) => 
       item.type === 'FunctionDef' && item.name === '__init__'
     );
     
     const children: IR[] = [];
     if (constructor) {
-      // コンストラクタから実際のフィールド名と型を抽出
+      // Extract actual field names and types from constructor
       const attributes = this.extractAttributesFromConstructor(constructor);
       
       for (const attr of attributes) {
@@ -128,7 +128,7 @@ export class DefinitionVisitor extends BaseParser {
   }
 
   /**
-   * 通常のクラスの作成
+   * Create regular class
    */
   private createClass(node: ASTNode, className: string): IR {
     const baseClass = node.bases.length > 0 ? node.bases[0].id : null;
@@ -142,11 +142,11 @@ export class DefinitionVisitor extends BaseParser {
     
     const members: IR[] = [];
     
-    // クラス属性とメソッドを処理
+    // Process class attributes and methods
     for (const item of node.body) {
       if (item.type === 'FunctionDef') {
         if (item.name === '__init__') {
-          // コンストラクタから属性を抽出
+          // Extract attributes from constructor
           const attributes = this.extractAttributesFromConstructor(item);
           attributes.forEach(attr => {
             members.push(this.createIRNode('statement', `PRIVATE ${attr}`));
@@ -154,7 +154,7 @@ export class DefinitionVisitor extends BaseParser {
         }
         members.push(this.visitNode ? this.visitNode(item) : this.createIRNode('comment', '// Unprocessed node'));
       } else if (item.type === 'Assign') {
-        // クラス属性
+        // Class attributes
         const attrIR = this.visitNode ? this.visitNode(item) : this.createIRNode('comment', '// Unprocessed node');
         attrIR.text = `PRIVATE ${attrIR.text}`;
         members.push(attrIR);
@@ -171,22 +171,21 @@ export class DefinitionVisitor extends BaseParser {
   }
 
   /**
-   * 関数パラメータの抽出
+   * Extract function parameters
    */
-  private extractParameters(args: any, functionName?: string): ParameterInfo[] {
+  private extractParameters(args: any): ParameterInfo[] {
     const params: ParameterInfo[] = [];
     
     if (args.args) {
-      args.args.forEach((arg: any, index: number) => {
+      args.args.forEach((arg: any) => {
         const name = arg.arg;
+        // Prioritize type annotations if available
         let type = this.convertPythonTypeToIGCSE(arg.annotation);
         
-        // 型注釈がない場合、関数呼び出し情報から型を推論
-        if (type === 'STRING' && !arg.annotation && functionName) {
-          const callInfo = this.getFunctionCallInfo(functionName);
-          if (callInfo && callInfo.argumentTypes[index]) {
-            type = callInfo.argumentTypes[index];
-          }
+        // If no type annotation, infer INTEGER as default
+    // (More appropriate default due to frequent numeric operations)
+        if (!arg.annotation) {
+          type = 'INTEGER';
         }
         
         params.push({ name, type });
@@ -197,10 +196,10 @@ export class DefinitionVisitor extends BaseParser {
   }
 
   /**
-   * Python型注釈をIGCSE型に変換
+   * Convert Python type annotations to IGCSE types
    */
   private convertPythonTypeToIGCSE(annotation: any): IGCSEDataType {
-    if (!annotation) return 'STRING';
+    if (!annotation) return 'INTEGER'; // Changed default to INTEGER
     
     if (annotation.type === 'Name') {
       switch (annotation.id) {
@@ -208,19 +207,19 @@ export class DefinitionVisitor extends BaseParser {
         case 'str': return 'STRING';
         case 'bool': return 'BOOLEAN';
         case 'float': return 'REAL';
-        default: return 'STRING';
+        default: return 'INTEGER'; // Unknown types also default to INTEGER
       }
     }
-    return 'STRING';
+    return 'INTEGER';
   }
 
   /**
-   * コンストラクタから属性を抽出
+   * Extract attributes from constructor
    */
   private extractAttributesFromConstructor(constructor: ASTNode): string[] {
     const attributes: string[] = [];
     
-    // コンストラクタのパラメータから型情報を取得
+    // Get type information from constructor parameters
     const paramTypes = new Map<string, IGCSEDataType>();
     if (constructor.args && constructor.args.args) {
       constructor.args.args.forEach((arg: any) => {
@@ -231,19 +230,19 @@ export class DefinitionVisitor extends BaseParser {
       });
     }
     
-    // self.attribute = value の形式を探す
+    // Look for self.attribute = value format
     for (const stmt of constructor.body) {
       if (stmt.type === 'Assign') {
         const target = stmt.targets[0];
         if (target.type === 'Attribute' && target.value.id === 'self') {
           const attrName = target.attr;
           
-          // 代入される値がパラメータの場合、パラメータの型を使用
+          // If assigned value is a parameter, use parameter type
           let attrType: IGCSEDataType = 'STRING';
           if (stmt.value.type === 'Name' && paramTypes.has(stmt.value.id)) {
             attrType = paramTypes.get(stmt.value.id)!;
           } else {
-            // パラメータでない場合は値から型を推論
+            // If not a parameter, infer type from value
             attrType = this.expressionVisitor.inferTypeFromValue(stmt.value);
           }
           
@@ -256,32 +255,32 @@ export class DefinitionVisitor extends BaseParser {
   }
 
   /**
-   * レコード型として扱うかどうかを判定
+   * Determine whether to treat as record type
    */
   private shouldTreatAsRecordType(node: ASTNode): boolean {
-    // 継承を持つクラスはレコード型として扱わない
+    // Classes with inheritance are not treated as record types
     if (node.bases && node.bases.length > 0) {
       return false;
     }
     
-    // このクラスが他のクラスの親クラスとして使用されているかチェック
+    // Check if this class is used as a parent class by other classes
     if (this.isUsedAsBaseClass(node.name)) {
       return false;
     }
     
-    // クラスがレコード型として使用されるかを判定
+    // Determine if class is used as record type
     const methods = node.body.filter((item: ASTNode) => item.type === 'FunctionDef');
     
-    // __init__メソッドのみを持つ場合
+    // If it only has __init__ method
     if (methods.length === 1 && methods[0].name === '__init__') {
       const initMethod = methods[0];
-      // __init__内が単純なフィールド代入のみかチェック
+      // Check if __init__ contains only simple field assignments
       return this.isSimpleConstructor(initMethod);
     }
     
-    // メソッドがない場合（データクラス的な使用）
+    // If no methods (data class usage)
     if (methods.length === 0) {
-      // クラス属性のみを持つ場合はレコード型として扱う
+      // Treat as record type if it only has class attributes
       const hasOnlyAttributes = node.body.every((item: ASTNode) => 
         item.type === 'Assign' || item.type === 'AnnAssign'
       );
@@ -292,28 +291,28 @@ export class DefinitionVisitor extends BaseParser {
   }
 
   /**
-   * __init__メソッドが単純なコンストラクタかどうかを判定
+   * Determine if __init__ method is a simple constructor
    */
   private isSimpleConstructor(initMethod: ASTNode): boolean {
-    // __init__の本体をチェック
+    // Check __init__ body
     for (const stmt of initMethod.body) {
       if (stmt.type === 'Assign') {
-        // self.field = parameter の形式かチェック
+        // Check if it's self.field = parameter format
         const target = stmt.targets[0];
         if (target.type === 'Attribute' && 
             target.value.type === 'Name' && 
             target.value.id === 'self') {
-          // 単純なフィールド代入
+          // Simple field assignment
           continue;
         } else {
-          // 複雑な代入があるため、レコード型として扱わない
+          // Complex assignment exists, don't treat as record type
           return false;
         }
       } else if (stmt.type === 'Expr' && stmt.value.type === 'Constant') {
-        // ドキュメント文字列は許可
+        // Documentation strings are allowed
         continue;
       } else {
-        // その他の複雑な処理があるため、レコード型として扱わない
+        // Other complex processing exists, don't treat as record type
         return false;
       }
     }
@@ -321,10 +320,10 @@ export class DefinitionVisitor extends BaseParser {
   }
 
   /**
-   * このクラスが他のクラスの親クラスとして使用されているかチェック
+   * Check if this class is used as a parent class by other classes
    */
   private isUsedAsBaseClass(className: string): boolean {
-       // コンテキストから全てのクラス定義を取得し、継承関係をチェック
+       // Get all class definitions from context and check inheritance relationships
        if (this.context && this.context.classDefinitions) {
          for (const [, classDef] of Object.entries(this.context.classDefinitions)) {
            if (classDef.bases && classDef.bases.includes(className)) {
@@ -336,7 +335,7 @@ export class DefinitionVisitor extends BaseParser {
      }
 
   /**
-   * 戻り値文があるかどうかを判定
+   * Determine if there are return statements
    */
   private hasReturnStatement(body: ASTNode[]): boolean {
     return body.some(stmt => 
@@ -346,10 +345,10 @@ export class DefinitionVisitor extends BaseParser {
   }
 
   /**
-   * 戻り値の型を推論
+   * Infer return type
    */
-  private inferReturnType(node: ASTNode, params?: ParameterInfo[]): IGCSEDataType {
-    // Python型ヒントがある場合は優先
+  private inferReturnType(node: ASTNode): IGCSEDataType {
+    // Prioritize Python type hints if available
     if (node.returns && node.returns.id) {
       switch (node.returns.id) {
         case 'int': return 'INTEGER';
@@ -360,33 +359,20 @@ export class DefinitionVisitor extends BaseParser {
       }
     }
     
-    // 関数呼び出し情報から引数の型を取得
-    const functionCallInfo = this.context.functionCalls?.get(node.name);
-    const argumentTypes = functionCallInfo?.argumentTypes || [];
+    // Get parameter type information
+    const params = this.extractParameters(node.args);
+    const paramTypes = new Map<string, IGCSEDataType>();
+    params.forEach(param => {
+      paramTypes.set(param.name, param.type);
+    });
     
-    // 簡易的な戻り値型推論（再帰的にReturn文を検索）
+    // Simple return type inference (recursively search for Return statements)
     const findReturnType = (statements: ASTNode[]): IGCSEDataType | null => {
       for (const stmt of statements) {
         if (stmt.type === 'Return' && stmt.value) {
-          // 戻り値が引数の演算の場合、関数呼び出し情報と引数の型を考慮
-          if (stmt.value.type === 'BinOp') {
-            const leftType = this.getOperandTypeWithCallInfo(stmt.value.left, params, argumentTypes);
-            const rightType = this.getOperandTypeWithCallInfo(stmt.value.right, params, argumentTypes);
-            
-            // 両方の引数が同じ型の場合、その型を返す
-            if (leftType && rightType && leftType === rightType) {
-              return leftType;
-            }
-            // 一方がINTEGERの場合、INTEGERを優先
-            if (leftType === 'INTEGER' || rightType === 'INTEGER') {
-              return 'INTEGER';
-            }
-          }
-          
-          const inferredType = this.expressionVisitor.inferTypeFromValue(stmt.value);
-          return inferredType;
+          return this.inferReturnTypeFromExpression(stmt.value, paramTypes);
         }
-        // ネストした構造（if文、for文など）も検索
+        // Also search nested structures (if statements, for loops, etc.)
         if (stmt.body && Array.isArray(stmt.body)) {
           const nestedType = findReturnType(stmt.body);
           if (nestedType) return nestedType;
@@ -400,33 +386,104 @@ export class DefinitionVisitor extends BaseParser {
     };
     
     const returnType = findReturnType(node.body);
-    return returnType || 'STRING';
+    return returnType || 'INTEGER';
   }
 
   /**
-   * 演算子のオペランドの型を取得（関数呼び出し情報を活用）
+   * Return type inference considering parameter type information
    */
-  private getOperandTypeWithCallInfo(operand: ASTNode, params?: ParameterInfo[], argumentTypes?: IGCSEDataType[]): IGCSEDataType | null {
-    if (operand.type === 'Name') {
-      // パラメータ名の場合、まず関数呼び出し情報から型を取得
-      if (params && argumentTypes) {
-        const paramIndex = params.findIndex(p => p.name === operand.id);
-        if (paramIndex >= 0 && paramIndex < argumentTypes.length) {
-          return argumentTypes[paramIndex];
+  private inferReturnTypeFromExpression(node: ASTNode, paramTypes: Map<string, IGCSEDataType>): IGCSEDataType {
+    if (!node) return 'INTEGER';
+    
+    switch (node.type) {
+      case 'Constant':
+        if (typeof node.value === 'number') {
+          return Number.isInteger(node.value) ? 'INTEGER' : 'REAL';
         }
-      }
-      
-      // 関数呼び出し情報がない場合は、パラメータの型を返す
-      if (params) {
-        const param = params.find(p => p.name === operand.id);
-        if (param) {
-          return param.type;
+        if (typeof node.value === 'string') return 'STRING';
+        if (typeof node.value === 'boolean') return 'BOOLEAN';
+        break;
+      case 'Num':
+        return Number.isInteger(node.n) ? 'INTEGER' : 'REAL';
+      case 'Str':
+        return 'STRING';
+      case 'Name':
+        // Reference parameter type
+        if (paramTypes.has(node.id)) {
+          return paramTypes.get(node.id)!;
         }
-      }
+        // Numeric literal
+        if (node.id && /^\d+$/.test(node.id)) {
+          return 'INTEGER';
+        }
+        if (node.id && /^\d+\.\d+$/.test(node.id)) {
+          return 'REAL';
+        }
+        return 'INTEGER';
+      case 'BinOp':
+        // Type inference for binary operations
+        const leftType = this.inferReturnTypeFromExpression(node.left, paramTypes);
+        const rightType = this.inferReturnTypeFromExpression(node.right, paramTypes);
+        
+        // For arithmetic operators
+        if (['Add', 'Sub', 'Mult', 'Div', 'Mod', 'Pow'].includes(node.op.type)) {
+          // String concatenation (+operator) - only for explicit string types
+          if (node.op.type === 'Add' && 
+              ((leftType === 'STRING' && this.isExplicitStringNode(node.left)) || 
+               (rightType === 'STRING' && this.isExplicitStringNode(node.right)))) {
+            return 'STRING';
+          }
+          
+          // Treat as numeric operation if numeric types are involved
+          if ((leftType === 'INTEGER' || leftType === 'REAL') || 
+              (rightType === 'INTEGER' || rightType === 'REAL')) {
+            // Division results in REAL
+            if (node.op.type === 'Div') {
+              return 'REAL';
+            }
+            // INTEGER if both are INTEGER
+            if (leftType === 'INTEGER' && rightType === 'INTEGER') {
+              return 'INTEGER';
+            }
+            // REAL if either is REAL
+            if (leftType === 'REAL' || rightType === 'REAL') {
+              return 'REAL';
+            }
+            // Default is INTEGER
+            return 'INTEGER';
+          }
+          
+          // Default arithmetic operations inferred as INTEGER
+          return 'INTEGER';
+        }
+        
+        // For comparison operators
+        if (['Eq', 'NotEq', 'Lt', 'LtE', 'Gt', 'GtE'].includes(node.op.type)) {
+          return 'BOOLEAN';
+        }
+        
+        return 'INTEGER';
     }
     
-    // その他の場合は通常の型推論
-    return this.expressionVisitor.inferTypeFromValue(operand);
+    return 'INTEGER';
+  }
+  
+  /**
+   * Check if it's an explicit string node
+   */
+  private isExplicitStringNode(node: ASTNode): boolean {
+    if (!node) return false;
+    
+    switch (node.type) {
+      case 'Constant':
+        return typeof node.value === 'string';
+      case 'Str':
+        return true;
+      case 'JoinedStr': // f-string
+        return true;
+      default:
+        return false;
+    }
   }
 
   protected override createIRNode(kind: IRKind, text: string, children: IR[] = [], meta?: IRMeta): IR {
@@ -434,12 +491,12 @@ export class DefinitionVisitor extends BaseParser {
   }
 
   /**
-   * 文字列の最初の文字を大文字にする
+   * Capitalize the first character of a string
    */
   private capitalizeFirstLetter(str: string): string {
     if (!str) return str;
     return str.charAt(0).toUpperCase() + str.slice(1);
   }
 
-  // visitNodeはプロパティとして定義済み
+  // visitNode is already defined as a property
 }

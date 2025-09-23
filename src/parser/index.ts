@@ -1,10 +1,10 @@
-// パーサーモジュールのエクスポート
+// Parser module exports
 
 export { BaseParser } from './base-parser';
 export { PythonASTVisitor } from './visitor';
 
-// メインのパーサークラス
+// Main parser classes
 export { PythonParser } from './python-parser';
 
-// パーサーファクトリー
+// Parser factory
 export { createParser } from './factory';

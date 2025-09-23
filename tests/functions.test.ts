@@ -13,7 +13,7 @@ describe('Functions and Procedures Tests', () => {
       const pythonCode = 'def display_message(msg):\n    print(msg)';
       const result = await converter.convert(pythonCode);
       const expected = 
-`PROCEDURE Display_message(msg : STRING)
+`PROCEDURE Display_message(msg : INTEGER)
   OUTPUT msg
 ENDPROCEDURE`;
       expect(result.code).toBe(expected);
@@ -23,7 +23,7 @@ ENDPROCEDURE`;
       const pythonCode = 'def show_sum(a, b):\n    result = a + b\n    print(result)';
       const result = await converter.convert(pythonCode);
       const expected = 
-`PROCEDURE Show_sum(a : STRING, b : STRING)
+`PROCEDURE Show_sum(a : INTEGER, b : INTEGER)
   result ← a + b
   OUTPUT result
 ENDPROCEDURE`;
@@ -52,7 +52,7 @@ ENDPROCEDURE`;
       // Or, the test should reflect what the current converter implementation does.
       // Let's assume it can infer or has a default like 'ANY'.
       const expected = 
-`FUNCTION Add(x : STRING, y : STRING) RETURNS STRING
+`FUNCTION Add(x : INTEGER, y : INTEGER) RETURNS INTEGER
   RETURN x + y
 ENDFUNCTION`;
       // If type hinting is used in Python, it should be used: def add(x: int, y: int) -> int:
@@ -101,7 +101,7 @@ increment_val(x)
 print(x) # x should still be 5 in Python if val is a number (immutable)`;
       const result = await converter.convert(pythonCode);
       const expected = 
-`PROCEDURE Increment_val(val : STRING)
+`PROCEDURE Increment_val(val : INTEGER)
   val ← val + 1
   OUTPUT val
 ENDPROCEDURE

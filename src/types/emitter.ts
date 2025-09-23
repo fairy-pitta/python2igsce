@@ -1,230 +1,240 @@
-// エミッター関連の型定義
+// Type definitions for emitters
 import { IR } from './ir';
 
 /**
- * エミッターの設定オプション
+ * Emitter configuration options
  */
 export interface EmitterOptions {
-  /** 出力フォーマット */
+  /** Output format */
   format: OutputFormat;
-  /** インデントサイズ */
+  /** Indent size */
   indentSize: number;
-  /** インデント文字（スペースまたはタブ） */
+  /** Indent character (space or tab) */
   indentChar: ' ' | '\t';
-  /** インデントタイプ */
+  /** Indent type */
   indentType?: 'spaces' | 'tabs';
-  /** 行末文字 */
+  /** Line ending character */
   lineEnding: '\n' | '\r\n';
-  /** 最大行長 */
+  /** Maximum line length */
   maxLineLength?: number;
-  /** コメントの出力 */
+  /** Include comments in output */
   includeComments: boolean;
-  /** 行番号の出力 */
+  /** Include line numbers in output */
   includeLineNumbers: boolean;
-  /** デバッグ情報の出力 */
+  /** Include debug information in output */
   includeDebugInfo: boolean;
-  /** 美化オプション */
+  /** Beautify options */
   beautify: boolean;
+  /** Uppercase keywords */
+  uppercaseKeywords?: boolean;
+  /** Preserve whitespace */
+  preserveWhitespace?: boolean;
 }
 
 /**
- * 出力フォーマット
+ * Output format
  */
 export type OutputFormat = 
-  | 'plain'     // プレーンテキスト
-  | 'markdown'  // Markdown形式
-  | 'html'      // HTML形式
-  | 'latex';    // LaTeX形式
+  | 'plain'     // Plain text
+  | 'markdown'  // Markdown format
+  | 'html'      // HTML format
+  | 'latex';    // LaTeX format
 
 /**
- * エミッターの結果
+ * Emitter result
  */
 export interface EmitResult {
-  /** 生成されたコード */
+  /** Generated code */
   code: string;
-  /** エラーメッセージ */
+  /** Error messages */
   errors: EmitError[];
-  /** 警告メッセージ */
+  /** Warning messages */
   warnings: EmitWarning[];
-  /** 出力統計 */
+  /** Output statistics */
   stats: EmitStats;
+  /** Success flag */
+  success: boolean;
+  /** Emit time */
+  emitTime: number;
+  /** Output code */
+  output: string;
 }
 
 /**
- * エミットエラー
+ * Emit error
  */
 export interface EmitError {
-  /** エラーメッセージ */
+  /** Error message */
   message: string;
-  /** エラーの種類 */
+  /** Error type */
   type: EmitErrorType;
-  /** 対象のIRノード */
+  /** Target IR node */
   node?: IR;
-  /** エラーの重要度 */
+  /** Error severity */
   severity: 'error' | 'warning';
 }
 
 /**
- * エミット警告
+ * Emit warning
  */
 export interface EmitWarning {
-  /** 警告メッセージ */
+  /** Warning message */
   message: string;
-  /** 警告の種類 */
+  /** Warning type */
   type: EmitWarningType;
-  /** 対象のIRノード */
+  /** Target IR node */
   node?: IR;
 }
 
 /**
- * エミットエラーの種類
+ * Emit error type
  */
 export type EmitErrorType = 
-  | 'invalid_ir'          // 無効なIR
-  | 'unsupported_node'    // サポートされていないノード
-  | 'formatting_error'    // フォーマットエラー
-  | 'output_error'        // 出力エラー
-  | 'validation_error';   // 検証エラー
+  | 'invalid_ir'          // Invalid IR
+  | 'unsupported_node'    // Unsupported node
+  | 'formatting_error'    // Formatting error
+  | 'output_error'        // Output error
+  | 'validation_error';   // Validation error
 
 /**
- * エミット警告の種類
+ * Emit warning type
  */
 export type EmitWarningType = 
-  | 'long_line'           // 長い行
-  | 'deep_nesting'        // 深いネスト
-  | 'complex_expression'  // 複雑な式
-  | 'style_issue';        // スタイルの問題
+  | 'long_line'           // Long line
+  | 'deep_nesting'        // Deep nesting
+  | 'complex_expression'  // Complex expression
+  | 'style_issue';        // Style issue
 
 /**
- * エミット統計
+ * Emit statistics
  */
 export interface EmitStats {
-  /** 出力行数 */
+  /** Number of output lines */
   linesGenerated: number;
-  /** 出力行数（テスト用エイリアス） */
+  /** Number of output lines (test alias) */
   lineCount: number;
-  /** 出力文字数 */
+  /** Number of output characters */
   charactersGenerated: number;
-  /** 出力文字数（テスト用エイリアス） */
+  /** Number of output characters (test alias) */
   characterCount: number;
-  /** 処理したIRノード数 */
+  /** Number of processed IR nodes */
   nodesProcessed: number;
-  /** エミット時間（ミリ秒） */
+  /** Emit time (milliseconds) */
   emitTime: number;
-  /** 処理時間（テスト用エイリアス） */
+  /** Processing time (test alias) */
   processingTime: number;
-  /** 最大ネスト深度 */
+  /** Maximum nesting depth */
   maxNestingDepth: number;
-  /** 最大行長 */
+  /** Maximum line length */
   maxLineLength: number;
 }
 
 /**
- * インデント情報
+ * Indent information
  */
 export interface IndentInfo {
-  /** 現在のインデントレベル */
+  /** Current indent level */
   level: number;
-  /** インデント文字列 */
+  /** Indent string */
   string: string;
-  /** 次のレベルのインデント文字列 */
+  /** Next level indent string */
   next: string;
 }
 
 /**
- * フォーマッター設定
+ * Formatter configuration
  */
 export interface FormatterConfig {
-  /** キーワードの大文字化 */
+  /** Uppercase keywords */
   uppercaseKeywords: boolean;
-  /** 演算子周りのスペース */
+  /** Space around operators */
   spaceAroundOperators: boolean;
-  /** カンマ後のスペース */
+  /** Space after comma */
   spaceAfterComma: boolean;
-  /** 括弧内のスペース */
+  /** Space inside parentheses */
   spaceInsideParentheses: boolean;
-  /** 空行の挿入 */
+  /** Insert blank lines */
   insertBlankLines: boolean;
-  /** 行の折り返し */
+  /** Wrap long lines */
   wrapLongLines: boolean;
 }
 
 /**
- * 出力コンテキスト
+ * Output context
  */
 export interface EmitContext {
-  /** 現在のインデント情報 */
+  /** Current indent information */
   indent: IndentInfo;
-  /** 出力バッファ */
+  /** Output buffer */
   output: string[];
-  /** 現在の行番号 */
+  /** Current line number */
   currentLine: number;
-  /** エラーリスト */
+  /** Error list */
   errors: EmitError[];
-  /** 警告リスト */
+  /** Warning list */
   warnings: EmitWarning[];
-  /** フォーマッター設定 */
+  /** Formatter configuration */
   formatter: FormatterConfig;
-  /** 現在処理中のIRノード */
+  /** Currently processing IR node */
   currentNode?: IR;
 }
 
 /**
- * テンプレート情報
+ * Template information
  */
 export interface Template {
-  /** テンプレート名 */
+  /** Template name */
   name: string;
-  /** テンプレート内容 */
+  /** Template content */
   content: string;
-  /** 変数プレースホルダー */
+  /** Variable placeholders */
   variables: string[];
 }
 
 /**
- * Markdown出力用の設定
+ * Markdown output configuration
  */
 export interface MarkdownConfig {
-  /** コードブロックの言語指定 */
+  /** Code block language specification */
   codeBlockLanguage: string;
-  /** 見出しレベル */
+  /** Heading level */
   headingLevel: number;
-  /** 説明文の追加 */
+  /** Include description */
   includeDescription: boolean;
-  /** 目次の生成 */
+  /** Generate table of contents */
   generateToc: boolean;
 }
 
 /**
- * HTML出力用の設定
+ * HTML output configuration
  */
 export interface HtmlConfig {
-  /** CSSクラス名のプレフィックス */
+  /** CSS class name prefix */
   cssPrefix: string;
-  /** インラインスタイルの使用 */
+  /** Use inline styles */
   useInlineStyles: boolean;
-  /** シンタックスハイライト */
+  /** Syntax highlighting */
   syntaxHighlight: boolean;
-  /** 行番号の表示 */
+  /** Show line numbers */
   showLineNumbers: boolean;
 }
 
 /**
- * LaTeX出力用の設定
+ * LaTeX output configuration
  */
 export interface LatexConfig {
-  /** パッケージリスト */
+  /** Package list */
   packages: string[];
-  /** フォント設定 */
+  /** Font configuration */
   fontFamily: string;
-  /** コードブロック環境 */
+  /** Code block environment */
   codeEnvironment: string;
-  /** 数式モード */
+  /** Math mode */
   mathMode: boolean;
 }
 
 /**
- * エミッターのヘルパー関数
+ * Emitter helper functions
  */
 export function createEmitError(
   message: string,

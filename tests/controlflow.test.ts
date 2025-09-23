@@ -118,7 +118,7 @@ ENDIF`;
       const result = converter.convert(pythonCode);
       const expected = 
 `count ← 0
-WHILE count < 5
+WHILE count < 5 DO
   OUTPUT count
   count ← count + 1
 ENDWHILE`;
@@ -172,7 +172,7 @@ while True:
 REPEAT
   OUTPUT "Guess the number: "
   INPUT guess
-  UNTIL guess = "7"`;
+UNTIL guess = "7"`;
       expect(result.code).toBe(expected);
     });
   });

@@ -1,7 +1,7 @@
 // Python to IGCSE Pseudocode Converter - Main Entry Point
 
 // Core exports
-export { Converter, convertPythonToIGCSE, convertFileToIGCSE, convertFilesToIGCSE } from './converter';
+export { convertPythonToIGCSE, Converter } from './converter';
 export { CLI } from './cli';
 
 // Legacy export for compatibility

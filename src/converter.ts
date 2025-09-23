@@ -18,7 +18,7 @@ export class Converter {
   constructor(options: Partial<ConversionOptions> = {}) {
     this.options = this.mergeDefaultOptions(options);
     
-    // パーサーの初期化
+    // Initialize parser
     const parserOptions: ParserOptions = {
       strictMode: this.options.strictMode ?? false,
       includeComments: this.options.includeComments ?? true,
@@ -28,7 +28,7 @@ export class Converter {
     };
     this.parser = new PythonParser(parserOptions);
     
-    // エミッターの初期化
+    // Initialize emitters
     const emitterOptions: EmitterOptions = {
       format: this.options.outputFormat ?? 'plain',
       indentSize: this.options.indentSize ?? 2,
@@ -50,30 +50,30 @@ export class Converter {
   }
 
   /**
-   * Python コードを IGCSE Pseudocode に変換
+   * Convert Python code to IGCSE Pseudocode
    */
   convert(pythonCode: string): ConversionResult {
     const startTime = Date.now();
     
     try {
-      // パース処理
+      // Parse process
       const parseResult = this.parser.parse(pythonCode);
       
-      if (parseResult.errors.length > 0 && this.options.strictMode) {
+      if (parseResult.errors.length > 0) {
         return this.createErrorResult(
-          'Parse errors occurred in strict mode',
+          'Parse errors occurred',
           parseResult.errors,
           parseResult.warnings,
           startTime
         );
       }
       
-      // エミット処理
+      // Emit process
       const emitter = this.options.outputFormat === 'markdown' 
         ? this.markdownEmitter 
         : this.textEmitter;
       
-      // すべてのIRノードを処理するため、compound IRを作成
+      // Create compound IR to process all IR nodes
       const compoundIR: IR = {
         kind: 'compound',
         text: '',
@@ -82,7 +82,7 @@ export class Converter {
       
       const emitResult = emitter.emit(compoundIR);
       
-      // 結果の作成
+      // Create result
       const endTime = Date.now();
       const stats = this.createConversionStats(
         parseResult,
@@ -97,7 +97,8 @@ export class Converter {
         emitResult,
         stats,
         ast: parseResult.ir,
-        ir: Array.isArray(parseResult.ir) ? parseResult.ir : [parseResult.ir]
+        ir: Array.isArray(parseResult.ir) ? parseResult.ir : [parseResult.ir],
+        success: parseResult.success && emitResult.success
       };
       return result;
       
@@ -113,17 +114,17 @@ export class Converter {
   }
 
   /**
-   * バッチ変換（複数ファイル）
+   * Batch conversion (multiple files)
    */
-  async convertBatch(files: Array<{ name: string; content: string }>): Promise<Array<{
+  convertBatch(files: Array<{ name: string; content: string }>): Array<{
     name: string;
     result: ConversionResult;
-  }>> {
+  }> {
     const results: Array<{ name: string; result: ConversionResult }> = [];
     
     for (const file of files) {
       try {
-        const result = await this.convert(file.content);
+        const result = this.convert(file.content);
         results.push({ name: file.name, result });
       } catch (error) {
         const errorResult: ConversionResult = {
@@ -145,7 +146,9 @@ export class Converter {
                functionsFound: 0,
                classesFound: 0,
                variablesFound: 0
-             }
+             },
+            success: false,
+            parseTime: 0
           },
           emitResult: {
             code: '',
@@ -161,7 +164,10 @@ export class Converter {
               processingTime: 0,
               maxNestingDepth: 0,
               maxLineLength: 0
-            }
+            },
+            success: false,
+            emitTime: 0,
+            output: ''
           },
           stats: {
             parseTime: 0,
@@ -170,8 +176,10 @@ export class Converter {
             inputLines: 0,
             outputLines: 0,
             errorCount: 1,
-            warningCount: 0
-          }
+            warningCount: 0,
+            totalTime: 0
+          },
+          success: false
         };
         results.push({ name: file.name, result: errorResult });
       }
@@ -181,14 +189,14 @@ export class Converter {
   }
 
   /**
-   * 変換オプションの更新
+   * Update conversion options
    */
   updateOptions(newOptions: Partial<ConversionOptions>): void {
     this.options = this.mergeDefaultOptions({ ...this.options, ...newOptions });
     
-    // パーサーオプションの更新（必要に応じて実装）
+    // Update parser options (implement as needed)
     
-    // エミッターオプションの更新
+    // Update emitter options
     const emitterOptions: EmitterOptions = {
       format: this.options.outputFormat ?? 'plain',
       indentSize: this.options.indentSize ?? 2,
@@ -207,14 +215,14 @@ export class Converter {
   }
 
   /**
-   * 現在のオプションを取得
+   * Get current options
    */
   getOptions(): ConversionOptions {
     return { ...this.options };
   }
 
   /**
-   * 変換統計の取得
+   * Get conversion statistics
    */
   getStats(): {
     totalConversions: number;
@@ -223,8 +231,8 @@ export class Converter {
     averageEmitTime: number;
     averageTotalTime: number;
   } {
-    // 実装では統計を追跡する必要がある
-    // 現在は仮の値を返す
+    // Implementation should track statistics
+    // Currently returns dummy values
     return {
       totalConversions: 0,
       successfulConversions: 0,
@@ -235,7 +243,7 @@ export class Converter {
   }
 
   /**
-   * IRの検証
+   * Validate IR
    */
   validateIR(ir: IR): {
     isValid: boolean;
@@ -245,7 +253,7 @@ export class Converter {
     const errors: string[] = [];
     const warnings: string[] = [];
     
-    // 基本的な検証
+    // Basic validation
     if (!ir.kind) {
       errors.push('IR node missing kind property');
     }
@@ -256,7 +264,7 @@ export class Converter {
     
 
     
-    // 再帰的な検証
+    // Recursive validation
     for (const child of ir.children || []) {
       const childValidation = this.validateIR(child);
       errors.push(...childValidation.errors);
@@ -271,7 +279,7 @@ export class Converter {
   }
 
   /**
-   * デフォルトオプションとのマージ
+   * Merge with default options
    */
   private mergeDefaultOptions(options: Partial<ConversionOptions>): ConversionOptions {
     const defaults: ConversionOptions = {
@@ -296,7 +304,7 @@ export class Converter {
   }
 
   /**
-   * エラー結果の作成
+   * Create error result
    */
   private createErrorResult(
     message: string,
@@ -327,7 +335,9 @@ export class Converter {
           functionsFound: 0,
           classesFound: 0,
           variablesFound: 0
-        }
+        },
+        success: false,
+        parseTime: 0
       },
       emitResult: {
          code: '',
@@ -343,7 +353,10 @@ export class Converter {
             processingTime: 0,
             maxNestingDepth: 0,
             maxLineLength: 0
-          }
+          },
+         success: false,
+         emitTime: 0,
+         output: ''
        },
       stats: {
         parseTime: 0,
@@ -352,14 +365,16 @@ export class Converter {
         inputLines: 0,
         outputLines: 0,
         errorCount: parseErrors.length + 1,
-        warningCount: parseWarnings.length
+        warningCount: parseWarnings.length,
+        totalTime: endTime - startTime
       },
+      success: false,
       ast: undefined
     };
   }
 
   /**
-   * 変換統計の作成
+   * Create conversion statistics
    */
   private createConversionStats(
     parseResult: ParseResult,
@@ -374,13 +389,14 @@ export class Converter {
       inputLines: parseResult.stats.linesProcessed,
       outputLines: emitResult.stats.linesGenerated,
       errorCount: parseResult.errors.length,
-      warningCount: parseResult.warnings.length
+      warningCount: parseResult.warnings.length,
+      totalTime: endTime - startTime
     };
   }
 }
 
 /**
- * 便利な関数：簡単な変換
+ * Utility function: Simple conversion
  */
 export async function convertPythonToIGCSE(
   pythonCode: string,
@@ -391,33 +407,10 @@ export async function convertPythonToIGCSE(
 }
 
 /**
- * 便利な関数：ファイルからの変換
+ * Utility function: Convert from file
  */
-export async function convertFileToIGCSE(
-  filePath: string,
-  options: Partial<ConversionOptions> = {}
-): Promise<ConversionResult> {
-  const fs = await import('fs/promises');
-  const pythonCode = await fs.readFile(filePath, 'utf-8');
-  return convertPythonToIGCSE(pythonCode, options);
-}
+// File conversion functions are available in converter-node.ts for Node.js environments
 
 /**
- * 便利な関数：複数ファイルの変換
+ * Utility function: Convert multiple files
  */
-export async function convertFilesToIGCSE(
-  filePaths: string[],
-  options: Partial<ConversionOptions> = {}
-): Promise<Array<{ name: string; result: ConversionResult }>> {
-  const converter = new Converter(options);
-  const fs = await import('fs/promises');
-  
-  const files = await Promise.all(
-    filePaths.map(async (filePath) => {
-      const content = await fs.readFile(filePath, 'utf-8');
-      return { name: filePath, content };
-    })
-  );
-  
-  return converter.convertBatch(files);
-}

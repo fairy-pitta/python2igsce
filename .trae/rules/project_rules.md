@@ -1,158 +1,158 @@
-# Python → IGCSE Pseudocode 変換ライブラリ - プロジェクト現状
+# Python → IGCSE Pseudocode Conversion Library - Project Status
 
-## 📊 現在の状況 (2024年12月)
+## 📊 Current Status (December 2024)
 
-### ✅ 完了済み項目
+### ✅ Completed Items
 
-#### 基盤構造
-- **TypeScript設定**: 完全に設定済み、コンパイルエラーなし
-- **プロジェクト構造**: 適切なディレクトリ構成が確立
-- **依存関係**: 必要なパッケージがインストール済み
-- **型定義**: 基本的なIR、IGCSE、パーサー、エミッター型が定義済み
+#### Foundation Structure
+- **TypeScript Configuration**: Fully configured, no compilation errors
+- **Project Structure**: Proper directory structure established
+- **Dependencies**: Required packages installed
+- **Type Definitions**: Basic IR, IGCSE, parser, and emitter types defined
 
-#### 実装済みコンポーネント
-- **src/types/**: 完全実装
-  - `ir.ts` - IR構造とユーティリティ関数
-  - `igcse.ts` - IGCSE Pseudocode型定義
-  - `parser.ts` - パーサー関連型
-  - `emitter.ts` - エミッター関連型
-  - `index.ts` - 統合型定義
+#### Implemented Components
+- **src/types/**: Fully implemented
+- `ir.ts` - IR structure and utility functions
+- `igcse.ts` - IGCSE Pseudocode type definitions
+- `parser.ts` - Parser-related types
+- `emitter.ts` - Emitter-related types
+- `index.ts` - Integrated type definitions
 
-- **src/parser/**: 基本構造実装済み
-  - `base-parser.ts` - 抽象パーサークラス
-  - `python-parser.ts` - Pythonパーサーメイン
-  - `visitor.ts` - ASTビジター
-  - `statement-visitor.ts` - 文ビジター
-  - `expression-visitor.ts` - 式ビジター
-  - `definition-visitor.ts` - 定義ビジター
-  - `factory.ts` - パーサーファクトリー
+- **src/parser/**: Basic structure implemented
+- `base-parser.ts` - Abstract parser class
+- `python-parser.ts` - Python parser main
+- `visitor.ts` - AST visitor
+- `statement-visitor.ts` - Statement visitor
+- `expression-visitor.ts` - Expression visitor
+- `definition-visitor.ts` - Definition visitor
+- `factory.ts` - Parser factory
 
-- **src/emitter/**: 基本構造実装済み
-  - `base-emitter.ts` - 抽象エミッタークラス
-  - `text-emitter.ts` - テキスト出力
-  - `markdown-emitter.ts` - Markdown出力
-  - `factory.ts` - エミッターファクトリー
-  - `utils.ts` - ユーティリティ
+- **src/emitter/**: Basic structure implemented
+- `base-emitter.ts` - Abstract emitter class
+- `text-emitter.ts` - Text output
+- `markdown-emitter.ts` - Markdown output
+- `factory.ts` - Emitter factory
+- `utils.ts` - Utilities
 
-- **src/**: メインファイル
-  - `converter.ts` - メイン変換クラス
-  - `index.ts` - 公開API
-  - `cli.ts` - コマンドラインインターフェース
+- **src/**: Main files
+- `converter.ts` - Main conversion class
+- `index.ts` - Public API
+- `cli.ts` - Command line interface
 
-### ⚠️ 現在の課題
+### ⚠️ Current Issues
 
-#### テスト状況
-- **総テスト数**: 122テスト (10ファイル)
-- **通過**: 56テスト
-- **失敗**: 61テスト
-- **スキップ**: 5テスト
-- **通過率**: 約46%
+#### Test Status
+- **Total Tests**: 122 tests (10 files)
+- **Passed**: 56 tests
+- **Failed**: 61 tests
+- **Skipped**: 5 tests
+- **Pass Rate**: Approximately 46%
 
-### ⚠️ 現在の課題
+### ⚠️ Current Issues
 
-#### 最近の改善
-- **IF文制御構造**: 大幅に改善済み
-  - 単純なIF文、IF-ELSE文、IF-ELIF-ELSE文のサポート完了
-  - ELSE文の適切な認識とインデント調整
-  - 式解析での単語境界問題（"score"→"sc OR e"）を修正
-  - `text-emitter.ts`と`visitor.ts`でのELSE文処理改善
+#### Recent Improvements
+- **IF Statement Control Structure**: Significantly improved
+- Support for simple IF, IF-ELSE, and IF-ELIF-ELSE statements completed
+- Proper recognition and indentation adjustment for ELSE statements
+- Fixed word boundary issues in expression parsing ("score"→"sc OR e")
+- Improved ELSE statement handling in `text-emitter.ts` and `visitor.ts`
 
-#### 主な残存課題
-1. **ネストされたIF文**: テスト期待値の構造的問題
-2. **未実装機能**: 一部のPython構文がまだ"Unsupported node type"エラー
-3. **パーサー実装**: より複雑な構文への対応が必要
-4. **エミッター実装**: 高度なフォーマッティングの改善
+#### Main Remaining Issues
+1. **Nested IF Statements**: Structural issues with test expected values
+2. **Unimplemented Features**: Some Python syntax still causes "Unsupported node type" errors
+3. **Parser Implementation**: Need support for more complex syntax
+4. **Emitter Implementation**: Advanced formatting improvements needed
 
-### 🎯 次の実装優先度
+### 🎯 Next Implementation Priorities
 
-#### 高優先度 (即座に対応)
-1. **制御構造の完成**
-   - ネストされたIF文のテスト期待値修正
-   - ループ文 (for/while → FOR/WHILE)
-   - 複雑な条件式のサポート
+#### High Priority (Immediate Response)
+1. **Control Structure Completion**
+   - Fix test expected values for nested IF statements
+   - Loop statements (for/while → FOR/WHILE)
+   - Support for complex conditional expressions
 
-2. **基本構文の強化**
-   - 代入文 (assign) の改善
-   - 出力文 (print → OUTPUT) の完成
+2. **Basic Syntax Enhancement**
+   - Improvement of assignment statements (assign)
+   - Completion of output statements (print → OUTPUT)
 
-2. **パーサー実装**
-   - `visitor.ts`の各visit*メソッドの実装
-   - Python AST → IR変換ロジック
+2. **Parser Implementation**
+   - Implementation of each visit* method in `visitor.ts`
+   - Python AST → IR conversion logic
 
-3. **エミッター実装**
-   - IR → IGCSE Pseudocode変換
-   - 適切なフォーマッティング
+3. **Emitter Implementation**
+   - IR → IGCSE Pseudocode conversion
+   - Proper formatting
 
-#### 中優先度
-4. **関数・プロシージャ**
-   - 関数定義の変換
-   - 戻り値の有無による PROCEDURE/FUNCTION 判定
+#### Medium Priority
+4. **Functions & Procedures**
+   - Function definition conversion
+   - PROCEDURE/FUNCTION determination based on return value presence
 
-5. **データ構造**
-   - 配列・リストの処理
-   - 辞書・オブジェクトの処理
+5. **Data Structures**
+   - Array and list processing
+   - Dictionary and object processing
 
-#### 低優先度
-6. **高度な機能**
-   - クラス定義
-   - 例外処理
-   - 複雑な制御構造
+#### Low Priority
+6. **Advanced Features**
+   - Class definitions
+   - Exception handling
+   - Complex control structures
 
-### 📁 ディレクトリ構成
+### 📁 Directory Structure
 
 ```
-python2ibcsg/
-├── .trae/rules/project_rules.md    # このファイル
+python2igsce/
+├── .trae/rules/project_rules.md    # This file
 ├── src/
-│   ├── types/                      # ✅ 型定義完了
-│   ├── parser/                     # 🔄 基本構造のみ
-│   ├── emitter/                    # 🔄 基本構造のみ
-│   ├── converter.ts                # 🔄 統合クラス
-│   ├── index.ts                    # ✅ 公開API
+│   ├── types/                      # ✅ Type definitions completed
+│   ├── parser/                     # 🔄 Basic structure only
+│   ├── emitter/                    # 🔄 Basic structure only
+│   ├── converter.ts                # 🔄 Integration class
+│   ├── index.ts                    # ✅ Public API
 │   └── cli.ts                      # ✅ CLI
-├── tests/                          # ❌ 大部分が失敗
-├── docs/                           # ✅ ドキュメント
-└── package.json                    # ✅ 設定完了
+├── tests/                          # ❌ Most tests failing
+├── docs/                           # ✅ Documentation
+└── package.json                    # ✅ Configuration completed
 ```
 
-### 🔧 開発環境
+### 🔧 Development Environment
 
-- **TypeScript**: 正常にコンパイル可能
-- **テストフレームワーク**: Vitest
-- **リンター**: ESLint
-- **フォーマッター**: Prettier
-- **ビルドシステム**: TypeScript Compiler
+- **TypeScript**: Can compile successfully
+- **Test Framework**: Vitest
+- **Linter**: ESLint
+- **Formatter**: Prettier
+- **Build System**: TypeScript Compiler
 
-### 📋 開発ルール
+### 📋 Development Rules
 
-- **テスト**: ウォッチモード禁止、単体テスト推奨
-- **コミット**: 英語でのコミットメッセージ
-- **実装方針**: テストを実際の値に合わせて修正することは禁止
+- **Testing**: Watch mode prohibited, unit tests recommended
+- **Commits**: English commit messages
+- **Implementation Policy**: Modifying tests to match actual values is prohibited
 
-### 🎯 次のステップ
+### 🎯 Next Steps
 
-1. **基本構文の実装** (Week 1)
-   - 代入、出力、条件文、ループの最小実装
-   - 対応するテストの通過を目指す
+1. **Basic Syntax Implementation** (Week 1)
+   - Minimal implementation of assignment, output, conditional, and loop statements
+   - Aim to pass corresponding tests
 
-2. **パーサー強化** (Week 2)
-   - より多くのPython構文への対応
-   - エラーハンドリングの改善
+2. **Parser Enhancement** (Week 2)
+   - Support for more Python syntax
+   - Improved error handling
 
-3. **エミッター改善** (Week 3)
-   - フォーマッティングの向上
-   - IGCSE標準への準拠
+3. **Emitter Improvement** (Week 3)
+   - Enhanced formatting
+   - Compliance with IGCSE standards
 
-4. **統合テスト** (Week 4)
-   - E2Eテストの実装
-   - 実際のPythonコードでの検証
+4. **Integration Testing** (Week 4)
+   - E2E test implementation
+   - Verification with actual Python code
 
-### 📈 成功指標
+### 📈 Success Metrics
 
-- **短期目標**: テスト通過率50%以上 ✅ (現在46%、ほぼ達成)
-- **中期目標**: 基本構文の完全サポート 🔄 (IF文は完了)
-- **長期目標**: 実用的なPython→IGCSE変換の実現
+- **Short-term Goal**: Test pass rate 50% or higher ✅ (Currently 46%, almost achieved)
+- **Medium-term Goal**: Complete support for basic syntax 🔄 (IF statements completed)
+- **Long-term Goal**: Practical Python→IGCSE conversion implementation
 
 ---
 
-*最終更新: 2024年12月*
+*Last updated: December 2024*

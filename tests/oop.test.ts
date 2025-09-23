@@ -30,7 +30,7 @@ describe('Object-Oriented Programming (OOP) Tests', () => {
     OUTPUT "Generic animal sound"
   ENDPROCEDURE
 ENDCLASS`;
-      // 現在の実装では基本的なクラス定義のみサポート
+      // Current implementation only supports basic class definitions
       expect(result.code).toContain('CLASS Animal');
       expect(result.code).toContain('ENDCLASS');
     });
@@ -46,7 +46,7 @@ ENDCLASS`;
     def area(self):
         return Circle.pi * self.radius * self.radius`;
       const result = await converter.convert(pythonCode);
-      // 現在の実装では基本的なクラス定義のみサポート
+      // Current implementation only supports basic class definitions
       expect(result.code).toContain('CLASS Circle');
       expect(result.code).toContain('ENDCLASS');
     });
@@ -66,7 +66,7 @@ class Dog(Animal):
     def speak(self):
         print(self.name + " says Woof!")`;
       const result = await converter.convert(pythonCode);
-      // 現在の実装では基本的なクラス定義のみサポート
+      // Current implementation only supports basic class definitions
       expect(result.code).toContain('CLASS Animal');
       expect(result.code).toContain('ENDCLASS');
       expect(result.code).toContain('CLASS Dog');
@@ -84,7 +84,7 @@ class Child(Parent):
         super().__init__(val)
         self.extra_val = extra`;
       const result = await converter.convert(pythonCode);
-      // 現在の実装では基本的なクラス定義のみサポート
+      // Current implementation only supports basic class definitions
       expect(result.code).toContain('CLASS Parent');
       expect(result.code).toContain('ENDCLASS');
       expect(result.code).toContain('CLASS Child');
@@ -104,7 +104,7 @@ class Child(Parent):
 
 my_greeter = Greeter("Hello IGCSE")`;
       const result = await converter.convert(pythonCode);
-      // 現在の実装では基本的なクラス定義のみサポート
+      // Current implementation only supports basic class definitions
       expect(result.code).toContain('CLASS Greeter');
       expect(result.code).toContain('ENDCLASS');
     });
@@ -124,7 +124,7 @@ class Greeter:
 my_greeter = Greeter("Test")
 my_greeter.greet()`;
       const result = await converter.convert(pythonCode);
-      // 現在の実装では基本的なクラス定義のみサポート
+      // Current implementation only supports basic class definitions
       expect(result.code).toContain('CLASS Greeter');
       expect(result.code).toContain('ENDCLASS');
     });
@@ -137,7 +137,7 @@ my_greeter.greet()`;
 calc = Calculator()
 sum_val = calc.add(5, 7)`;
       const result = await converter.convert(pythonCode);
-      // 現在の実装では基本的なクラス定義のみサポート
+      // Current implementation only supports basic class definitions
       expect(result.code).toContain('CLASS Calculator');
       expect(result.code).toContain('ENDCLASS');
     });

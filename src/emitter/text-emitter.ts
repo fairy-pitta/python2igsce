@@ -1,4 +1,4 @@
-// テキストエミッター（プレーンテキスト出力）
+// Text emitter (plain text output)
 import { IR } from '../types/ir';
 import { EmitResult, EmitterOptions } from '../types/emitter';
 import { BaseEmitter } from './base-emitter';
@@ -16,7 +16,7 @@ export class TextEmitter extends BaseEmitter {
   /**
    * IRをプレーンテキストに変換
    */
-  emit(ir: IR | IR[]): EmitResult {
+  emit(ir: IR): EmitResult {
     this.startEmitting();
     this.resetContext();
     this.nodesProcessed = 0;
@@ -24,14 +24,7 @@ export class TextEmitter extends BaseEmitter {
     this.debug('Starting text emission...');
     
     try {
-      // IRが配列の場合は各要素を処理
-      if (Array.isArray(ir)) {
-        for (const node of ir) {
-          this.emitNode(node);
-        }
-      } else {
-        this.emitNode(ir);
-      }
+      this.emitNode(ir);
       
       const result = this.createEmitResult();
       result.stats.nodesProcessed = this.nodesProcessed;
@@ -164,7 +157,7 @@ export class TextEmitter extends BaseEmitter {
         break;
         
       default:
-        // 未知のノードタイプの場合、テキストをそのまま出力
+        // For unknown node types, output text as is
         if (node.text) {
           this.emitLine(this.formatText(node.text));
         }
@@ -198,16 +191,15 @@ export class TextEmitter extends BaseEmitter {
     if (node.meta?.arguments) {
       const formattedArgs = node.meta.arguments.map(arg => {
         if (arg.type === 'literal') {
-          // 文字列リテラルはそのまま出力（整形しない）
+          // Output string literals as is (no formatting)
           return arg.value;
         } else {
           // 変数や式は通常通り整形
           return this.formatText(arg.value);
         }
-      }).join(', '); // エミッター側で安全にスペースを追加
+      }).join(', '); // Safely add spaces on emitter side
       
       const outputText = `OUTPUT ${formattedArgs}`;
-      // OUTPUT文は直接出力（formatTextを通さない）
       this.emitLine(outputText);
     } else {
       // 従来の処理（後方互換性）
@@ -245,7 +237,7 @@ export class TextEmitter extends BaseEmitter {
       // ELSE側（alternate）の出力
       if (node.meta?.alternate && node.meta.alternate.length > 0) {
         for (const altStmt of node.meta.alternate) {
-          // ELSE IF文の場合はインデントを調整しない
+          // Don't adjust indent for ELSE IF statements
           if (altStmt.text.startsWith('ELSE IF')) {
             this.emitNode(altStmt);
           } else {
@@ -261,7 +253,7 @@ export class TextEmitter extends BaseEmitter {
       this.decreaseIndent();
     }
     
-    // ENDIFの出力（ELSE IF文の場合は出力しない）
+    // Output ENDIF (don't output for ELSE IF statements)
     if (!node.text.startsWith('ELSE IF')) {
       this.emitLine('ENDIF');
     }
@@ -272,7 +264,7 @@ export class TextEmitter extends BaseEmitter {
    * 構造化されたconsequentフィールドを使用
    */
   private emitElse(node: IR): void {
-    // ELSEはIF文と同じレベルなので、現在のインデントを一時的に減らす
+    // ELSE is at same level as IF, so temporarily reduce current indent
     this.decreaseIndent();
     const text = this.formatText(node.text);
     this.emitLine(text);
@@ -293,7 +285,7 @@ export class TextEmitter extends BaseEmitter {
    * ELSE IF文の出力
    */
   private emitElseIf(node: IR): void {
-    // ELSE IFはIF文と同じレベルなので、現在のインデントを一時的に減らす
+    // ELSE IF is at same level as IF, so temporarily reduce current indent
     this.decreaseIndent();
     const text = this.formatText(node.text);
     this.emitLine(text);
@@ -318,7 +310,7 @@ export class TextEmitter extends BaseEmitter {
     this.emitLine(text);
     
     this.increaseIndent();
-    // 子ノードを処理するが、NEXT文は元のインデントレベルで出力
+    // Process child nodes, but output NEXT at original indent level
     for (const child of node.children) {
       if (child.kind === 'statement' && child.text.trim().startsWith('NEXT')) {
         this.decreaseIndent();
@@ -339,7 +331,7 @@ export class TextEmitter extends BaseEmitter {
     this.emitLine(text);
     
     this.increaseIndent();
-    // 子ノードを処理するが、ENDWHILEは元のインデントレベルで出力
+    // Process child nodes, but output ENDWHILE at original indent level
     for (const child of node.children) {
       if (child.kind === 'endwhile') {
         this.decreaseIndent();
@@ -369,7 +361,16 @@ export class TextEmitter extends BaseEmitter {
     this.emitLine(text);
     
     this.increaseIndent();
-    this.emitChildren(node);
+    // Process child nodes, but output UNTIL at original indent level
+    for (const child of node.children) {
+      if (child.kind === 'until') {
+        this.decreaseIndent();
+        this.emitNode(child);
+        this.increaseIndent();
+      } else {
+        this.emitNode(child);
+      }
+    }
     this.decreaseIndent();
   }
 
@@ -394,12 +395,12 @@ export class TextEmitter extends BaseEmitter {
     this.emitLine(text);
     
     this.increaseIndent();
-    // 子ノードを処理するが、ENDPROCEDURE/ENDFUNCTIONは元のインデントレベルで出力
+    // Process child nodes, but output ENDPROCEDURE/ENDFUNCTION at original indent level
     for (const child of node.children) {
       if (child.kind === 'statement' && (child.text.trim() === 'ENDPROCEDURE' || child.text.trim() === 'ENDFUNCTION')) {
         this.decreaseIndent();
         this.emitNode(child);
-        return; // ENDPROCEDUREを出力したら終了
+        return; // Exit after outputting ENDPROCEDURE
       } else {
         this.emitNode(child);
       }
@@ -423,12 +424,12 @@ export class TextEmitter extends BaseEmitter {
     this.emitLine(text);
     
     this.increaseIndent();
-    // 子ノードを処理するが、ENDPROCEDURE/ENDFUNCTIONは元のインデントレベルで出力
+    // Process child nodes, but output ENDPROCEDURE/ENDFUNCTION at original indent level
     for (const child of node.children) {
       if (child.kind === 'statement' && (child.text.trim() === 'ENDPROCEDURE' || child.text.trim() === 'ENDFUNCTION')) {
         this.decreaseIndent();
         this.emitNode(child);
-        return; // ENDFUNCTIONを出力したら終了
+        return; // Exit after outputting ENDFUNCTION
       } else {
         this.emitNode(child);
       }
@@ -444,7 +445,7 @@ export class TextEmitter extends BaseEmitter {
    * RETURN文の出力
    */
   private emitReturn(node: IR): void {
-    // RETURN文は引用符で囲まずに直接出力（formatTextを使わない）
+    // Output RETURN statement directly without quotes (don't use formatText)
     this.emitLine(node.text);
     this.emitChildren(node);
   }
@@ -509,16 +510,7 @@ export class TextEmitter extends BaseEmitter {
     this.emitLine(text);
     
     this.increaseIndent();
-    // 子ノードを処理するが、ENDCASEは元のインデントレベルで出力
-    for (const child of node.children) {
-      if (child.kind === 'statement' && child.text.trim() === 'ENDCASE') {
-        this.decreaseIndent();
-        this.emitNode(child);
-        this.increaseIndent();
-      } else {
-        this.emitNode(child);
-      }
-    }
+    this.emitChildren(node);
     this.decreaseIndent();
   }
 
@@ -563,7 +555,7 @@ export class TextEmitter extends BaseEmitter {
         this.emitLine(text);
       }
     } else {
-      // テキストが空の場合のみ子ノードを処理
+      // Process child nodes only when text is empty
       this.emitChildren(node);
     }
   }

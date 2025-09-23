@@ -1,269 +1,261 @@
-// パーサー関連の型定義
+// Parser-related type definitions
 import { IR } from './ir';
 import { IGCSEDataType } from './igcse';
 
 /**
- * パーサーの設定オプション
+ * Parser configuration options
  */
 export interface ParserOptions {
-  /** デバッグモードの有効化 */
+  /** Enable debug mode */
   debug?: boolean;
-  /** 厳密な型チェック */
+  /** Strict type checking */
   strictTypes?: boolean;
-  /** 厳密モード */
+  /** Strict mode */
   strictMode?: boolean;
-  /** コメントの保持 */
+  /** Preserve comments */
   preserveComments?: boolean;
-  /** コメントを含める */
+  /** Include comments */
   includeComments?: boolean;
-  /** 空白の保持 */
+  /** Preserve whitespace */
   preserveWhitespace?: boolean;
-  /** インデントサイズ */
+  /** Indent size */
   indentSize?: number;
-  /** 最大ネスト深度 */
+  /** Maximum nesting depth */
   maxDepth?: number;
-  /** 最大エラー数 */
+  /** Maximum nesting depth */
+  maxNestingDepth?: number;
+  /** Maximum number of errors */
   maxErrors?: number;
-  /** タイムアウト（ミリ秒） */
+  /** Timeout (milliseconds) */
   timeout?: number;
+  /** Allow experimental syntax */
+  allowExperimentalSyntax?: boolean;
 }
 
 /**
- * パーサーの結果
+ * Parser result
  */
 export interface ParseResult {
-  /** 生成されたIR */
+  /** Generated IR */
   ir: IR[];
-  /** エラーメッセージ */
+  /** Error messages */
   errors: ParseError[];
-  /** 警告メッセージ */
+  /** Warning messages */
   warnings: ParseWarning[];
-  /** パーサーコンテキスト */
-  context?: ParserContext;
-  /** パース統計 */
+  /** Parse statistics */
   stats: ParseStats;
+  /** Success flag */
+  success: boolean;
+  /** Parse time */
+  parseTime: number;
 }
 
 /**
- * パースエラー
+ * Parse error
  */
 export interface ParseError {
-  /** エラーメッセージ */
+  /** Error message */
   message: string;
-  /** エラーの種類 */
+  /** Error type */
   type: ParseErrorType;
-  /** 行番号 */
+  /** Line number */
   line?: number;
-  /** 列番号 */
+  /** Column number */
   column?: number;
-  /** エラーの重要度 */
+  /** Error severity */
   severity: 'error' | 'warning';
 }
 
 /**
- * パース警告
+ * Parse warning
  */
 export interface ParseWarning {
-  /** 警告メッセージ */
+  /** Warning message */
   message: string;
-  /** 警告の種類 */
+  /** Warning type */
   type: ParseWarningType;
-  /** 行番号 */
+  /** Line number */
   line?: number;
-  /** 列番号 */
+  /** Column number */
   column?: number;
 }
 
 /**
- * パースエラーの種類
+ * Parse error types
  */
 export type ParseErrorType = 
-  | 'syntax_error'        // 構文エラー
-  | 'type_error'          // 型エラー
-  | 'name_error'          // 名前エラー
-  | 'unsupported_feature' // サポートされていない機能
-  | 'conversion_error'    // 変換エラー
-  | 'validation_error';   // 検証エラー
+  | 'syntax_error'        // Syntax error
+  | 'type_error'          // Type error
+  | 'name_error'          // Name error
+  | 'unsupported_feature' // Unsupported feature
+  | 'conversion_error'    // Conversion error
+  | 'validation_error';   // Validation error
 
 /**
- * パース警告の種類
+ * Parse warning types
  */
 export type ParseWarningType = 
-  | 'type_inference'      // 型推論
-  | 'implicit_conversion' // 暗黙的変換
-  | 'deprecated_syntax'   // 非推奨構文
-  | 'performance_hint'    // パフォーマンスヒント
-  | 'style_suggestion';   // スタイル提案
+  | 'type_inference'      // Type inference
+  | 'implicit_conversion' // Implicit conversion
+  | 'deprecated_syntax'   // Deprecated syntax
+  | 'performance_hint'    // Performance hint
+  | 'style_suggestion';   // Style suggestion
 
 /**
- * パース統計
+ * Parse statistics
  */
 export interface ParseStats {
-  /** 処理した行数 */
+  /** Number of lines processed */
   linesProcessed: number;
-  /** 生成されたIRノード数 */
+  /** Number of generated IR nodes */
   nodesGenerated: number;
-  /** パース時間（ミリ秒） */
+  /** Parse time (milliseconds) */
   parseTime: number;
-  /** 検出された関数数 */
+  /** Number of functions detected */
   functionsFound: number;
-  /** 検出されたクラス数 */
+  /** Number of classes detected */
   classesFound: number;
-  /** 検出された変数数 */
+  /** Number of variables detected */
   variablesFound: number;
 }
 
 /**
- * 変数情報
+ * Variable information
  */
 export interface VariableInfo {
-  /** 変数名 */
+  /** Variable name */
   name: string;
-  /** データ型 */
+  /** Data type */
   type: IGCSEDataType;
-  /** スコープ */
+  /** Scope */
   scope: string;
-  /** 初期化済みかどうか */
+  /** Whether initialized */
   initialized: boolean;
-  /** 定義された行番号 */
+  /** Line number where defined */
   definedAt?: number | undefined;
 }
 
 /**
- * 関数情報
+ * Function information
  */
 export interface FunctionInfo {
-  /** 関数名 */
+  /** Function name */
   name: string;
-  /** パラメータリスト */
+  /** Parameter list */
   parameters: ParameterInfo[];
-  /** 戻り値の型 */
+  /** Return type */
   returnType?: IGCSEDataType | undefined;
-  /** 関数かプロシージャか */
+  /** Function or procedure */
   isFunction: boolean;
-  /** 戻り値があるか */
+  /** Has return value */
   hasReturn: boolean;
-  /** 定義された行番号 */
+  /** Line number where defined */
   definedAt?: number | undefined;
 }
 
 /**
- * 関数呼び出し情報
- */
-export interface FunctionCallInfo {
-  /** 関数名 */
-  name: string;
-  /** 引数の型リスト */
-  argumentTypes: IGCSEDataType[];
-  /** 呼び出し回数 */
-  callCount: number;
-}
-
-/**
- * パラメータ情報
+ * Parameter information
  */
 export interface ParameterInfo {
-  /** パラメータ名 */
+  /** Parameter name */
   name: string;
-  /** データ型 */
+  /** Data type */
   type: IGCSEDataType;
-  /** デフォルト値 */
+  /** Default value */
   defaultValue?: string;
-  /** 参照渡しかどうか */
+  /** Whether passed by reference */
   byReference?: boolean;
 }
 
 /**
- * スコープ情報
+ * Scope information
  */
 export interface ScopeInfo {
-  /** スコープ名 */
+  /** Scope name */
   name: string;
-  /** 親スコープ */
+  /** Parent scope */
   parent?: ScopeInfo;
-  /** 変数リスト */
+  /** Variable list */
   variables: Map<string, VariableInfo>;
-  /** 関数リスト */
+  /** Function list */
   functions: Map<string, FunctionInfo>;
-  /** スコープの種類 */
+  /** Scope type */
   type: ScopeType;
 }
 
 /**
- * スコープの種類
+ * Scope types
  */
 export type ScopeType = 
-  | 'global'     // グローバルスコープ
-  | 'function'   // 関数スコープ
-  | 'class'      // クラススコープ
-  | 'block'      // ブロックスコープ
-  | 'while'      // whileループスコープ
-  | 'for';       // forループスコープ
+  | 'global'     // Global scope
+  | 'function'   // Function scope
+  | 'class'      // Class scope
+  | 'block'      // Block scope
+  | 'while'      // While loop scope
+  | 'for';       // For loop scope
 
 /**
- * 位置情報
+ * Position information
  */
 export interface Position {
-  /** 行番号（1から開始） */
+  /** Line number (1-based) */
   line: number;
-  /** 列番号（1から開始） */
+  /** Column number (1-based) */
   column: number;
 }
 
 /**
- * 範囲情報
+ * Range information
  */
 export interface Range {
-  /** 開始位置 */
+  /** Start position */
   start: Position;
-  /** 終了位置 */
+  /** End position */
   end: Position;
 }
 
 /**
- * ソースロケーション
+ * Source location
  */
 export interface SourceLocation {
-  /** ファイル名 */
+  /** File name */
   filename?: string;
-  /** 範囲 */
+  /** Range */
   range: Range;
 }
 
 /**
- * パーサーコンテキスト
+ * Parser context
  */
 export interface ParserContext {
-  /** 現在のスコープ */
+  /** Current scope */
   currentScope: ScopeInfo;
-  /** スコープスタック */
+  /** Scope stack */
   scopeStack: ScopeInfo[];
-  /** 現在の関数 */
+  /** Current function */
   currentFunction?: FunctionInfo;
-  /** 現在のクラス */
+  /** Current class */
   currentClass?: string;
-  /** インデントレベル */
+  /** Indent level */
   indentLevel: number;
-  /** エラーリスト */
+  /** Error list */
   errors: ParseError[];
-  /** 警告リスト */
+  /** Warning list */
   warnings: ParseWarning[];
-  /** 配列情報 */
+  /** Array information */
   arrayInfo: { [key: string]: { size: number; elementType: string; currentIndex: number } };
-  /** パラメータマッピング（コンストラクタ用） */
+  /** Parameter mapping (for constructors) */
   parameterMapping: { [key: string]: string };
-  /** クラス定義情報 */
+  /** Class definition information */
   classDefinitions?: { [key: string]: any };
-  /** 関数呼び出し情報 */
-  functionCalls: Map<string, FunctionCallInfo>;
-  /** パース開始時刻 */
+  /** Parse start time */
   startTime: number;
-  /** クラスかどうかを判定するメソッド */
+  /** Method to determine if it's a class */
   isClass: (name: string) => boolean;
 }
 
 /**
- * パーサーのヘルパー関数
+ * Parser helper functions
  */
 export function createParseError(
   message: string,
