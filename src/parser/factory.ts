@@ -28,12 +28,12 @@ export class ParserFactory {
     switch (config.type) {
       case 'python':
         return new PythonParser(config.options);
-      
+
       case 'javascript':
       case 'java':
       case 'cpp':
         throw new Error(`Parser for ${config.type} is not implemented yet`);
-      
+
       default:
         throw new Error(`Unknown parser type: ${config.type}`);
     }
@@ -60,7 +60,7 @@ export class ParserFactory {
 export function createParser(options?: ParserOptions): PythonParser {
   return ParserFactory.create({
     type: 'python',
-    options: options || {}
+    options: options || {},
   });
 }
 
@@ -73,20 +73,20 @@ export function createPreconfiguredParser(preset: 'strict' | 'lenient' | 'debug'
       strictTypes: true,
       preserveComments: true,
       debug: false,
-      maxDepth: 20
+      maxDepth: 20,
     },
     lenient: {
       strictTypes: false,
       preserveComments: true,
       debug: false,
-      maxDepth: 50
+      maxDepth: 50,
     },
     debug: {
       strictTypes: true,
       preserveComments: true,
       debug: true,
-      maxDepth: 30
-    }
+      maxDepth: 30,
+    },
   };
 
   return createParser(presets[preset]);
@@ -111,23 +111,23 @@ export function getParserCapabilities(type: ParserType): {
           'Arrays and lists',
           'Comments',
           'Input/Output operations',
-          'Arithmetic and logical operations'
+          'Arithmetic and logical operations',
         ],
         limitations: [
           'Complex object-oriented features',
           'Advanced Python-specific syntax',
           'Decorators and metaclasses',
           'Async/await patterns',
-          'Complex comprehensions'
+          'Complex comprehensions',
         ],
-        recommendedUse: 'Basic to intermediate Python programs suitable for educational purposes'
+        recommendedUse: 'Basic to intermediate Python programs suitable for educational purposes',
       };
-    
+
     default:
       return {
         supportedFeatures: [],
         limitations: ['Not implemented'],
-        recommendedUse: 'Not available'
+        recommendedUse: 'Not available',
       };
   }
 }
@@ -156,15 +156,15 @@ export function getParserBenchmark(type: ParserType): ParserBenchmark {
         type: 'python',
         avgParseTimePerLine: 0.5,
         memoryUsagePer1000Lines: 2.0,
-        maxRecommendedLines: 10000
+        maxRecommendedLines: 10000,
       };
-    
+
     default:
       return {
         type,
         avgParseTimePerLine: 0,
         memoryUsagePer1000Lines: 0,
-        maxRecommendedLines: 0
+        maxRecommendedLines: 0,
       };
   }
 }

@@ -83,23 +83,23 @@ export interface ParseWarning {
 /**
  * Parse error types
  */
-export type ParseErrorType = 
-  | 'syntax_error'        // Syntax error
-  | 'type_error'          // Type error
-  | 'name_error'          // Name error
+export type ParseErrorType =
+  | 'syntax_error' // Syntax error
+  | 'type_error' // Type error
+  | 'name_error' // Name error
   | 'unsupported_feature' // Unsupported feature
-  | 'conversion_error'    // Conversion error
-  | 'validation_error';   // Validation error
+  | 'conversion_error' // Conversion error
+  | 'validation_error'; // Validation error
 
 /**
  * Parse warning types
  */
-export type ParseWarningType = 
-  | 'type_inference'      // Type inference
+export type ParseWarningType =
+  | 'type_inference' // Type inference
   | 'implicit_conversion' // Implicit conversion
-  | 'deprecated_syntax'   // Deprecated syntax
-  | 'performance_hint'    // Performance hint
-  | 'style_suggestion';   // Style suggestion
+  | 'deprecated_syntax' // Deprecated syntax
+  | 'performance_hint' // Performance hint
+  | 'style_suggestion'; // Style suggestion
 
 /**
  * Parse statistics
@@ -186,13 +186,13 @@ export interface ScopeInfo {
 /**
  * Scope types
  */
-export type ScopeType = 
-  | 'global'     // Global scope
-  | 'function'   // Function scope
-  | 'class'      // Class scope
-  | 'block'      // Block scope
-  | 'while'      // While loop scope
-  | 'for';       // For loop scope
+export type ScopeType =
+  | 'global' // Global scope
+  | 'function' // Function scope
+  | 'class' // Class scope
+  | 'block' // Block scope
+  | 'while' // While loop scope
+  | 'for'; // For loop scope
 
 /**
  * Position information
@@ -267,7 +267,7 @@ export function createParseError(
   const error: ParseError = {
     message,
     type,
-    severity
+    severity,
   };
   if (line !== undefined) error.line = line;
   if (column !== undefined) error.column = column;
@@ -282,7 +282,7 @@ export function createParseWarning(
 ): ParseWarning {
   const warning: ParseWarning = {
     message,
-    type
+    type,
   };
   if (line !== undefined) warning.line = line;
   if (column !== undefined) warning.column = column;

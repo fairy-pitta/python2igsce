@@ -1,14 +1,14 @@
 // Base parser class
 import { IR, createIR } from '../types/ir';
-import { 
-  ParserOptions, 
-  ParseResult, 
+import {
+  ParserOptions,
+  ParseResult,
   ParserContext,
   ScopeInfo,
   VariableInfo,
   FunctionInfo,
   createParseError,
-  createParseWarning
+  createParseWarning,
 } from '../types/parser';
 import { IGCSEDataType } from '../types/igcse';
 
@@ -42,7 +42,7 @@ export abstract class BaseParser {
       maxNestingDepth: options.maxNestingDepth ?? 50,
       maxErrors: options.maxErrors ?? 100,
       timeout: options.timeout ?? 30000,
-      allowExperimentalSyntax: options.allowExperimentalSyntax ?? false
+      allowExperimentalSyntax: options.allowExperimentalSyntax ?? false,
     };
   }
 
@@ -54,7 +54,7 @@ export abstract class BaseParser {
       name: 'global',
       variables: new Map(),
       functions: new Map(),
-      type: 'global'
+      type: 'global',
     };
 
     const context: ParserContext = {
@@ -68,7 +68,7 @@ export abstract class BaseParser {
       startTime: Date.now(),
       isClass: (name: string) => {
         return !!(context.classDefinitions && context.classDefinitions[name] !== undefined);
-      }
+      },
     };
 
     return context;
@@ -90,7 +90,7 @@ export abstract class BaseParser {
   ): void {
     const error = createParseError(message, type, line, column);
     this.context.errors.push(error);
-    
+
     if (this.options.debug) {
       console.error(`Parse Error: ${message} at line ${line}:${column}`);
     }
@@ -107,7 +107,7 @@ export abstract class BaseParser {
   ): void {
     const warning = createParseWarning(message, type, line, column);
     this.context.warnings.push(warning);
-    
+
     if (this.options.debug) {
       console.warn(`Parse Warning: ${message} at line ${line}:${column}`);
     }
@@ -122,9 +122,9 @@ export abstract class BaseParser {
       parent: this.context.currentScope,
       variables: new Map(),
       functions: new Map(),
-      type
+      type,
     };
-    
+
     this.context.scopeStack.push(newScope);
     this.context.currentScope = newScope;
   }
@@ -156,19 +156,15 @@ export abstract class BaseParser {
   /**
    * Register variable
    */
-  protected registerVariable(
-    name: string,
-    type: IGCSEDataType,
-    line?: number
-  ): void {
+  protected registerVariable(name: string, type: IGCSEDataType, line?: number): void {
     const variable: VariableInfo = {
       name,
       type,
       scope: this.context.currentScope.name,
       initialized: false,
-      definedAt: line
+      definedAt: line,
     };
-    
+
     this.context.currentScope.variables.set(name, variable);
   }
 
@@ -187,9 +183,9 @@ export abstract class BaseParser {
       returnType,
       isFunction: returnType !== undefined,
       hasReturn: returnType !== undefined,
-      definedAt: line
+      definedAt: line,
     };
-    
+
     this.context.currentScope.functions.set(name, func);
     this.context.currentFunction = func;
   }
@@ -200,7 +196,7 @@ export abstract class BaseParser {
   protected findVariable(name: string): VariableInfo | undefined {
     // Search from current scope to parent scopes in order
     let scope: ScopeInfo | undefined = this.context.currentScope;
-    
+
     while (scope) {
       const variable = scope.variables.get(name);
       if (variable) {
@@ -208,7 +204,7 @@ export abstract class BaseParser {
       }
       scope = scope.parent;
     }
-    
+
     return undefined;
   }
 
@@ -218,7 +214,7 @@ export abstract class BaseParser {
   protected findFunction(name: string): FunctionInfo | undefined {
     // Search from current scope to parent scopes in order
     let scope: ScopeInfo | undefined = this.context.currentScope;
-    
+
     while (scope) {
       const func = scope.functions.get(name);
       if (func) {
@@ -226,7 +222,7 @@ export abstract class BaseParser {
       }
       scope = scope.parent;
     }
-    
+
     return undefined;
   }
 
@@ -246,7 +242,7 @@ export abstract class BaseParser {
    */
   protected increaseIndent(): void {
     this.context.indentLevel++;
-    
+
     if (this.context.indentLevel > this.options.maxDepth) {
       this.addError(
         `Maximum nesting depth (${this.options.maxDepth}) exceeded`,
@@ -282,7 +278,7 @@ export abstract class BaseParser {
   protected createParseResult(ir: IR[]): ParseResult {
     const endTime = Date.now();
     const parseTime = endTime - this.startTime;
-    
+
     return {
       ir,
       errors: [...this.context.errors],
@@ -292,11 +288,13 @@ export abstract class BaseParser {
         nodesGenerated: ir.reduce((sum, node) => sum + this.countNodes(node), 0),
         parseTime,
         functionsFound: this.countFunctions(),
-        classesFound: this.context.classDefinitions ? Object.keys(this.context.classDefinitions).length : 0,
-        variablesFound: this.countVariables()
+        classesFound: this.context.classDefinitions
+          ? Object.keys(this.context.classDefinitions).length
+          : 0,
+        variablesFound: this.countVariables(),
       },
       success: this.context.errors.length === 0,
-      parseTime
+      parseTime,
     };
   }
 

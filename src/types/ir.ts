@@ -19,48 +19,48 @@ export interface IR {
 /**
  * Types of IR nodes
  */
-export type IRKind = 
+export type IRKind =
   // Program structure
-  | 'program'    // Entire program
-  
+  | 'program' // Entire program
+
   // Basic syntax
-  | 'assign'     // Assignment statement
+  | 'assign' // Assignment statement
   | 'element_assign' // Array element assignment
   | 'attribute_assign' // Attribute assignment
-  | 'output'     // Output statement
-  | 'input'      // Input statement
-  | 'comment'    // Comment
-  
+  | 'output' // Output statement
+  | 'input' // Input statement
+  | 'comment' // Comment
+
   // Control structures
-  | 'if'         // IF statement
-  | 'else'       // ELSE statement
-  | 'elseif'     // ELSE IF statement
-  | 'endif'      // ENDIF statement
-  | 'for'        // FOR statement
-  | 'while'      // WHILE statement
-  | 'endwhile'   // ENDWHILE statement
-  | 'repeat'     // REPEAT statement
-  | 'until'      // UNTIL statement
-  | 'break'      // BREAK statement (EXIT WHILE/FOR)
-  
+  | 'if' // IF statement
+  | 'else' // ELSE statement
+  | 'elseif' // ELSE IF statement
+  | 'endif' // ENDIF statement
+  | 'for' // FOR statement
+  | 'while' // WHILE statement
+  | 'endwhile' // ENDWHILE statement
+  | 'repeat' // REPEAT statement
+  | 'until' // UNTIL statement
+  | 'break' // BREAK statement (EXIT WHILE/FOR)
+
   // Functions and procedures
-  | 'procedure'  // PROCEDURE definition
-  | 'function'   // FUNCTION definition
-  | 'return'     // RETURN statement
-  
+  | 'procedure' // PROCEDURE definition
+  | 'function' // FUNCTION definition
+  | 'return' // RETURN statement
+
   // Data structures
-  | 'array'      // Array declaration
+  | 'array' // Array declaration
   | 'array_literal' // Array literal
-  | 'type'       // TYPE definition
-  | 'class'      // CLASS definition
-  
+  | 'type' // TYPE definition
+  | 'class' // CLASS definition
+
   // Others
-  | 'block'      // Grouping of multiple IR nodes
-  | 'case'       // CASE statement
-  | 'statement'  // General statement
+  | 'block' // Grouping of multiple IR nodes
+  | 'case' // CASE statement
+  | 'statement' // General statement
   | 'expression' // Expression
-  | 'compound'   // Compound statement (grouping multiple statements)
-  | 'module';    // Module
+  | 'compound' // Compound statement (grouping multiple statements)
+  | 'module'; // Module
 
 /**
  * Detailed argument information (distinguishes string literals from variables)
@@ -131,16 +131,11 @@ export interface IRMeta {
 /**
  * Helper function for creating IR nodes
  */
-export function createIR(
-  kind: IRKind,
-  text: string,
-  children: IR[] = [],
-  meta?: IRMeta
-): IR {
+export function createIR(kind: IRKind, text: string, children: IR[] = [], meta?: IRMeta): IR {
   const ir: IR = {
     kind,
     text,
-    children
+    children,
   };
   if (meta !== undefined) ir.meta = meta;
   return ir;
@@ -153,7 +148,7 @@ export function getIRDepth(ir: IR): number {
   if (ir.children.length === 0) {
     return 1;
   }
-  return 1 + Math.max(...ir.children.map(child => getIRDepth(child)));
+  return 1 + Math.max(...ir.children.map((child) => getIRDepth(child)));
 }
 
 /**
@@ -168,14 +163,14 @@ export function countIRNodes(ir: IR): number {
  */
 export function findIRNodes(ir: IR, kind: IRKind): IR[] {
   const result: IR[] = [];
-  
+
   if (ir.kind === kind) {
     result.push(ir);
   }
-  
+
   for (const child of ir.children) {
     result.push(...findIRNodes(child, kind));
   }
-  
+
   return result;
 }

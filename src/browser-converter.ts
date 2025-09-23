@@ -55,17 +55,17 @@ export class BrowserConverter {
 
   constructor(options: BrowserConversionOptions = {}) {
     this.options = this.mergeDefaultOptions(options);
-    
+
     // Initialize parser with basic options
     const parserOptions: ParserOptions = {
       strictMode: this.options.strictMode ?? false,
       includeComments: this.options.includeComments ?? true,
       preserveWhitespace: this.options.preserveWhitespace ?? false,
       maxErrors: this.options.maxErrors ?? 100,
-      timeout: this.options.timeout ?? 30000
+      timeout: this.options.timeout ?? 30000,
     };
     this.parser = new PythonParser(parserOptions);
-    
+
     // Initialize emitter with basic options
     const emitterOptions: EmitterOptions = {
       format: this.options.outputFormat ?? 'plain',
@@ -75,7 +75,7 @@ export class BrowserConverter {
       includeComments: this.options.includeComments ?? true,
       includeLineNumbers: this.options.includeLineNumbers ?? false,
       includeDebugInfo: false,
-      beautify: this.options.beautify ?? true
+      beautify: this.options.beautify ?? true,
     };
     this.emitter = new TextEmitter(emitterOptions);
   }
@@ -85,11 +85,11 @@ export class BrowserConverter {
    */
   convertCode(pythonCode: string): ConversionResult {
     const startTime = Date.now();
-    
+
     try {
       // Parse Python code
       const parseResult = this.parser.parse(pythonCode);
-      
+
       if (!parseResult.success || parseResult.errors.length > 0) {
         return this.createErrorResult(
           'Parse failed',
@@ -105,13 +105,13 @@ export class BrowserConverter {
         text: '',
         children: parseResult.ir,
         meta: {
-          lineNumber: 1
-        }
+          lineNumber: 1,
+        },
       };
-      
+
       // Emit IGCSE pseudocode
       const emitResult = this.emitter.emit(programIR);
-      
+
       if (!emitResult.success || emitResult.errors.length > 0) {
         return this.createErrorResult(
           'Emit failed',
@@ -122,7 +122,7 @@ export class BrowserConverter {
       }
 
       const endTime = Date.now();
-      
+
       return {
         code: emitResult.code,
         parseResult,
@@ -136,8 +136,8 @@ export class BrowserConverter {
           emitTime: emitResult.emitTime || 0,
           errorCount: parseResult.errors.length + emitResult.errors.length,
           warningCount: parseResult.warnings.length + emitResult.warnings.length,
-          totalTime: endTime - startTime
-        }
+          totalTime: endTime - startTime,
+        },
       };
     } catch (error) {
       return this.createErrorResult(
@@ -157,14 +157,14 @@ export class BrowserConverter {
       const parseResult = this.parser.parse(pythonCode);
       return {
         isValid: parseResult.success && parseResult.errors.length === 0,
-        errors: parseResult.errors.map(e => e.message),
-        warnings: parseResult.warnings.map(w => w.message)
+        errors: parseResult.errors.map((e) => e.message),
+        warnings: parseResult.warnings.map((w) => w.message),
       };
     } catch (error) {
       return {
         isValid: false,
         errors: [error instanceof Error ? error.message : 'Unknown error'],
-        warnings: []
+        warnings: [],
       };
     }
   }
@@ -205,7 +205,7 @@ export class BrowserConverter {
       spaceAfterCommas: true,
       allowExperimentalSyntax: false,
       maxNestingDepth: 50,
-      ...options
+      ...options,
     };
   }
 
@@ -216,24 +216,30 @@ export class BrowserConverter {
     startTime: number
   ): ConversionResult {
     const endTime = Date.now();
-    
+
     return {
       code: '',
       success: false,
       parseResult: {
         ir: [],
-        errors: errors.map(e => typeof e === 'string' ? { message: e, type: 'syntax_error' as const, severity: 'error' as const } : e),
-        warnings: warnings.map(w => typeof w === 'string' ? { message: w, type: 'style_suggestion' as const } : w),
+        errors: errors.map((e) =>
+          typeof e === 'string'
+            ? { message: e, type: 'syntax_error' as const, severity: 'error' as const }
+            : e
+        ),
+        warnings: warnings.map((w) =>
+          typeof w === 'string' ? { message: w, type: 'style_suggestion' as const } : w
+        ),
         stats: {
           linesProcessed: 0,
           nodesGenerated: 0,
           parseTime: 0,
           functionsFound: 0,
           classesFound: 0,
-          variablesFound: 0
+          variablesFound: 0,
         },
         success: false,
-        parseTime: 0
+        parseTime: 0,
       },
       emitResult: {
         code: '',
@@ -248,11 +254,11 @@ export class BrowserConverter {
           emitTime: 0,
           processingTime: 0,
           maxNestingDepth: 0,
-          maxLineLength: 0
+          maxLineLength: 0,
         },
         success: false,
         emitTime: 0,
-        output: ''
+        output: '',
       },
       stats: {
         inputLines: 0,
@@ -262,8 +268,8 @@ export class BrowserConverter {
         emitTime: 0,
         errorCount: errors.length,
         warningCount: warnings.length,
-        totalTime: endTime - startTime
-      }
+        totalTime: endTime - startTime,
+      },
     };
   }
 }

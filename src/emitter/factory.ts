@@ -25,18 +25,18 @@ export class EmitterFactory {
    */
   static create(config: EmitterFactoryOptions): BaseEmitter {
     const options = config.options || {};
-    
+
     switch (config.format) {
       case 'plain':
         return new TextEmitter(options);
-      
+
       case 'markdown':
         return new MarkdownEmitter(options, config.markdownConfig);
-      
+
       case 'html':
       case 'latex':
         throw new Error(`Emitter for ${config.format} is not implemented yet`);
-      
+
       default:
         throw new Error(`Unknown output format: ${config.format}`);
     }
@@ -71,9 +71,9 @@ export class EmitterFactory {
       beautify: true,
       includeComments: true,
       indentSize: 3,
-      maxLineLength: 80
+      maxLineLength: 80,
     };
-    
+
     return this.create({ format, options });
   }
 
@@ -84,9 +84,9 @@ export class EmitterFactory {
     const options: Partial<EmitterOptions> = {
       beautify: false,
       includeComments: false,
-      indentSize: 2
+      indentSize: 2,
     };
-    
+
     return this.create({ format, options });
   }
 
@@ -98,9 +98,9 @@ export class EmitterFactory {
       includeDebugInfo: true,
       includeLineNumbers: true,
       includeComments: true,
-      beautify: true
+      beautify: true,
     };
-    
+
     return this.create({ format, options });
   }
 }
@@ -152,12 +152,12 @@ export function getFormatSpecificOptions(format: OutputFormat): {
           indentChar: ' ',
           lineEnding: '\n',
           includeComments: true,
-          beautify: true
+          beautify: true,
         },
         description: 'Plain text format suitable for printing and basic viewing',
-        fileExtension: '.txt'
+        fileExtension: '.txt',
       };
-    
+
     case 'markdown':
       return {
         recommendedOptions: {
@@ -165,12 +165,12 @@ export function getFormatSpecificOptions(format: OutputFormat): {
           indentChar: ' ',
           lineEnding: '\n',
           includeComments: true,
-          beautify: true
+          beautify: true,
         },
         description: 'Markdown format with syntax highlighting and documentation features',
-        fileExtension: '.md'
+        fileExtension: '.md',
       };
-    
+
     case 'html':
       return {
         recommendedOptions: {
@@ -178,12 +178,12 @@ export function getFormatSpecificOptions(format: OutputFormat): {
           indentChar: ' ',
           lineEnding: '\n',
           includeComments: true,
-          beautify: true
+          beautify: true,
         },
         description: 'HTML format with styling and interactive features',
-        fileExtension: '.html'
+        fileExtension: '.html',
       };
-    
+
     case 'latex':
       return {
         recommendedOptions: {
@@ -191,17 +191,17 @@ export function getFormatSpecificOptions(format: OutputFormat): {
           indentChar: ' ',
           lineEnding: '\n',
           includeComments: false,
-          beautify: true
+          beautify: true,
         },
         description: 'LaTeX format for academic papers and documentation',
-        fileExtension: '.tex'
+        fileExtension: '.tex',
       };
-    
+
     default:
       return {
         recommendedOptions: {},
         description: 'Unknown format',
-        fileExtension: '.txt'
+        fileExtension: '.txt',
       };
   }
 }
@@ -222,16 +222,12 @@ export function getEmitterCapabilities(format: OutputFormat): {
           'Indentation',
           'Line numbering',
           'Comments',
-          'Syntax highlighting (basic)'
+          'Syntax highlighting (basic)',
         ],
-        limitations: [
-          'No rich formatting',
-          'No hyperlinks',
-          'No embedded media'
-        ],
-        bestUseCase: 'Simple viewing, printing, and basic documentation'
+        limitations: ['No rich formatting', 'No hyperlinks', 'No embedded media'],
+        bestUseCase: 'Simple viewing, printing, and basic documentation',
       };
-    
+
     case 'markdown':
       return {
         supportedFeatures: [
@@ -240,15 +236,12 @@ export function getEmitterCapabilities(format: OutputFormat): {
           'Headers and sections',
           'Table of contents',
           'Links and references',
-          'Tables and lists'
+          'Tables and lists',
         ],
-        limitations: [
-          'Limited interactive features',
-          'Depends on Markdown renderer'
-        ],
-        bestUseCase: 'Documentation, README files, and web publishing'
+        limitations: ['Limited interactive features', 'Depends on Markdown renderer'],
+        bestUseCase: 'Documentation, README files, and web publishing',
       };
-    
+
     case 'html':
       return {
         supportedFeatures: [
@@ -256,35 +249,29 @@ export function getEmitterCapabilities(format: OutputFormat): {
           'Interactive elements',
           'CSS styling',
           'JavaScript integration',
-          'Embedded media'
+          'Embedded media',
         ],
-        limitations: [
-          'Requires web browser',
-          'More complex output'
-        ],
-        bestUseCase: 'Web applications and interactive documentation'
+        limitations: ['Requires web browser', 'More complex output'],
+        bestUseCase: 'Web applications and interactive documentation',
       };
-    
+
     case 'latex':
       return {
         supportedFeatures: [
           'Professional typesetting',
           'Mathematical notation',
           'Academic formatting',
-          'Bibliography support'
+          'Bibliography support',
         ],
-        limitations: [
-          'Requires LaTeX compiler',
-          'Learning curve for editing'
-        ],
-        bestUseCase: 'Academic papers and professional documentation'
+        limitations: ['Requires LaTeX compiler', 'Learning curve for editing'],
+        bestUseCase: 'Academic papers and professional documentation',
       };
-    
+
     default:
       return {
         supportedFeatures: [],
         limitations: ['Not implemented'],
-        bestUseCase: 'Not available'
+        bestUseCase: 'Not available',
       };
   }
 }

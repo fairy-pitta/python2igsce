@@ -25,16 +25,16 @@ export class EmitterUtils {
       hasComments: false,
       hasFunctions: false,
       hasLoops: false,
-      hasConditionals: false
+      hasConditionals: false,
     };
 
     this.traverseIR(ir, (node, depth) => {
       stats.totalNodes++;
       stats.maxDepth = Math.max(stats.maxDepth, depth);
-      
+
       // Count node types
       stats.nodeTypes[node.kind] = (stats.nodeTypes[node.kind] || 0) + 1;
-      
+
       // Feature detection
       if (node.kind === 'comment') {
         stats.hasComments = true;
@@ -56,13 +56,9 @@ export class EmitterUtils {
   /**
    * Traverse IR tree
    */
-  static traverseIR(
-    ir: IR,
-    callback: (node: IR, depth: number) => void,
-    depth: number = 0
-  ): void {
+  static traverseIR(ir: IR, callback: (node: IR, depth: number) => void, depth: number = 0): void {
     callback(ir, depth);
-    
+
     for (const child of ir.children) {
       this.traverseIR(child, callback, depth + 1);
     }
@@ -109,7 +105,7 @@ export class EmitterUtils {
     return {
       isValid: issues.length === 0,
       issues,
-      suggestions
+      suggestions,
     };
   }
 
@@ -126,18 +122,18 @@ export class EmitterUtils {
     };
     recommendations: string[];
   } {
-    const lines = code.split('\n').filter(line => line.trim());
+    const lines = code.split('\n').filter((line) => line.trim());
     const recommendations: string[] = [];
 
     // Evaluate readability
     const readability = this.evaluateReadability(lines, recommendations);
-    
+
     // Evaluate structure
     const structure = this.evaluateStructure(lines, recommendations);
-    
+
     // Evaluate consistency
     const consistency = this.evaluateConsistency(lines, recommendations);
-    
+
     // Evaluate completeness
     const completeness = this.evaluateCompleteness(lines, recommendations);
 
@@ -149,9 +145,9 @@ export class EmitterUtils {
         readability,
         structure,
         consistency,
-        completeness
+        completeness,
       },
-      recommendations
+      recommendations,
     };
   }
 
@@ -160,16 +156,16 @@ export class EmitterUtils {
    */
   private static evaluateReadability(lines: string[], recommendations: string[]): number {
     let score = 100;
-    
+
     // Check for lines that are too long
-    const longLines = lines.filter(line => line.length > 80);
+    const longLines = lines.filter((line) => line.length > 80);
     if (longLines.length > 0) {
       score -= Math.min(30, longLines.length * 5);
       recommendations.push(`${longLines.length} line(s) exceed 80 characters`);
     }
 
     // Check for presence of comments
-    const commentLines = lines.filter(line => line.trim().startsWith('//'));
+    const commentLines = lines.filter((line) => line.trim().startsWith('//'));
     const commentRatio = commentLines.length / lines.length;
     if (commentRatio < 0.1) {
       score -= 20;
@@ -177,7 +173,7 @@ export class EmitterUtils {
     }
 
     // Proper use of blank lines
-    const blankLineCount = lines.filter(line => line.trim() === '').length;
+    const blankLineCount = lines.filter((line) => line.trim() === '').length;
     const blankLineRatio = blankLineCount / lines.length;
     if (blankLineRatio < 0.05) {
       score -= 10;
@@ -192,7 +188,7 @@ export class EmitterUtils {
    */
   private static evaluateStructure(lines: string[], recommendations: string[]): number {
     let score = 100;
-    
+
     // Check indentation consistency
     const indentSizes = new Set<number>();
     for (const line of lines) {
@@ -201,7 +197,7 @@ export class EmitterUtils {
         indentSizes.add(leadingSpaces);
       }
     }
-    
+
     if (indentSizes.size > 3) {
       score -= 20;
       recommendations.push('Inconsistent indentation detected');
@@ -222,29 +218,29 @@ export class EmitterUtils {
    */
   private static evaluateConsistency(lines: string[], recommendations: string[]): number {
     let score = 100;
-    
+
     // Keyword case consistency
     const keywords = ['IF', 'THEN', 'ELSE', 'ENDIF', 'FOR', 'WHILE', 'PROCEDURE', 'FUNCTION'];
     const inconsistentKeywords = new Set<string>();
-    
+
     for (const keyword of keywords) {
-      const upperCount = lines.filter(line => line.includes(keyword)).length;
-      const lowerCount = lines.filter(line => line.includes(keyword.toLowerCase())).length;
-      
+      const upperCount = lines.filter((line) => line.includes(keyword)).length;
+      const lowerCount = lines.filter((line) => line.includes(keyword.toLowerCase())).length;
+
       if (upperCount > 0 && lowerCount > 0) {
         inconsistentKeywords.add(keyword);
       }
     }
-    
+
     if (inconsistentKeywords.size > 0) {
       score -= inconsistentKeywords.size * 10;
       recommendations.push('Inconsistent keyword capitalization');
     }
 
     // Operator consistency
-    const hasArrowAssign = lines.some(line => line.includes('←'));
-    const hasEqualsAssign = lines.some(line => line.includes('=') && !line.includes('=='));
-    
+    const hasArrowAssign = lines.some((line) => line.includes('←'));
+    const hasEqualsAssign = lines.some((line) => line.includes('=') && !line.includes('=='));
+
     if (hasArrowAssign && hasEqualsAssign) {
       score -= 20;
       recommendations.push('Mixed assignment operators (← and =)');
@@ -258,17 +254,17 @@ export class EmitterUtils {
    */
   private static evaluateCompleteness(lines: string[], recommendations: string[]): number {
     let score = 100;
-    
+
     // Check for basic syntax elements
-    const hasVariables = lines.some(line => line.includes('←'));
-    const hasOutput = lines.some(line => line.includes('OUTPUT'));
-    const hasInput = lines.some(line => line.includes('INPUT'));
-    
+    const hasVariables = lines.some((line) => line.includes('←'));
+    const hasOutput = lines.some((line) => line.includes('OUTPUT'));
+    const hasInput = lines.some((line) => line.includes('INPUT'));
+
     if (!hasVariables) {
       score -= 10;
       recommendations.push('No variable assignments found');
     }
-    
+
     if (!hasOutput && !hasInput) {
       score -= 15;
       recommendations.push('No input/output operations found');
@@ -286,20 +282,28 @@ export class EmitterUtils {
   } {
     const stack: string[] = [];
     const issues: string[] = [];
-    
+
     const openKeywords = ['IF', 'FOR', 'WHILE', 'REPEAT', 'PROCEDURE', 'FUNCTION', 'CASE'];
-    const closeKeywords = ['ENDIF', 'NEXT', 'ENDWHILE', 'UNTIL', 'ENDPROCEDURE', 'ENDFUNCTION', 'ENDCASE'];
-    
+    const closeKeywords = [
+      'ENDIF',
+      'NEXT',
+      'ENDWHILE',
+      'UNTIL',
+      'ENDPROCEDURE',
+      'ENDFUNCTION',
+      'ENDCASE',
+    ];
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim().toUpperCase();
-      
+
       for (const keyword of openKeywords) {
         if (line.startsWith(keyword)) {
           stack.push(keyword);
           break;
         }
       }
-      
+
       for (const keyword of closeKeywords) {
         if (line.startsWith(keyword)) {
           if (stack.length === 0) {
@@ -311,14 +315,14 @@ export class EmitterUtils {
         }
       }
     }
-    
+
     if (stack.length > 0) {
       issues.push(`Unclosed structures: ${stack.join(', ')}`);
     }
-    
+
     return {
       balanced: issues.length === 0,
-      issues
+      issues,
     };
   }
 
@@ -333,25 +337,25 @@ export class EmitterUtils {
     let cyclomaticComplexity = 1; // Basic path
     let cognitiveComplexity = 0;
     let maxNestingDepth = 0;
-    
+
     this.traverseIR(ir, (node, depth) => {
       maxNestingDepth = Math.max(maxNestingDepth, depth);
-      
+
       // Cyclomatic complexity
       if (['if', 'for', 'while', 'case'].includes(node.kind)) {
         cyclomaticComplexity++;
       }
-      
+
       // Cognitive complexity
       if (['if', 'for', 'while'].includes(node.kind)) {
         cognitiveComplexity += 1 + depth; // Weighting by nesting
       }
     });
-    
+
     return {
       cyclomaticComplexity,
       cognitiveComplexity,
-      nestingDepth: maxNestingDepth
+      nestingDepth: maxNestingDepth,
     };
   }
 
@@ -362,25 +366,25 @@ export class EmitterUtils {
     const suggestions: string[] = [];
     const stats = this.getIRStats(ir);
     const complexity = this.calculateComplexity(ir);
-    
+
     // 複雑度に基づく提案
     if (complexity.cyclomaticComplexity > 10) {
       suggestions.push('Consider breaking down complex functions into smaller ones');
     }
-    
+
     if (complexity.nestingDepth > 5) {
       suggestions.push('Deep nesting detected - consider using early returns or guard clauses');
     }
-    
+
     // ノード種別に基づく提案
     if (stats.nodeTypes['comment'] && stats.nodeTypes['comment'] < stats.totalNodes * 0.1) {
       suggestions.push('Add more comments to improve code documentation');
     }
-    
+
     if (stats.nodeTypes['function'] && stats.nodeTypes['function'] > 10) {
       suggestions.push('Large number of functions - consider organizing into modules');
     }
-    
+
     return suggestions;
   }
 
@@ -393,19 +397,19 @@ export class EmitterUtils {
   ): Partial<EmitterOptions> {
     const stats = this.getIRStats(ir);
     const complexity = this.calculateComplexity(ir);
-    
+
     const options: Partial<EmitterOptions> = {};
-    
+
     // 複雑度に基づく調整
     if (complexity.nestingDepth > 3) {
       options.indentSize = 2; // 深いネストの場合はインデントを小さく
     } else {
       options.indentSize = 4;
     }
-    
+
     // コメントの有無に基づく調整
     options.includeComments = stats.hasComments;
-    
+
     // フォーマット固有の調整
     if (targetFormat === 'markdown') {
       options.beautify = true;
@@ -413,7 +417,7 @@ export class EmitterUtils {
     } else if (targetFormat === 'plain') {
       options.maxLineLength = 80;
     }
-    
+
     return options;
   }
 }

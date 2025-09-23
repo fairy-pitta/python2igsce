@@ -20,24 +20,24 @@ export class TextEmitter extends BaseEmitter {
     this.startEmitting();
     this.resetContext();
     this.nodesProcessed = 0;
-    
+
     this.debug('Starting text emission...');
-    
+
     try {
       this.emitNode(ir);
-      
+
       const result = this.createEmitResult();
       result.stats.nodesProcessed = this.nodesProcessed;
-      
+
       this.debug(`Text emission completed. Lines: ${result.stats.linesGenerated}`);
-      
+
       return result;
     } catch (error) {
       this.addError(
         `Emit failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         'output_error'
       );
-      
+
       return this.createEmitResult();
     }
   }
@@ -48,114 +48,114 @@ export class TextEmitter extends BaseEmitter {
   protected emitNode(node: IR): void {
     this.nodesProcessed++;
     this.context.currentNode = node;
-    
+
     this.debug(`Emitting node: ${node.kind} - "${node.text}"`);
-    
+
     switch (node.kind) {
       case 'statement':
         this.emitStatement(node);
         break;
-        
+
       case 'assign':
         this.emitAssign(node);
         break;
-        
+
       case 'element_assign':
         this.emitAssign(node);
         break;
-        
+
       case 'attribute_assign':
         this.emitAssign(node);
         break;
-        
+
       case 'output':
         this.emitOutput(node);
         break;
-        
+
       case 'input':
         this.emitInput(node);
         break;
-        
+
       case 'comment':
         this.emitComment(node.text);
         break;
-        
+
       case 'compound':
         this.emitCompound(node);
         break;
-        
+
       case 'if':
         this.emitIf(node);
         break;
-        
+
       case 'else':
         this.emitElse(node);
         break;
-        
+
       case 'elseif':
         this.emitElseIf(node);
         break;
-        
+
       case 'endif':
         this.emitEndif(node);
         break;
-        
+
       case 'for':
         this.emitFor(node);
         break;
-        
+
       case 'while':
         this.emitWhile(node);
         break;
-        
+
       case 'endwhile':
         this.emitEndwhile(node);
         break;
-        
+
       case 'repeat':
         this.emitRepeat(node);
         break;
-        
+
       case 'until':
         this.emitUntil(node);
         break;
-        
+
       case 'procedure':
         this.emitProcedure(node);
         break;
-        
+
       case 'function':
         this.emitFunction(node);
         break;
-        
+
       case 'return':
         this.emitReturn(node);
         break;
-        
+
       case 'array':
         this.emitArray(node);
         break;
-        
+
       case 'type':
         this.emitType(node);
         break;
-        
+
       case 'class':
         this.emitClass(node);
         break;
-        
+
       case 'case':
         this.emitCase(node);
         break;
-        
+
       case 'expression':
         this.emitExpression(node);
         break;
-        
+
       case 'block':
         this.emitBlock(node);
         break;
-        
+
       default:
         // For unknown node types, output text as is
         if (node.text) {
@@ -189,16 +189,18 @@ export class TextEmitter extends BaseEmitter {
   private emitOutput(node: IR): void {
     // IRArgumentの情報を使用して適切にフォーマット
     if (node.meta?.arguments) {
-      const formattedArgs = node.meta.arguments.map(arg => {
-        if (arg.type === 'literal') {
-          // Output string literals as is (no formatting)
-          return arg.value;
-        } else {
-          // 変数や式は通常通り整形
-          return this.formatText(arg.value);
-        }
-      }).join(', '); // Safely add spaces on emitter side
-      
+      const formattedArgs = node.meta.arguments
+        .map((arg) => {
+          if (arg.type === 'literal') {
+            // Output string literals as is (no formatting)
+            return arg.value;
+          } else {
+            // 変数や式は通常通り整形
+            return this.formatText(arg.value);
+          }
+        })
+        .join(', '); // Safely add spaces on emitter side
+
       const outputText = `OUTPUT ${formattedArgs}`;
       this.emitLine(outputText);
     } else {
@@ -225,7 +227,7 @@ export class TextEmitter extends BaseEmitter {
   private emitIf(node: IR): void {
     const text = this.formatText(node.text);
     this.emitLine(text);
-    
+
     // THEN側（consequent）の出力
     if (node.meta?.consequent) {
       this.increaseIndent();
@@ -233,7 +235,7 @@ export class TextEmitter extends BaseEmitter {
         this.emitNode(stmt);
       }
       this.decreaseIndent();
-      
+
       // ELSE側（alternate）の出力
       if (node.meta?.alternate && node.meta.alternate.length > 0) {
         for (const altStmt of node.meta.alternate) {
@@ -252,7 +254,7 @@ export class TextEmitter extends BaseEmitter {
       this.emitChildren(node);
       this.decreaseIndent();
     }
-    
+
     // Output ENDIF (don't output for ELSE IF statements)
     if (!node.text.startsWith('ELSE IF')) {
       this.emitLine('ENDIF');
@@ -269,7 +271,7 @@ export class TextEmitter extends BaseEmitter {
     const text = this.formatText(node.text);
     this.emitLine(text);
     this.increaseIndent();
-    
+
     // ELSE文の本体（consequent）の出力
     if (node.meta?.consequent) {
       for (const stmt of node.meta.consequent) {
@@ -290,7 +292,7 @@ export class TextEmitter extends BaseEmitter {
     const text = this.formatText(node.text);
     this.emitLine(text);
     this.increaseIndent();
-    
+
     this.emitChildren(node);
   }
 
@@ -308,7 +310,7 @@ export class TextEmitter extends BaseEmitter {
   private emitFor(node: IR): void {
     const text = this.formatText(node.text);
     this.emitLine(text);
-    
+
     this.increaseIndent();
     // Process child nodes, but output NEXT at original indent level
     for (const child of node.children) {
@@ -329,7 +331,7 @@ export class TextEmitter extends BaseEmitter {
   private emitWhile(node: IR): void {
     const text = this.formatText(node.text);
     this.emitLine(text);
-    
+
     this.increaseIndent();
     // Process child nodes, but output ENDWHILE at original indent level
     for (const child of node.children) {
@@ -359,7 +361,7 @@ export class TextEmitter extends BaseEmitter {
   private emitRepeat(node: IR): void {
     const text = this.formatText(node.text);
     this.emitLine(text);
-    
+
     this.increaseIndent();
     // Process child nodes, but output UNTIL at original indent level
     for (const child of node.children) {
@@ -390,14 +392,17 @@ export class TextEmitter extends BaseEmitter {
     if (this.context.formatter.insertBlankLines) {
       this.emitBlankLine();
     }
-    
+
     const text = this.formatText(node.text);
     this.emitLine(text);
-    
+
     this.increaseIndent();
     // Process child nodes, but output ENDPROCEDURE/ENDFUNCTION at original indent level
     for (const child of node.children) {
-      if (child.kind === 'statement' && (child.text.trim() === 'ENDPROCEDURE' || child.text.trim() === 'ENDFUNCTION')) {
+      if (
+        child.kind === 'statement' &&
+        (child.text.trim() === 'ENDPROCEDURE' || child.text.trim() === 'ENDFUNCTION')
+      ) {
         this.decreaseIndent();
         this.emitNode(child);
         return; // Exit after outputting ENDPROCEDURE
@@ -406,7 +411,7 @@ export class TextEmitter extends BaseEmitter {
       }
     }
     this.decreaseIndent();
-    
+
     if (this.context.formatter.insertBlankLines) {
       this.emitBlankLine();
     }
@@ -419,14 +424,17 @@ export class TextEmitter extends BaseEmitter {
     if (this.context.formatter.insertBlankLines) {
       this.emitBlankLine();
     }
-    
+
     const text = this.formatText(node.text);
     this.emitLine(text);
-    
+
     this.increaseIndent();
     // Process child nodes, but output ENDPROCEDURE/ENDFUNCTION at original indent level
     for (const child of node.children) {
-      if (child.kind === 'statement' && (child.text.trim() === 'ENDPROCEDURE' || child.text.trim() === 'ENDFUNCTION')) {
+      if (
+        child.kind === 'statement' &&
+        (child.text.trim() === 'ENDPROCEDURE' || child.text.trim() === 'ENDFUNCTION')
+      ) {
         this.decreaseIndent();
         this.emitNode(child);
         return; // Exit after outputting ENDFUNCTION
@@ -435,7 +443,7 @@ export class TextEmitter extends BaseEmitter {
       }
     }
     this.decreaseIndent();
-    
+
     if (this.context.formatter.insertBlankLines) {
       this.emitBlankLine();
     }
@@ -466,17 +474,17 @@ export class TextEmitter extends BaseEmitter {
     if (this.context.formatter.insertBlankLines) {
       this.emitBlankLine();
     }
-    
+
     const text = this.formatText(node.text);
     this.emitLine(text);
-    
+
     this.increaseIndent();
     this.emitChildren(node);
     this.decreaseIndent();
-    
+
     // ENDTYPEを元のインデントレベルで出力
     this.emitLine('ENDTYPE');
-    
+
     if (this.context.formatter.insertBlankLines) {
       this.emitBlankLine();
     }
@@ -489,14 +497,14 @@ export class TextEmitter extends BaseEmitter {
     if (this.context.formatter.insertBlankLines) {
       this.emitBlankLine();
     }
-    
+
     const text = this.formatText(node.text);
     this.emitLine(text);
-    
+
     this.increaseIndent();
     this.emitChildren(node);
     this.decreaseIndent();
-    
+
     if (this.context.formatter.insertBlankLines) {
       this.emitBlankLine();
     }
@@ -508,7 +516,7 @@ export class TextEmitter extends BaseEmitter {
   private emitCase(node: IR): void {
     const text = this.formatText(node.text);
     this.emitLine(text);
-    
+
     this.increaseIndent();
     this.emitChildren(node);
     this.decreaseIndent();
@@ -519,11 +527,11 @@ export class TextEmitter extends BaseEmitter {
    */
   private emitExpression(node: IR): void {
     const text = this.formatText(node.text);
-    
+
     // 長い式の場合は折り返し
     if (this.context.formatter.wrapLongLines && this.options.maxLineLength) {
       const wrappedLines = this.wrapLongLine(text, this.options.maxLineLength);
-      
+
       if (wrappedLines.length > 1) {
         for (let i = 0; i < wrappedLines.length; i++) {
           if (i === 0) {
@@ -538,7 +546,7 @@ export class TextEmitter extends BaseEmitter {
     } else {
       this.emitLine(text);
     }
-    
+
     this.emitChildren(node);
   }
 
@@ -575,20 +583,20 @@ export class TextEmitter extends BaseEmitter {
    */
   addHeader(title: string, author?: string, date?: string): void {
     if (!this.options.includeComments) return;
-    
+
     this.emitComment('// ==========================================');
     this.emitComment(`// ${title}`);
-    
+
     if (author) {
       this.emitComment(`// Author: ${author}`);
     }
-    
+
     if (date) {
       this.emitComment(`// Date: ${date}`);
     } else {
       this.emitComment(`// Date: ${new Date().toLocaleDateString()}`);
     }
-    
+
     this.emitComment('// Generated by python2igcse');
     this.emitComment('// ==========================================');
     this.emitBlankLine();
@@ -599,7 +607,7 @@ export class TextEmitter extends BaseEmitter {
    */
   addFooter(): void {
     if (!this.options.includeComments) return;
-    
+
     this.emitBlankLine();
     this.emitComment('// ==========================================');
     this.emitComment('// End of program');

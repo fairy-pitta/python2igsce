@@ -23,13 +23,13 @@ export async function convertFilesToIGCSE(
 ): Promise<Array<{ name: string; result: ConversionResult }>> {
   const converter = new Converter(options);
   const fs = await import('fs/promises');
-  
+
   const files = await Promise.all(
     filePaths.map(async (filePath) => {
       const content = await fs.readFile(filePath, 'utf-8');
       return { name: filePath, content };
     })
   );
-  
+
   return converter.convertBatch(files);
 }

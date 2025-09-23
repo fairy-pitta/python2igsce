@@ -25,7 +25,7 @@ export class Python2IGCSEBrowser {
       spaceAroundOperators: true,
       spaceAfterCommas: true,
       maxErrors: 10,
-      timeout: 30000
+      timeout: 30000,
     };
 
     this.options = { ...defaultOptions, ...options };
@@ -41,7 +41,9 @@ export class Python2IGCSEBrowser {
       const converter = new Converter(this.options);
       return converter.convert(pythonCode);
     } catch (error) {
-      throw new Error(`Conversion failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Conversion failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -55,14 +57,14 @@ export class Python2IGCSEBrowser {
       const result = this.convertCode(pythonCode);
       return {
         isValid: result.parseResult.errors.length === 0,
-        errors: result.parseResult.errors.map(e => e.message),
-        warnings: (result.parseResult.warnings || []).map(w => w.message)
+        errors: result.parseResult.errors.map((e) => e.message),
+        warnings: (result.parseResult.warnings || []).map((w) => w.message),
       };
     } catch (error) {
       return {
         isValid: false,
         errors: [error instanceof Error ? error.message : 'Unknown validation error'],
-        warnings: []
+        warnings: [],
       };
     }
   }

@@ -86,7 +86,7 @@ export class ExpressionVisitor {
       stringLiterals.push(content);
       return `"${placeholder}"`;
     });
-    
+
     // Convert comparison operators (using word boundaries)
     result = result
       .replace(/==/g, ' = ')
@@ -105,12 +105,12 @@ export class ExpressionVisitor {
       .replace(/\bmax\(/g, 'MAX(')
       .replace(/\bmin\(/g, 'MIN(')
       .replace(/\bround\(/g, 'ROUND(');
-    
+
     // Restore string literals
     result = result.replace(/"__STRING_(\d+)__"/g, (_, index) => {
       return `"${stringLiterals[parseInt(index)]}"`;
     });
-    
+
     return result.trim();
   }
 
@@ -137,13 +137,15 @@ export class ExpressionVisitor {
   private visitBinOp(node: ASTNode): string {
     const left = this.visitExpression(node.left);
     const right = this.visitExpression(node.right);
-    
+
     // Special handling for string concatenation
-    if (node.op.type === 'Add' && 
-        (this.isExplicitStringType(node.left) || this.isExplicitStringType(node.right))) {
+    if (
+      node.op.type === 'Add' &&
+      (this.isExplicitStringType(node.left) || this.isExplicitStringType(node.right))
+    ) {
       return `${left} & ${right}`;
     }
-    
+
     const op = this.convertOperator(node.op);
     return `${left} ${op} ${right}`;
   }
@@ -158,13 +160,13 @@ export class ExpressionVisitor {
 
   private visitCompare(node: ASTNode): string {
     let result = this.visitExpression(node.left);
-    
+
     for (let i = 0; i < node.ops.length; i++) {
       const op = this.convertCompareOperator(node.ops[i]);
       const comparator = this.visitExpression(node.comparators[i]);
       result += ` ${op} ${comparator}`;
     }
-    
+
     return result;
   }
 
@@ -179,7 +181,7 @@ export class ExpressionVisitor {
       const value = this.visitExpression(node.func.value);
       const method = node.func.attr;
       const args = node.args.map((arg: ASTNode) => this.visitExpression(arg));
-      
+
       // Convert string methods to IGCSE Pseudocode functions
       switch (method) {
         case 'upper':
@@ -191,27 +193,35 @@ export class ExpressionVisitor {
         case 'split':
           return args.length > 0 ? `SPLIT(${value}, ${args[0]})` : `SPLIT(${value})`;
         case 'replace':
-          return args.length >= 2 ? `REPLACE(${value}, ${args[0]}, ${args[1]})` : `${value}.${method}(${args.join(', ')})`;
+          return args.length >= 2
+            ? `REPLACE(${value}, ${args[0]}, ${args[1]})`
+            : `${value}.${method}(${args.join(', ')})`;
         case 'find':
-          return args.length > 0 ? `FIND(${value}, ${args[0]})` : `${value}.${method}(${args.join(', ')})`;
+          return args.length > 0
+            ? `FIND(${value}, ${args[0]})`
+            : `${value}.${method}(${args.join(', ')})`;
         case 'startswith':
-          return args.length > 0 ? `STARTSWITH(${value}, ${args[0]})` : `${value}.${method}(${args.join(', ')})`;
+          return args.length > 0
+            ? `STARTSWITH(${value}, ${args[0]})`
+            : `${value}.${method}(${args.join(', ')})`;
         case 'endswith':
-          return args.length > 0 ? `ENDSWITH(${value}, ${args[0]})` : `${value}.${method}(${args.join(', ')})`;
+          return args.length > 0
+            ? `ENDSWITH(${value}, ${args[0]})`
+            : `${value}.${method}(${args.join(', ')})`;
         default:
           return `${value}.${method}(${args.join(', ')})`;
       }
     }
-    
+
     const func = this.visitExpression(node.func);
     const args = node.args.map((arg: ASTNode) => this.visitExpression(arg));
-    
+
     // Convert built-in functions
     const builtinResult = this.convertBuiltinFunction(func, args);
     if (builtinResult) {
       return builtinResult;
     }
-    
+
     return `${func}(${args.join(', ')})`;
   }
 
@@ -220,32 +230,32 @@ export class ExpressionVisitor {
     if (node.value.type === 'Subscript') {
       const subscriptValue = this.visitExpression(node.value.value);
       const slice = node.value.slice;
-      
+
       // For numeric indices, convert from 0-based to 1-based
       if (slice.type === 'Num') {
         const index = slice.n + 1;
         return `${subscriptValue}[${index}].${node.attr}`;
       }
-      
+
       // Also convert for Constant type numeric indices
       if (slice.type === 'Constant' && typeof slice.value === 'number') {
         const index = slice.value + 1;
         return `${subscriptValue}[${index}].${node.attr}`;
       }
-      
+
       // For variable indices, add +1
       if (slice.type === 'Name') {
         const sliceValue = this.visitExpression(slice);
         return `${subscriptValue}[${sliceValue} + 1].${node.attr}`;
       }
-      
+
       // For other cases, keep as is
       const sliceValue = this.visitExpression(slice);
       return `${subscriptValue}[${sliceValue}].${node.attr}`;
     }
-    
+
     const value = this.visitExpression(node.value);
-    
+
     // Convert string methods to IGCSE Pseudocode functions
     switch (node.attr) {
       case 'upper':
@@ -265,24 +275,24 @@ export class ExpressionVisitor {
   private visitSubscript(node: ASTNode): string {
     const value = this.visitExpression(node.value);
     const slice = this.visitExpression(node.slice);
-    
+
     // For numeric indices, convert from 0-based to 1-based
     if (node.slice.type === 'Num') {
       const index = node.slice.n + 1;
       return `${value}[${index}]`;
     }
-    
+
     // Also convert for Constant type numeric indices
     if (node.slice.type === 'Constant' && typeof node.slice.value === 'number') {
       const index = node.slice.value + 1;
       return `${value}[${index}]`;
     }
-    
+
     // For variable indices, add +1
     if (node.slice.type === 'Name') {
       return `${value}[${slice} + 1]`;
     }
-    
+
     return `${value}[${slice}]`;
   }
 
@@ -303,6 +313,7 @@ export class ExpressionVisitor {
     return `{${pairs.join(', ')}}`;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private visitListComp(_node: ASTNode): string {
     // Simplify list comprehensions
     return '[/* list comprehension */]';
@@ -318,7 +329,7 @@ export class ExpressionVisitor {
   private visitJoinedStr(node: ASTNode): string {
     // Process f-strings
     const parts: string[] = [];
-    
+
     for (const value of node.values) {
       if (value.type === 'Constant') {
         // String literal parts
@@ -332,7 +343,7 @@ export class ExpressionVisitor {
         parts.push(this.visitExpression(value));
       }
     }
-    
+
     // Output as string concatenation
     return parts.join(' & ');
   }
@@ -343,7 +354,7 @@ export class ExpressionVisitor {
         return `OUTPUT ${args.join(', ')}`;
       case 'input':
         // input() requires special handling on the right side of assignment
-    // Return as is for now, process later in emitter
+        // Return as is for now, process later in emitter
         return args.length > 0 ? `input(${args[0]})` : 'input()';
       case 'len':
         return `LENGTH(${args[0]})`;
@@ -377,44 +388,72 @@ export class ExpressionVisitor {
 
   private convertOperator(op: ASTNode): string {
     switch (op.type) {
-      case 'Add': return '+'; // Keep '+' for numeric addition
-      case 'Sub': return '-';
-      case 'Mult': return '*';
-      case 'Div': return '/';
-      case 'FloorDiv': return 'DIV';
-      case 'Mod': return 'MOD';
-      case 'Pow': return '^';
-      case 'LShift': return '<<';
-      case 'RShift': return '>>';
-      case 'BitOr': return '|';
-      case 'BitXor': return '^';
-      case 'BitAnd': return '&';
-      default: return '+';
+      case 'Add':
+        return '+'; // Keep '+' for numeric addition
+      case 'Sub':
+        return '-';
+      case 'Mult':
+        return '*';
+      case 'Div':
+        return '/';
+      case 'FloorDiv':
+        return 'DIV';
+      case 'Mod':
+        return 'MOD';
+      case 'Pow':
+        return '^';
+      case 'LShift':
+        return '<<';
+      case 'RShift':
+        return '>>';
+      case 'BitOr':
+        return '|';
+      case 'BitXor':
+        return '^';
+      case 'BitAnd':
+        return '&';
+      default:
+        return '+';
     }
   }
 
   private convertUnaryOperator(op: ASTNode): string {
     switch (op.type) {
-      case 'UAdd': return '+';
-      case 'USub': return '-';
-      case 'Not': return 'NOT';
-      default: return '';
+      case 'UAdd':
+        return '+';
+      case 'USub':
+        return '-';
+      case 'Not':
+        return 'NOT';
+      default:
+        return '';
     }
   }
 
   private convertCompareOperator(op: ASTNode): string {
     switch (op.type) {
-      case 'Eq': return '=';
-      case 'NotEq': return '≠';
-      case 'Lt': return '<';
-      case 'LtE': return '≤';
-      case 'Gt': return '>';
-      case 'GtE': return '≥';
-      case 'Is': return '=';
-      case 'IsNot': return '≠';
-      case 'In': return 'IN';
-      case 'NotIn': return 'NOT IN';
-      default: return '=';
+      case 'Eq':
+        return '=';
+      case 'NotEq':
+        return '≠';
+      case 'Lt':
+        return '<';
+      case 'LtE':
+        return '≤';
+      case 'Gt':
+        return '>';
+      case 'GtE':
+        return '≥';
+      case 'Is':
+        return '=';
+      case 'IsNot':
+        return '≠';
+      case 'In':
+        return 'IN';
+      case 'NotIn':
+        return 'NOT IN';
+      default:
+        return '=';
     }
   }
 
@@ -423,7 +462,7 @@ export class ExpressionVisitor {
    */
   inferTypeFromValue(node: ASTNode): IGCSEDataType {
     if (!node) return 'STRING';
-    
+
     switch (node.type) {
       case 'Constant':
         if (typeof node.value === 'number') {
@@ -457,54 +496,63 @@ export class ExpressionVisitor {
         }
         // Other variable names are STRING (when type information is unavailable)
         return 'STRING';
-      case 'BinOp':
+      case 'BinOp': {
         // Type inference for binary operations
         const leftType = this.inferTypeFromValue(node.left);
         const rightType = this.inferTypeFromValue(node.right);
-        
+
         // For arithmetic operators
         if (['Add', 'Sub', 'Mult', 'Div', 'Mod', 'Pow'].includes(node.op.type)) {
           // String concatenation (+operator) - only for explicit string types
-          if (node.op.type === 'Add' && 
-              ((leftType === 'STRING' && this.isExplicitStringType(node.left)) || 
-               (rightType === 'STRING' && this.isExplicitStringType(node.right)))) {
+          if (
+            node.op.type === 'Add' &&
+            ((leftType === 'STRING' && this.isExplicitStringType(node.left)) ||
+              (rightType === 'STRING' && this.isExplicitStringType(node.right)))
+          ) {
             return 'STRING';
           }
-          
+
           // Treat as numeric operation if numeric types are involved
-          if ((leftType === 'INTEGER' || leftType === 'REAL') || 
-              (rightType === 'INTEGER' || rightType === 'REAL')) {
+          if (
+            leftType === 'INTEGER' ||
+            leftType === 'REAL' ||
+            rightType === 'INTEGER' ||
+            rightType === 'REAL'
+          ) {
             // Division results in REAL
             if (node.op.type === 'Div') {
               return 'REAL';
             }
             // INTEGER if both are INTEGER or type unknown (variables)
-            if ((leftType === 'INTEGER' || leftType === 'STRING') && 
-                (rightType === 'INTEGER' || rightType === 'STRING')) {
+            if (
+              (leftType === 'INTEGER' || leftType === 'STRING') &&
+              (rightType === 'INTEGER' || rightType === 'STRING')
+            ) {
               return 'INTEGER';
             } else {
               return 'REAL';
             }
           }
-          
+
           // Default arithmetic operations inferred as INTEGER (for unknown variable types)
           return 'INTEGER';
         }
-        
+
         // For comparison operators
         if (['Eq', 'NotEq', 'Lt', 'LtE', 'Gt', 'GtE'].includes(node.op.type)) {
           return 'BOOLEAN';
         }
-        
+
         // For logical operators
         if (['And', 'Or'].includes(node.op.type)) {
           return 'BOOLEAN';
         }
-        
+
         // Default is STRING
         return 'STRING';
+      }
     }
-    
+
     return 'STRING';
   }
 
@@ -512,8 +560,7 @@ export class ExpressionVisitor {
    * Check if it's a numeric constant
    */
   isNumericConstant(node: ASTNode): boolean {
-    return (node.type === 'Constant' && typeof node.value === 'number') ||
-           (node.type === 'Num');
+    return (node.type === 'Constant' && typeof node.value === 'number') || node.type === 'Num';
   }
 
   /**
@@ -541,7 +588,7 @@ export class ExpressionVisitor {
    */
   private isExplicitStringType(node: ASTNode): boolean {
     if (!node) return false;
-    
+
     switch (node.type) {
       case 'Constant':
         return typeof node.value === 'string';
@@ -549,10 +596,20 @@ export class ExpressionVisitor {
         return true;
       case 'JoinedStr': // f-string
         return true;
-      case 'Name':
+      case 'Name': {
         // For test cases with undefined variables, assume string type for variables with common string naming patterns
-        const namePatterns = ['name', 'str', 'text', 'message', 'title', 'description', 'label', 'id'];
-        return namePatterns.some(pattern => node.id && node.id.toLowerCase().includes(pattern));
+        const namePatterns = [
+          'name',
+          'str',
+          'text',
+          'message',
+          'title',
+          'description',
+          'label',
+          'id',
+        ];
+        return namePatterns.some((pattern) => node.id && node.id.toLowerCase().includes(pattern));
+      }
       default:
         return false;
     }

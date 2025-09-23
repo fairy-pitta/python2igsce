@@ -11,21 +11,10 @@ export { Converter as PythonToIGCSEConverter } from './converter';
 import { Converter } from './converter';
 
 // Parser exports
-export {
-  BaseParser,
-  PythonParser,
-  PythonASTVisitor,
-  createParser
-} from './parser';
+export { BaseParser, PythonParser, PythonASTVisitor, createParser } from './parser';
 
 // Emitter exports
-export {
-  BaseEmitter,
-  TextEmitter,
-  MarkdownEmitter,
-  createEmitter,
-  EmitterUtils
-} from './emitter';
+export { BaseEmitter, TextEmitter, MarkdownEmitter, createEmitter, EmitterUtils } from './emitter';
 
 // Type exports
 export * from './types';
@@ -83,44 +72,48 @@ export const utils = {
     /**
      * Converter optimized for educational use
      */
-    educational: () => new Converter({
-      outputFormat: 'plain',
-      beautify: true,
-      includeComments: true,
-      uppercaseKeywords: true,
-      spaceAroundOperators: true,
-      maxLineLength: 80
-    }),
+    educational: () =>
+      new Converter({
+        outputFormat: 'plain',
+        beautify: true,
+        includeComments: true,
+        uppercaseKeywords: true,
+        spaceAroundOperators: true,
+        maxLineLength: 80,
+      }),
 
     /**
      * Converter optimized for markdown documentation
      */
-    documentation: () => new Converter({
-      outputFormat: 'markdown',
-      beautify: true,
-      includeComments: true,
-      includeLineNumbers: false
-    }),
+    documentation: () =>
+      new Converter({
+        outputFormat: 'markdown',
+        beautify: true,
+        includeComments: true,
+        includeLineNumbers: false,
+      }),
 
     /**
      * Converter with compact output
      */
-    compact: () => new Converter({
-      outputFormat: 'plain',
-      beautify: false,
-      includeComments: false,
-      indentSize: 2,
-      maxLineLength: 120
-    }),
+    compact: () =>
+      new Converter({
+        outputFormat: 'plain',
+        beautify: false,
+        includeComments: false,
+        indentSize: 2,
+        maxLineLength: 120,
+      }),
 
     /**
      * Converter with strict validation
      */
-    strict: () => new Converter({
-      strictMode: true,
-      maxErrors: 5,
-      timeout: 10000
-    })
+    strict: () =>
+      new Converter({
+        strictMode: true,
+        maxErrors: 5,
+        timeout: 10000,
+      }),
   },
 
   /**
@@ -138,39 +131,41 @@ export const utils = {
       try {
         const converter = new Converter();
         const result = await converter.convert(pythonCode);
-        
+
         const issues: string[] = [];
         const suggestions: string[] = [];
-        
+
         // Check for errors
         if (result.parseResult.errors.length > 0) {
           issues.push(...result.parseResult.errors.map((e: any) => e.message));
         }
-        
+
         // Check for warnings
         if (result.parseResult.warnings.length > 0) {
           suggestions.push(...result.parseResult.warnings.map((w: any) => w.message));
         }
-        
+
         // Additional checks
         if (pythonCode.includes('import ')) {
-          suggestions.push('Consider removing or simplifying import statements for IGCSE compatibility');
+          suggestions.push(
+            'Consider removing or simplifying import statements for IGCSE compatibility'
+          );
         }
-        
+
         if (pythonCode.includes('class ')) {
           suggestions.push('Object-oriented features may need simplification for IGCSE level');
         }
-        
+
         return {
           suitable: issues.length === 0,
           issues,
-          suggestions
+          suggestions,
         };
       } catch (error) {
         return {
           suitable: false,
           issues: [error instanceof Error ? error.message : 'Unknown error'],
-          suggestions: []
+          suggestions: [],
         };
       }
     },
@@ -192,17 +187,17 @@ export const utils = {
       try {
         const converter = new Converter();
         const result = await converter.convert(pythonCode);
-        
+
         // Analyze IR for complexity
         const lines = pythonCode.split('\n').length;
         let functions = 0;
         let loops = 0;
         let conditionals = 0;
         let maxDepth = 0;
-        
+
         const analyzeNode = (node: import('./types/ir').IR, depth: number = 0) => {
           maxDepth = Math.max(maxDepth, depth);
-          
+
           switch (node.kind) {
             case 'function':
             case 'procedure':
@@ -217,22 +212,22 @@ export const utils = {
               conditionals++;
               break;
           }
-          
+
           for (const child of node.children) {
             analyzeNode(child, depth + 1);
           }
         };
-        
+
         if (Array.isArray(result.parseResult.ir)) {
-          result.parseResult.ir.forEach(node => analyzeNode(node));
+          result.parseResult.ir.forEach((node) => analyzeNode(node));
         } else {
           analyzeNode(result.parseResult.ir);
         }
-        
+
         // Determine complexity level
         let complexity: 'low' | 'medium' | 'high' = 'low';
         const recommendations: string[] = [];
-        
+
         if (lines > 100 || functions > 5 || maxDepth > 4) {
           complexity = 'high';
           recommendations.push('Consider breaking down into smaller, simpler functions');
@@ -242,15 +237,15 @@ export const utils = {
         } else {
           recommendations.push('Code complexity is appropriate for IGCSE level');
         }
-        
+
         if (loops > 3) {
           recommendations.push('Multiple loops detected - ensure each serves a clear purpose');
         }
-        
+
         if (conditionals > 5) {
           recommendations.push('Many conditional statements - consider simplifying logic');
         }
-        
+
         return {
           complexity,
           metrics: {
@@ -258,9 +253,9 @@ export const utils = {
             functions,
             loops,
             conditionals,
-            nestingDepth: maxDepth
+            nestingDepth: maxDepth,
           },
-          recommendations
+          recommendations,
         };
       } catch (error) {
         return {
@@ -270,12 +265,12 @@ export const utils = {
             functions: 0,
             loops: 0,
             conditionals: 0,
-            nestingDepth: 0
+            nestingDepth: 0,
           },
-          recommendations: ['Error analyzing code complexity']
+          recommendations: ['Error analyzing code complexity'],
         };
       }
-    }
+    },
   },
 
   /**
@@ -300,7 +295,7 @@ export const utils = {
       // Add proper spacing and formatting for textbook
       return code
         .split('\n')
-        .map(line => line.trim() ? `    ${line}` : '')
+        .map((line) => (line.trim() ? `    ${line}` : ''))
         .join('\n');
     },
 
@@ -312,10 +307,10 @@ export const utils = {
       return code
         .replace(/\t/g, '  ') // Convert tabs to 2 spaces
         .split('\n')
-        .filter(line => line.trim()) // Remove empty lines
+        .filter((line) => line.trim()) // Remove empty lines
         .join('\n');
-    }
-  }
+    },
+  },
 };
 
 /**
@@ -362,7 +357,7 @@ else:
     print("You are a minor")
 
 if age >= 65:
-    print("Senior citizen discount available")`
+    print("Senior citizen discount available")`,
 };
 
 // Re-export Converter class as default export

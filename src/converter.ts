@@ -17,17 +17,17 @@ export class Converter {
 
   constructor(options: Partial<ConversionOptions> = {}) {
     this.options = this.mergeDefaultOptions(options);
-    
+
     // Initialize parser
     const parserOptions: ParserOptions = {
       strictMode: this.options.strictMode ?? false,
       includeComments: this.options.includeComments ?? true,
       preserveWhitespace: this.options.preserveWhitespace ?? false,
       maxErrors: this.options.maxErrors ?? 100,
-      timeout: this.options.timeout ?? 30000
+      timeout: this.options.timeout ?? 30000,
     };
     this.parser = new PythonParser(parserOptions);
-    
+
     // Initialize emitters
     const emitterOptions: EmitterOptions = {
       format: this.options.outputFormat ?? 'plain',
@@ -39,13 +39,13 @@ export class Converter {
       beautify: this.options.beautify ?? true,
       includeComments: this.options.includeComments ?? true,
       includeLineNumbers: this.options.includeLineNumbers ?? false,
-      includeDebugInfo: false
+      includeDebugInfo: false,
     };
-    
+
     this.textEmitter = new TextEmitter(emitterOptions);
     this.markdownEmitter = new MarkdownEmitter({
       ...emitterOptions,
-      format: 'markdown'
+      format: 'markdown',
     });
   }
 
@@ -54,11 +54,11 @@ export class Converter {
    */
   convert(pythonCode: string): ConversionResult {
     const startTime = Date.now();
-    
+
     try {
       // Parse process
       const parseResult = this.parser.parse(pythonCode);
-      
+
       if (parseResult.errors.length > 0) {
         return this.createErrorResult(
           'Parse errors occurred',
@@ -67,30 +67,24 @@ export class Converter {
           startTime
         );
       }
-      
+
       // Emit process
-      const emitter = this.options.outputFormat === 'markdown' 
-        ? this.markdownEmitter 
-        : this.textEmitter;
-      
+      const emitter =
+        this.options.outputFormat === 'markdown' ? this.markdownEmitter : this.textEmitter;
+
       // Create compound IR to process all IR nodes
       const compoundIR: IR = {
         kind: 'compound',
         text: '',
-        children: parseResult.ir
+        children: parseResult.ir,
       };
-      
+
       const emitResult = emitter.emit(compoundIR);
-      
+
       // Create result
       const endTime = Date.now();
-      const stats = this.createConversionStats(
-        parseResult,
-        emitResult,
-        startTime,
-        endTime
-      );
-      
+      const stats = this.createConversionStats(parseResult, emitResult, startTime, endTime);
+
       const result = {
         code: emitResult.code,
         parseResult,
@@ -98,10 +92,9 @@ export class Converter {
         stats,
         ast: parseResult.ir,
         ir: Array.isArray(parseResult.ir) ? parseResult.ir : [parseResult.ir],
-        success: parseResult.success && emitResult.success
+        success: parseResult.success && emitResult.success,
       };
       return result;
-      
     } catch (error) {
       const errorResult = this.createErrorResult(
         error instanceof Error ? error.message : 'Unknown error occurred',
@@ -121,7 +114,7 @@ export class Converter {
     result: ConversionResult;
   }> {
     const results: Array<{ name: string; result: ConversionResult }> = [];
-    
+
     for (const file of files) {
       try {
         const result = this.convert(file.content);
@@ -131,24 +124,26 @@ export class Converter {
           code: '',
           parseResult: {
             ir: [{ kind: 'comment', text: '', children: [] }],
-            errors: [{
-              message: error instanceof Error ? error.message : 'Unknown error',
-              type: 'syntax_error',
-              line: 1,
-              column: 1,
-              severity: 'error'
-            }],
+            errors: [
+              {
+                message: error instanceof Error ? error.message : 'Unknown error',
+                type: 'syntax_error',
+                line: 1,
+                column: 1,
+                severity: 'error',
+              },
+            ],
             warnings: [],
             stats: {
-               parseTime: 0,
-               linesProcessed: 0,
-               nodesGenerated: 0,
-               functionsFound: 0,
-               classesFound: 0,
-               variablesFound: 0
-             },
+              parseTime: 0,
+              linesProcessed: 0,
+              nodesGenerated: 0,
+              functionsFound: 0,
+              classesFound: 0,
+              variablesFound: 0,
+            },
             success: false,
-            parseTime: 0
+            parseTime: 0,
           },
           emitResult: {
             code: '',
@@ -163,11 +158,11 @@ export class Converter {
               nodesProcessed: 0,
               processingTime: 0,
               maxNestingDepth: 0,
-              maxLineLength: 0
+              maxLineLength: 0,
             },
             success: false,
             emitTime: 0,
-            output: ''
+            output: '',
           },
           stats: {
             parseTime: 0,
@@ -177,14 +172,14 @@ export class Converter {
             outputLines: 0,
             errorCount: 1,
             warningCount: 0,
-            totalTime: 0
+            totalTime: 0,
           },
-          success: false
+          success: false,
         };
         results.push({ name: file.name, result: errorResult });
       }
     }
-    
+
     return results;
   }
 
@@ -193,9 +188,9 @@ export class Converter {
    */
   updateOptions(newOptions: Partial<ConversionOptions>): void {
     this.options = this.mergeDefaultOptions({ ...this.options, ...newOptions });
-    
+
     // Update parser options (implement as needed)
-    
+
     // Update emitter options
     const emitterOptions: EmitterOptions = {
       format: this.options.outputFormat ?? 'plain',
@@ -207,9 +202,9 @@ export class Converter {
       beautify: this.options.beautify ?? true,
       includeComments: this.options.includeComments ?? true,
       includeLineNumbers: this.options.includeLineNumbers ?? false,
-      includeDebugInfo: false
+      includeDebugInfo: false,
     };
-    
+
     this.textEmitter.updateOptions(emitterOptions);
     this.markdownEmitter.updateOptions({ ...emitterOptions, format: 'markdown' });
   }
@@ -238,7 +233,7 @@ export class Converter {
       successfulConversions: 0,
       averageParseTime: 0,
       averageEmitTime: 0,
-      averageTotalTime: 0
+      averageTotalTime: 0,
     };
   }
 
@@ -252,29 +247,27 @@ export class Converter {
   } {
     const errors: string[] = [];
     const warnings: string[] = [];
-    
+
     // Basic validation
     if (!ir.kind) {
       errors.push('IR node missing kind property');
     }
-    
+
     if (!ir.children) {
       errors.push('IR node missing children property');
     }
-    
 
-    
     // Recursive validation
     for (const child of ir.children || []) {
       const childValidation = this.validateIR(child);
       errors.push(...childValidation.errors);
       warnings.push(...childValidation.warnings);
     }
-    
+
     return {
       isValid: errors.length === 0,
       errors,
-      warnings
+      warnings,
     };
   }
 
@@ -297,9 +290,9 @@ export class Converter {
       spaceAroundOperators: true,
       spaceAfterCommas: true,
       maxErrors: 10,
-      timeout: 30000
+      timeout: 30000,
     };
-    
+
     return { ...defaults, ...options };
   }
 
@@ -313,19 +306,19 @@ export class Converter {
     startTime: number
   ): ConversionResult {
     const endTime = Date.now();
-    
+
     return {
       code: '',
       parseResult: {
-         ir: [{ kind: 'comment', text: '', children: [] }],
+        ir: [{ kind: 'comment', text: '', children: [] }],
         errors: [
           {
             type: 'conversion',
             severity: 'error',
             message,
-            location: { line: 1, column: 1 }
+            location: { line: 1, column: 1 },
           },
-          ...parseErrors
+          ...parseErrors,
         ],
         warnings: parseWarnings,
         stats: {
@@ -334,30 +327,30 @@ export class Converter {
           nodesGenerated: 0,
           functionsFound: 0,
           classesFound: 0,
-          variablesFound: 0
+          variablesFound: 0,
         },
         success: false,
-        parseTime: 0
+        parseTime: 0,
       },
       emitResult: {
-         code: '',
-         errors: [],
-         warnings: [],
-         stats: {
-            emitTime: 0,
-            linesGenerated: 0,
-            lineCount: 0,
-            charactersGenerated: 0,
-            characterCount: 0,
-            nodesProcessed: 0,
-            processingTime: 0,
-            maxNestingDepth: 0,
-            maxLineLength: 0
-          },
-         success: false,
-         emitTime: 0,
-         output: ''
-       },
+        code: '',
+        errors: [],
+        warnings: [],
+        stats: {
+          emitTime: 0,
+          linesGenerated: 0,
+          lineCount: 0,
+          charactersGenerated: 0,
+          characterCount: 0,
+          nodesProcessed: 0,
+          processingTime: 0,
+          maxNestingDepth: 0,
+          maxLineLength: 0,
+        },
+        success: false,
+        emitTime: 0,
+        output: '',
+      },
       stats: {
         parseTime: 0,
         emitTime: 0,
@@ -366,10 +359,10 @@ export class Converter {
         outputLines: 0,
         errorCount: parseErrors.length + 1,
         warningCount: parseWarnings.length,
-        totalTime: endTime - startTime
+        totalTime: endTime - startTime,
       },
       success: false,
-      ast: undefined
+      ast: undefined,
     };
   }
 
@@ -390,7 +383,7 @@ export class Converter {
       outputLines: emitResult.stats.linesGenerated,
       errorCount: parseResult.errors.length,
       warningCount: parseResult.warnings.length,
-      totalTime: endTime - startTime
+      totalTime: endTime - startTime,
     };
   }
 }

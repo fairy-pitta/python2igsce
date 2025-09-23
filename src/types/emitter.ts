@@ -34,11 +34,11 @@ export interface EmitterOptions {
 /**
  * Output format
  */
-export type OutputFormat = 
-  | 'plain'     // Plain text
-  | 'markdown'  // Markdown format
-  | 'html'      // HTML format
-  | 'latex';    // LaTeX format
+export type OutputFormat =
+  | 'plain' // Plain text
+  | 'markdown' // Markdown format
+  | 'html' // HTML format
+  | 'latex'; // LaTeX format
 
 /**
  * Emitter result
@@ -89,21 +89,21 @@ export interface EmitWarning {
 /**
  * Emit error type
  */
-export type EmitErrorType = 
-  | 'invalid_ir'          // Invalid IR
-  | 'unsupported_node'    // Unsupported node
-  | 'formatting_error'    // Formatting error
-  | 'output_error'        // Output error
-  | 'validation_error';   // Validation error
+export type EmitErrorType =
+  | 'invalid_ir' // Invalid IR
+  | 'unsupported_node' // Unsupported node
+  | 'formatting_error' // Formatting error
+  | 'output_error' // Output error
+  | 'validation_error'; // Validation error
 
 /**
  * Emit warning type
  */
-export type EmitWarningType = 
-  | 'long_line'           // Long line
-  | 'deep_nesting'        // Deep nesting
-  | 'complex_expression'  // Complex expression
-  | 'style_issue';        // Style issue
+export type EmitWarningType =
+  | 'long_line' // Long line
+  | 'deep_nesting' // Deep nesting
+  | 'complex_expression' // Complex expression
+  | 'style_issue'; // Style issue
 
 /**
  * Emit statistics
@@ -245,20 +245,16 @@ export function createEmitError(
   const error: EmitError = {
     message,
     type,
-    severity
+    severity,
   };
   if (node !== undefined) error.node = node;
   return error;
 }
 
-export function createEmitWarning(
-  message: string,
-  type: EmitWarningType,
-  node?: IR
-): EmitWarning {
+export function createEmitWarning(message: string, type: EmitWarningType, node?: IR): EmitWarning {
   const warning: EmitWarning = {
     message,
-    type
+    type,
   };
   if (node !== undefined) warning.node = node;
   return warning;
@@ -272,11 +268,11 @@ export function createIndentInfo(
   const unit = indentChar.repeat(indentSize);
   const string = unit.repeat(level);
   const next = unit.repeat(level + 1);
-  
+
   return {
     level,
     string,
-    next
+    next,
   };
 }
 
@@ -290,7 +286,7 @@ export function getDefaultEmitterOptions(): EmitterOptions {
     includeComments: true,
     includeLineNumbers: false,
     includeDebugInfo: false,
-    beautify: true
+    beautify: true,
   };
 }
 
@@ -301,6 +297,6 @@ export function getDefaultFormatterConfig(): FormatterConfig {
     spaceAfterComma: true,
     spaceInsideParentheses: false,
     insertBlankLines: false,
-    wrapLongLines: true
+    wrapLongLines: true,
   };
 }
